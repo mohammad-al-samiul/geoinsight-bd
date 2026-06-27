@@ -14,6 +14,12 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+  PUBLIC_FEED_333_RATE_MAX: z.coerce.number().int().positive().default(30),
+  PUBLIC_FEED_333_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  PUBLIC_FEED_999_RATE_MAX: z.coerce.number().int().positive().default(15),
+  PUBLIC_FEED_999_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  AI_SERVICE_URL: z.string().url().default("http://localhost:8000"),
+  SOVEREIGN_MODE: z.string().default("false").transform((v) => v === "true"),
 
   FABRIC_ENABLED: z.string().default("false").transform((v) => v === "true"),
   FABRIC_CONNECTION_PROFILE_PATH: z

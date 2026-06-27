@@ -164,6 +164,31 @@ services:
     networks:
       - geoinsight_net
 
+  # ---------------------------------------------------------------------------
+  # Nginx edge (TLS termination, CSP/HSTS, DDoS rate limits)
+  # Enable when app services (api-gateway, dashboard, ai-analytics) are on compose.
+  # ---------------------------------------------------------------------------
+  # nginx:
+  #   image: nginx:1.27-alpine
+  #   container_name: geoinsight-nginx
+  #   restart: unless-stopped
+  #   logging: *default-logging
+  #   ports:
+  #     - "${NGINX_HTTP_PORT:-80}:80"
+  #     - "${NGINX_HTTPS_PORT:-443}:443"
+  #   volumes:
+  #     - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./deploy/nginx/proxy_params.conf:/etc/nginx/proxy_params.conf:ro
+  #     - ./deploy/nginx/certs:/etc/nginx/certs:ro
+  #   networks:
+  #     - geoinsight_net
+  #   depends_on:
+  #     - postgres
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256M
+
 networks:
   geoinsight_net:
     name: geoinsight_net

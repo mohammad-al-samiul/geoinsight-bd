@@ -10,9 +10,11 @@ import { agroMarketModule } from "./agro-market/agro-market.module";
 import { blockchainModule } from "./blockchain/blockchain.module";
 import { dashboardModule } from "./dashboard/dashboard.module";
 import { healthModule } from "./health/health.module";
+import { publicFeedModule } from "./public-feed/public-feed.module";
 
 const modules: AppModule[] = [
   healthModule,
+  publicFeedModule,
   authModule,
   adminUnitModule,
   representativeModule,

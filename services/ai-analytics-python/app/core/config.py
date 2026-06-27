@@ -46,6 +46,9 @@ class Settings(BaseSettings):
         alias="BANGLA_BERT_MODEL_ID",
     )
     sentiment_use_mock: bool = Field(default=False, alias="SENTIMENT_USE_MOCK")
+    sovereign_mode: bool = Field(default=False, alias="SOVEREIGN_MODE")
+    public_feed_333_rate_max: int = Field(default=30, alias="PUBLIC_FEED_333_RATE_MAX")
+    public_feed_999_rate_max: int = Field(default=15, alias="PUBLIC_FEED_999_RATE_MAX")
 
     @property
     def cors_origin_list(self) -> list[str]:
