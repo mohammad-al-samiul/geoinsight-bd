@@ -1,0 +1,178 @@
+# GeoInsight BD — Local / shared infrastructure stack
+# Services: PostgreSQL (TimescaleDB), RabbitMQ, MinIO
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose up -d
+#   docker compose ps
+
+name: ${COMPOSE_PROJECT_NAME:-geoinsight-bd}
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL + TimescaleDB
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: timescale/timescaledb:2.17.2-pg16
+    container_name: geoinsight-postgres
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-geoinsight_db}
+      TZ: ${TZ:-Asia/Dhaka}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/init/postgres:/docker-entrypoint-initdb.d:ro
+    networks:
+      - geoinsight_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-geoinsight_db}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ---------------------------------------------------------------------------
+  # RabbitMQ (Management UI + Topic Exchange topology)
+  # ---------------------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3.13.7-management-alpine
+    container_name: geoinsight-rabbitmq
+    hostname: geoinsight-rabbitmq
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_LOAD_DEFINITIONS: /etc/rabbitmq/definitions/definitions.json
+      TZ: ${TZ:-Asia/Dhaka}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./deploy/init/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./deploy/init/rabbitmq/definitions.json:/etc/rabbitmq/definitions/definitions.json:ro
+      - ./deploy/init/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    networks:
+      - geoinsight_net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  rabbitmq-init:
+    image: curlimages/curl:8.13.0
+    container_name: geoinsight-rabbitmq-init
+    restart: "no"
+    logging: *default-logging
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_DEFINITIONS_FILE: /definitions/definitions.json
+      TZ: ${TZ:-Asia/Dhaka}
+    entrypoint: ["/bin/sh", "/scripts/init-topology.sh"]
+    volumes:
+      - ./deploy/init/rabbitmq/init-topology.sh:/scripts/init-topology.sh:ro
+      - ./deploy/init/rabbitmq/definitions.json:/definitions/definitions.json:ro
+    networks:
+      - geoinsight_net
+
+  # ---------------------------------------------------------------------------
+  # MinIO (S3-compatible object storage)
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: geoinsight-minio
+    restart: unless-stopped
+    logging: *default-logging
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:${MINIO_CONSOLE_PORT:-9001}
+      TZ: ${TZ:-Asia/Dhaka}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - geoinsight_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:9000/minio/health/live || wget -q -O /dev/null http://127.0.0.1:9000/minio/health/live",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    container_name: geoinsight-minio-init
+    restart: "no"
+    logging: *default-logging
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_DOCS: ${MINIO_BUCKET_DOCS:-national-intelligence-docs}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ALIAS: geoinsight
+      TZ: ${TZ:-Asia/Dhaka}
+    entrypoint: ["/bin/sh", "/scripts/init-buckets.sh"]
+    volumes:
+      - ./deploy/init/minio/init-buckets.sh:/scripts/init-buckets.sh:ro
+    networks:
+      - geoinsight_net
+
+networks:
+  geoinsight_net:
+    name: geoinsight_net
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: geoinsight_postgres_data
+  rabbitmq_data:
+    name: geoinsight_rabbitmq_data
+  minio_data:
+    name: geoinsight_minio_data

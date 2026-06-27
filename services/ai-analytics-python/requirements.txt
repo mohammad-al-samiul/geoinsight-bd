@@ -1,0 +1,17 @@
+# GeoInsight BD — AI Analytics Service
+fastapi==0.115.12
+uvicorn[standard]==0.34.0
+pydantic==2.11.3
+pydantic-settings==2.8.1
+httpx==0.28.1
+aio-pika==9.5.5
+python-dotenv==1.1.0
+
+# ML (CPU inference)
+torch==2.6.0
+transformers==4.51.3
+sentencepiece==0.2.0
+
+# Dev / test
+pytest==8.3.5
+pytest-asyncio==0.26.0

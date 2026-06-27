@@ -1,0 +1,77 @@
+{
+  "rabbit_version": "3.13.0",
+  "rabbitmq_version": "3.13.0",
+  "users": [],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "permissions": [],
+  "topic_permissions": [],
+  "parameters": [],
+  "global_parameters": [
+    {
+      "name": "internal_cluster_id",
+      "value": "geoinsight-bd-cluster"
+    }
+  ],
+  "policies": [],
+  "queues": [
+    {
+      "name": "gov_core_queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "ai_analytics_queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "geoinsight_exchange",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "geoinsight_exchange",
+      "vhost": "/",
+      "destination": "gov_core_queue",
+      "destination_type": "queue",
+      "routing_key": "gov.*",
+      "arguments": {}
+    },
+    {
+      "source": "geoinsight_exchange",
+      "vhost": "/",
+      "destination": "ai_analytics_queue",
+      "destination_type": "queue",
+      "routing_key": "agro.*",
+      "arguments": {}
+    },
+    {
+      "source": "geoinsight_exchange",
+      "vhost": "/",
+      "destination": "ai_analytics_queue",
+      "destination_type": "queue",
+      "routing_key": "ai.*",
+      "arguments": {}
+    }
+  ]
+}

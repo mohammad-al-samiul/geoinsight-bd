@@ -1,0 +1,68 @@
+{
+  "name": "geoinsight-network",
+  "version": "1.0.0",
+  "client": {
+    "organization": "PMORG",
+    "connection": {
+      "timeout": {
+        "peer": {
+          "endorser": "300"
+        },
+        "orderer": "300"
+      }
+    }
+  },
+  "organizations": {
+    "PMORG": {
+      "mspid": "PMORGMSP",
+      "peers": ["peer0.pmorg.geoinsight.bd"],
+      "certificateAuthorities": ["ca.pmorg.geoinsight.bd"]
+    }
+  },
+  "peers": {
+    "peer0.pmorg.geoinsight.bd": {
+      "url": "grpcs://localhost:7051",
+      "tlsCACerts": {
+        "path": "./crypto/peerOrganizations/pmorg.geoinsight.bd/peers/peer0.pmorg.geoinsight.bd/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.pmorg.geoinsight.bd",
+        "hostnameOverride": "peer0.pmorg.geoinsight.bd"
+      }
+    }
+  },
+  "certificateAuthorities": {
+    "ca.pmorg.geoinsight.bd": {
+      "url": "https://localhost:7054",
+      "caName": "ca-pmorg",
+      "tlsCACerts": {
+        "path": "./crypto/peerOrganizations/pmorg.geoinsight.bd/ca/ca.pmorg.geoinsight.bd-cert.pem"
+      }
+    }
+  },
+  "channels": {
+    "geoinsight-channel": {
+      "orderers": ["orderer.geoinsight.bd"],
+      "peers": {
+        "peer0.pmorg.geoinsight.bd": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        }
+      }
+    }
+  },
+  "orderers": {
+    "orderer.geoinsight.bd": {
+      "url": "grpcs://localhost:7050",
+      "tlsCACerts": {
+        "path": "./crypto/ordererOrganizations/geoinsight.bd/orderers/orderer.geoinsight.bd/msp/tlscacerts/tlsca.geoinsight.bd-cert.pem"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "orderer.geoinsight.bd",
+        "hostnameOverride": "orderer.geoinsight.bd"
+      }
+    }
+  }
+}

@@ -1,0 +1,2 @@
+# Model cache directory (populated at runtime)
+.cache/
