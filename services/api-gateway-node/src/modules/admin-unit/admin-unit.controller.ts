@@ -13,4 +13,8 @@ export class AdminUnitController {
   getTree = asyncHandler(async (req: Request, res: Response) => {
     sendSuccess(res, await this.service.getTree((req.params as UnitIdParam).unitId));
   });
+
+  getFullHierarchy = asyncHandler(async (_req: Request, res: Response) => {
+    sendSuccess(res, await this.service.getFullHierarchy());
+  });
 }

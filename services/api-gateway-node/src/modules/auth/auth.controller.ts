@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { asyncHandler, sendCreated, sendSuccess } from "../../core/utils/async-handler";
 import { AuthService } from "./auth.service";
-import { LoginDto, RefreshDto, RegisterDto } from "./auth.validator";
+import { LoginDto, LogoutDto, RefreshDto, RegisterDto } from "./auth.validator";
 
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -30,7 +30,7 @@ export class AuthController {
   });
 
   logout = asyncHandler(async (req: Request, res: Response) => {
-    const { refreshToken } = req.body as RefreshDto;
-    sendSuccess(res, await this.authService.logout(refreshToken));
+    const { refreshToken, accessToken } = req.body as LogoutDto;
+    sendSuccess(res, await this.authService.logout(refreshToken, accessToken));
   });
 }

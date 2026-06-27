@@ -105,11 +105,12 @@ scrape_configs:
           stack: geoinsight-bd
 
   # ---------------------------------------------------------------------------
-  # Redis (optional — uncomment when cache layer is deployed)
+  # Redis
   # ---------------------------------------------------------------------------
-  # - job_name: redis
-  #   static_configs:
-  #     - targets: ["redis-exporter:9121"]
-  #       labels:
-  #         service: redis
-  #         stack: geoinsight-bd
+  - job_name: redis
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+        labels:
+          service: redis
+          stack: geoinsight-bd

@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     public_feed_333_rate_max: int = Field(default=30, alias="PUBLIC_FEED_333_RATE_MAX")
     public_feed_999_rate_max: int = Field(default=15, alias="PUBLIC_FEED_999_RATE_MAX")
 
+    redis_url: str | None = Field(default=None, alias="REDIS_URL")
+    redis_max_connections: int = Field(default=32, alias="REDIS_MAX_CONNECTIONS")
+    arbitrage_cache_ttl_seconds: int = Field(default=3600, alias="ARBITRAGE_CACHE_TTL_SECONDS")
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

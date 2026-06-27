@@ -1,16 +1,24 @@
 import { AdminUnitType, UserRole } from "@prisma/client";
-import { prisma } from "../../core/database/prisma.client";
+import { prismaRead } from "../../core/database/prisma.client";
 import { NATIONAL_ROLES, ROLE_UNIT_TYPE } from "../../core/constants/rbac";
 import { ApiError } from "../../core/errors/api.error";
+import { redisCacheService } from "../../infrastructure/cache/redis-cache.service";
 import { AdminUnitNode, IAdminScopeService } from "./admin-scope.interface";
+
+const CHAIN_PREFIX = "geoinsight:admin:chain:";
+const CHAIN_TTL_SECONDS = 86_400;
 
 export class AdminScopeService implements IAdminScopeService {
   async getAncestorChain(unitId: string): Promise<AdminUnitNode[]> {
+    const cacheKey = `${CHAIN_PREFIX}${unitId}`;
+    const cached = await redisCacheService.get<AdminUnitNode[]>(cacheKey);
+    if (cached) return cached;
+
     const chain: AdminUnitNode[] = [];
     let currentId: string | null = unitId;
 
     while (currentId) {
-      const unit: AdminUnitNode | null = await prisma.adminUnit.findUnique({
+      const unit: AdminUnitNode | null = await prismaRead.adminUnit.findUnique({
         where: { id: currentId },
         select: { id: true, type: true, parentId: true },
       });
@@ -19,6 +27,7 @@ export class AdminScopeService implements IAdminScopeService {
       currentId = unit.parentId;
     }
 
+    await redisCacheService.set(cacheKey, chain, CHAIN_TTL_SECONDS);
     return chain;
   }
 

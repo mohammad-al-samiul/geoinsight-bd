@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Request
 
+from app.modules.arbitrage.orchestrator import run_arbitrage_cached
 from app.modules.arbitrage.schemas import ArbitrageRequest, ArbitrageResult, ScrapeJobResponse
 from app.modules.arbitrage.service import CommodityScraper
 
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/arbitrage", tags=["Arbitrage"])
 async def analyze_arbitrage(request: ArbitrageRequest, req: Request) -> ArbitrageResult:
     settings = req.app.state.settings
     scraper = CommodityScraper(settings.mock_country_count)
-    return await scraper.run_arbitrage(request)
+    return await run_arbitrage_cached(req.app.state.redis, scraper, request)
 
 
 @router.post("/scrape", response_model=ScrapeJobResponse)
@@ -27,7 +28,7 @@ async def trigger_scrape(
 
     async def _job() -> None:
         scraper = CommodityScraper(settings.mock_country_count)
-        result = await scraper.run_arbitrage(request)
+        result = await run_arbitrage_cached(req.app.state.redis, scraper, request)
         await publisher.publish(
             routing_key="agro.scrape",
             payload={

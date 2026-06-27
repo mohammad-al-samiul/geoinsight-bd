@@ -1,6 +1,10 @@
 import { createServer } from "http";
 import { env } from "./core/config/env";
-import { prisma } from "./core/database/prisma.client";
+import { connectDatabase, disconnectDatabase } from "./core/database/prisma.client";
+import {
+  connectRedis,
+  disconnectRedis,
+} from "./infrastructure/redis/redis.client";
 import {
   closeRabbitMq,
   startGovQueueConsumer,
@@ -17,7 +21,8 @@ if (env.NODE_ENV !== "test") {
 }
 
 async function bootstrap(): Promise<void> {
-  await prisma.$connect();
+  await connectDatabase();
+  await connectRedis();
   await startGovQueueConsumer();
   container.blockchainRetryWorker.start();
 
@@ -32,7 +37,8 @@ async function shutdown(signal: string): Promise<void> {
   await container.fabricClient.disconnect();
   httpServer.close();
   await closeRabbitMq();
-  await prisma.$disconnect();
+  await disconnectRedis();
+  await disconnectDatabase();
   process.exit(0);
 }
 

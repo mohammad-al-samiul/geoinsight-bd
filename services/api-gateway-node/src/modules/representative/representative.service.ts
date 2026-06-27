@@ -1,8 +1,8 @@
-import { prisma } from "../../core/database/prisma.client";
+import { prismaRead } from "../../core/database/prisma.client";
 
 export class RepresentativeService {
   async listByUnit(unitId: string) {
-    return prisma.representative.findMany({
+    return prismaRead.representative.findMany({
       where: { adminUnitId: unitId },
       select: {
         id: true,

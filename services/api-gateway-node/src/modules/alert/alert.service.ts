@@ -1,4 +1,4 @@
-import { prisma } from "../../core/database/prisma.client";
+import { prismaWrite, prismaRead } from "../../core/database/prisma.client";
 import { ApiError } from "../../core/errors/api.error";
 import { IAuditService } from "../../shared/audit/audit.service";
 import { ListAlertsQuery } from "./alert.validator";
@@ -7,7 +7,7 @@ export class AlertService {
   constructor(private readonly auditService: IAuditService) {}
 
   async list(query: ListAlertsQuery) {
-    return prisma.redFlagAlert.findMany({
+    return prismaRead.redFlagAlert.findMany({
       where: {
         ...(query.unresolvedOnly && { resolvedAt: null }),
         ...(query.unitId && { project: { adminUnitId: query.unitId } }),
@@ -29,11 +29,11 @@ export class AlertService {
   }
 
   async resolve(alertId: string, userId: string, ip?: string) {
-    const alert = await prisma.redFlagAlert.findUnique({ where: { id: alertId } });
+    const alert = await prismaRead.redFlagAlert.findUnique({ where: { id: alertId } });
     if (!alert) throw ApiError.notFound("Alert not found");
     if (alert.resolvedAt) throw ApiError.badRequest("Alert already resolved");
 
-    const updated = await prisma.redFlagAlert.update({
+    const updated = await prismaWrite.redFlagAlert.update({
       where: { id: alertId },
       data: { resolvedAt: new Date(), resolvedById: userId },
     });

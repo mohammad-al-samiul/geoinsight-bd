@@ -4,6 +4,9 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   API_GATEWAY_PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().min(1),
+  DATABASE_READ_URL: z.string().min(1).optional(),
+  DIRECT_DATABASE_URL: z.string().min(1).optional(),
+  REDIS_URL: z.string().min(1).optional(),
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default("8h"),
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
@@ -45,7 +48,12 @@ function loadEnv(): Env {
     console.error("Invalid environment:", parsed.error.flatten().fieldErrors);
     process.exit(1);
   }
-  return parsed.data;
+  const data = parsed.data;
+  return {
+    ...data,
+    DATABASE_READ_URL: data.DATABASE_READ_URL ?? data.DATABASE_URL,
+    DIRECT_DATABASE_URL: data.DIRECT_DATABASE_URL ?? data.DATABASE_URL,
+  };
 }
 
 export const env = loadEnv();

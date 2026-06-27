@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { UserRole } from "@prisma/client";
-import { prisma } from "../../core/database/prisma.client";
+import { prismaWrite, prismaRead } from "../../core/database/prisma.client";
 import { env } from "../../core/config/env";
 import { NATIONAL_ROLES } from "../../core/constants/rbac";
 import { ApiError } from "../../core/errors/api.error";
@@ -10,6 +10,7 @@ import { JwtPayload } from "../../core/types/express";
 import { IAuditService } from "../../shared/audit/audit.service";
 import { IAdminScopeService } from "../../shared/scope/admin-scope.interface";
 import { RegisterDto } from "./auth.validator";
+import { jwtSessionService } from "../../infrastructure/session/jwt-session.service";
 
 const BCRYPT_ROUNDS = 12;
 
@@ -20,6 +21,7 @@ function hashRefreshToken(token: string): string {
 function issueAccessToken(payload: JwtPayload): string {
   return jwt.sign(payload, env.JWT_SECRET, {
     expiresIn: env.JWT_ACCESS_EXPIRES_IN as jwt.SignOptions["expiresIn"],
+    jwtid: crypto.randomUUID(),
   });
 }
 
@@ -44,7 +46,7 @@ export class AuthService {
   ) {}
 
   async register(input: RegisterDto, actorId: string, ip?: string) {
-    if (await prisma.user.findUnique({ where: { email: input.email } })) {
+    if (await prismaWrite.user.findUnique({ where: { email: input.email } })) {
       throw ApiError.conflict("Email already registered");
     }
 
@@ -53,12 +55,12 @@ export class AuthService {
     }
 
     if (input.adminUnitId) {
-      const unit = await prisma.adminUnit.findUnique({ where: { id: input.adminUnitId } });
+      const unit = await prismaRead.adminUnit.findUnique({ where: { id: input.adminUnitId } });
       if (!unit) throw ApiError.notFound("Admin unit not found");
       this.scopeService.assertRoleMatchesUnitType(input.role, unit.type);
     }
 
-    const user = await prisma.user.create({
+    const user = await prismaWrite.user.create({
       data: {
         email: input.email,
         phone: input.phone,
@@ -93,7 +95,7 @@ export class AuthService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + env.JWT_REFRESH_EXPIRES_DAYS);
 
-    await prisma.refreshToken.create({
+    await prismaWrite.refreshToken.create({
       data: {
         userId,
         tokenHash: hashRefreshToken(refreshToken),
@@ -105,14 +107,14 @@ export class AuthService {
   }
 
   private async revokeRefreshToken(refreshToken: string): Promise<void> {
-    await prisma.refreshToken.updateMany({
+    await prismaWrite.refreshToken.updateMany({
       where: { tokenHash: hashRefreshToken(refreshToken), revokedAt: null },
       data: { revokedAt: new Date() },
     });
   }
 
   async login(email: string, password: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prismaRead.user.findUnique({ where: { email } });
     if (!user?.isActive) throw ApiError.unauthorized("Invalid credentials");
 
     if (!(await bcrypt.compare(password, user.passwordHash))) {
@@ -137,7 +139,7 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string) {
-    const record = await prisma.refreshToken.findUnique({
+    const record = await prismaWrite.refreshToken.findUnique({
       where: { tokenHash: hashRefreshToken(refreshToken) },
       include: {
         user: {
@@ -162,7 +164,7 @@ export class AuthService {
       throw ApiError.unauthorized("Invalid or expired refresh token");
     }
 
-    await prisma.refreshToken.update({
+    await prismaWrite.refreshToken.update({
       where: { id: record.id },
       data: { revokedAt: new Date() },
     });
@@ -184,13 +186,25 @@ export class AuthService {
     };
   }
 
-  async logout(refreshToken: string) {
+  async logout(refreshToken: string, accessToken?: string) {
     await this.revokeRefreshToken(refreshToken);
+    if (accessToken) {
+      await jwtSessionService.blacklistAccessToken(accessToken);
+    }
     return { success: true };
   }
 
+  /** Force logout across all gateway replicas (role revocation, security incident). */
+  async revokeAllUserSessions(userId: string): Promise<void> {
+    await jwtSessionService.revokeUserSessions(userId);
+    await prismaWrite.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
   async getProfile(userId: string) {
-    const user = await prisma.user.findUnique({
+    const user = await prismaRead.user.findUnique({
       where: { id: userId },
       select: {
         id: true,

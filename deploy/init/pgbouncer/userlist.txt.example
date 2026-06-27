@@ -1,0 +1,3 @@
+; Copy to userlist.txt — generate SCRAM secret with:
+;   psql -c "SELECT concat('\"', rolname, '\" \"', rolpassword, '\"') FROM pg_authid WHERE rolname='geoinsight_admin';"
+"geoinsight_admin" "SCRAM-SHA-256$4096:REPLACE_WITH_PG_SCRAM_HASH"

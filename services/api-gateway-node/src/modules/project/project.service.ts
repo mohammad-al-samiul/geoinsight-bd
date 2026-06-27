@@ -1,10 +1,10 @@
-import { prisma } from "../../core/database/prisma.client";
+import { prismaRead } from "../../core/database/prisma.client";
 import { ApiError } from "../../core/errors/api.error";
 import { ListProjectsQuery } from "./project.validator";
 
 export class ProjectService {
   async listByUnit(query: ListProjectsQuery) {
-    return prisma.project.findMany({
+    return prismaRead.project.findMany({
       where: {
         adminUnitId: query.unitId,
         ...(query.status && { status: query.status }),
@@ -26,7 +26,7 @@ export class ProjectService {
   }
 
   async getById(projectId: string) {
-    const project = await prisma.project.findUnique({
+    const project = await prismaRead.project.findUnique({
       where: { id: projectId },
       include: {
         adminUnit: { select: { id: true, name: true, type: true } },

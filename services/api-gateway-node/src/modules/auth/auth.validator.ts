@@ -27,4 +27,9 @@ export const refreshSchema = z.object({
   refreshToken: z.string().min(32).max(256),
 });
 
+export const logoutSchema = refreshSchema.extend({
+  accessToken: z.string().min(20).optional(),
+});
+
 export type RefreshDto = z.infer<typeof refreshSchema>;
+export type LogoutDto = z.infer<typeof logoutSchema>;

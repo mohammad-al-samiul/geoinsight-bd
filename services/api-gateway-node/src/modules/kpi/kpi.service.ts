@@ -1,15 +1,15 @@
 import { Prisma } from "@prisma/client";
-import { prisma } from "../../core/database/prisma.client";
+import { prismaWrite, prismaRead } from "../../core/database/prisma.client";
 import { ApiError } from "../../core/errors/api.error";
 import { CreateKpiRecordDto, ListKpiRecordsQuery } from "./kpi.validator";
 
 export class KpiService {
   async listDefinitions() {
-    return prisma.kpiDefinition.findMany({ orderBy: { code: "asc" } });
+    return prismaRead.kpiDefinition.findMany({ orderBy: { code: "asc" } });
   }
 
   async listRecords(query: ListKpiRecordsQuery) {
-    return prisma.kpiRecord.findMany({
+    return prismaRead.kpiRecord.findMany({
       where: {
         ...(query.representativeId && { representativeId: query.representativeId }),
         ...(query.kpiDefId && { kpiDefId: query.kpiDefId }),
@@ -25,15 +25,15 @@ export class KpiService {
   }
 
   async createRecord(input: CreateKpiRecordDto) {
-    const rep = await prisma.representative.findUnique({
+    const rep = await prismaRead.representative.findUnique({
       where: { id: input.representativeId },
     });
     if (!rep) throw ApiError.notFound("Representative not found");
 
-    const def = await prisma.kpiDefinition.findUnique({ where: { id: input.kpiDefId } });
+    const def = await prismaRead.kpiDefinition.findUnique({ where: { id: input.kpiDefId } });
     if (!def) throw ApiError.notFound("KPI definition not found");
 
-    return prisma.kpiRecord.create({
+    return prismaWrite.kpiRecord.create({
       data: {
         representativeId: input.representativeId,
         kpiDefId: input.kpiDefId,
@@ -52,7 +52,7 @@ export class KpiService {
 
   /** Resolve admin unit for RBAC scoping via representative. */
   async resolveAdminUnitId(representativeId: string): Promise<string> {
-    const rep = await prisma.representative.findUnique({
+    const rep = await prismaRead.representative.findUnique({
       where: { id: representativeId },
       select: { adminUnitId: true },
     });

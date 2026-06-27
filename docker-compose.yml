@@ -27,8 +27,19 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-geoinsight_db}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-change_me_replication_password}
       TZ: ${TZ:-Asia/Dhaka}
       PGDATA: /var/lib/postgresql/data/pgdata
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - hot_standby=on
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -50,6 +61,103 @@ services:
       resources:
         limits:
           memory: 2G
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL read replica (streaming standby)
+  # ---------------------------------------------------------------------------
+  postgres-replica:
+    image: timescale/timescaledb:2.17.2-pg16
+    container_name: geoinsight-postgres-replica
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-geoinsight_db}
+      POSTGRES_PRIMARY_HOST: postgres
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-change_me_replication_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${TZ:-Asia/Dhaka}
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ./deploy/scripts/postgres-replica-entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/replica-entrypoint.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - geoinsight_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-geoinsight_db}",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ---------------------------------------------------------------------------
+  # PgBouncer — transaction pooling (write + read pools)
+  # ---------------------------------------------------------------------------
+  pgbouncer:
+    image: pgbouncer/pgbouncer:1.23.1
+    container_name: geoinsight-pgbouncer
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./deploy/init/pgbouncer/pgbouncer.local.ini:/etc/pgbouncer/pgbouncer.ini:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "\"$${POSTGRES_USER}\" \"$${POSTGRES_PASSWORD}\"" > /etc/pgbouncer/userlist.txt
+        exec /opt/pgbouncer/pgbouncer /etc/pgbouncer/pgbouncer.ini
+    ports:
+      - "${PGBOUNCER_PORT:-6432}:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - geoinsight_net
+
+  # ---------------------------------------------------------------------------
+  # Redis 7 — cache, rate limits, sessions, Socket.io adapter
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7.4-alpine
+    container_name: geoinsight-redis
+    restart: unless-stopped
+    logging: *default-logging
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+      - --requirepass
+      - ${REDIS_PASSWORD:-change_me_redis_password}
+    volumes:
+      - ./deploy/init/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - geoinsight_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-change_me_redis_password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 768M
 
   # ---------------------------------------------------------------------------
   # RabbitMQ (Management UI + Topic Exchange topology)
@@ -201,3 +309,7 @@ volumes:
     name: geoinsight_rabbitmq_data
   minio_data:
     name: geoinsight_minio_data
+  postgres_replica_data:
+    name: geoinsight_postgres_replica_data
+  redis_data:
+    name: geoinsight_redis_data

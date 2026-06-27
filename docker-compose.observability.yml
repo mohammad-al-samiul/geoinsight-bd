@@ -126,6 +126,20 @@ services:
       postgres:
         condition: service_healthy
 
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: geoinsight-redis-exporter
+    restart: unless-stopped
+    logging: *obs-logging
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    networks:
+      - geoinsight_net
+    depends_on:
+      redis:
+        condition: service_healthy
+
 networks:
   geoinsight_net:
     name: geoinsight_prod_net

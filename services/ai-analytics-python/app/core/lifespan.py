@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.config import get_settings
+from app.infrastructure.redis.client import close_redis_pool, create_redis_pool
 from app.infrastructure.messaging.consumer import AiQueueConsumer
 from app.infrastructure.messaging.publisher import RabbitPublisher
 from app.ml.executor import shutdown_executor, startup_executor
@@ -18,6 +19,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     executor = startup_executor(settings.worker_pool_size)
     app.state.executor = executor
     app.state.settings = settings
+    app.state.redis = create_redis_pool(settings)
 
     publisher = RabbitPublisher(settings)
     await publisher.connect()
@@ -27,7 +29,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await consumer.start()
     app.state.consumer = consumer
 
-    arb_worker = ArbitrageBackgroundWorker(settings, publisher, executor)
+    arb_worker = ArbitrageBackgroundWorker(settings, publisher, executor, app.state.redis)
     await arb_worker.start()
     app.state.arb_worker = arb_worker
 
@@ -36,4 +38,5 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await arb_worker.stop()
     await consumer.stop()
     await publisher.close()
+    await close_redis_pool()
     shutdown_executor(executor)

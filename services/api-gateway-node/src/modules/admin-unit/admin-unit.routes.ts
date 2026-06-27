@@ -12,6 +12,12 @@ export function createAdminUnitRoutes(
   const router = Router();
 
   router.get(
+    "/hierarchy/full",
+    authenticate(),
+    controller.getFullHierarchy,
+  );
+
+  router.get(
     "/:unitId/tree",
     authenticate(),
     validate(unitIdParamSchema, "params"),

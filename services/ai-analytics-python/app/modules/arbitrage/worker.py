@@ -8,6 +8,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 from app.core.config import Settings
 from app.infrastructure.messaging.publisher import RabbitPublisher
+from app.modules.arbitrage.orchestrator import run_arbitrage_cached
 from app.modules.arbitrage.schemas import ArbitrageRequest
 from app.modules.arbitrage.service import CommodityScraper
 
@@ -20,10 +21,12 @@ class ArbitrageBackgroundWorker:
         settings: Settings,
         publisher: RabbitPublisher,
         executor: ProcessPoolExecutor,
+        redis=None,
     ) -> None:
         self._settings = settings
         self._publisher = publisher
         self._executor = executor
+        self._redis = redis
         self._scraper = CommodityScraper(settings.mock_country_count)
         self._task: asyncio.Task[None] | None = None
         self._running = False
@@ -47,7 +50,9 @@ class ArbitrageBackgroundWorker:
                 if not self._running:
                     break
                 try:
-                    result = await self._scraper.run_arbitrage(
+                    result = await run_arbitrage_cached(
+                        self._redis,
+                        self._scraper,
                         ArbitrageRequest(commodity=commodity, quantity_mt=1000.0),
                     )
                     await self._publisher.publish(
@@ -66,5 +71,5 @@ class ArbitrageBackgroundWorker:
             await asyncio.sleep(self._settings.scrape_interval_sec)
 
     async def run_once(self, request: ArbitrageRequest) -> dict[str, object]:
-        result = await self._scraper.run_arbitrage(request)
+        result = await run_arbitrage_cached(self._redis, self._scraper, request)
         return result.model_dump()

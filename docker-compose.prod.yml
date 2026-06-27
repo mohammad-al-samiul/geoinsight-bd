@@ -30,8 +30,19 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-geoinsight_db}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-change_me_replication_password}
       TZ: ${TZ:-Asia/Dhaka}
       PGDATA: /var/lib/postgresql/data/pgdata
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - hot_standby=on
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./deploy/init/postgres:/docker-entrypoint-initdb.d:ro
@@ -45,6 +56,83 @@ services:
       resources:
         limits:
           memory: 2G
+
+  postgres-replica:
+    <<: *app-restart
+    image: timescale/timescaledb:2.17.2-pg16
+    container_name: geoinsight-postgres-replica
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-geoinsight_db}
+      POSTGRES_PRIMARY_HOST: postgres
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-change_me_replication_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${TZ:-Asia/Dhaka}
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ./deploy/scripts/postgres-replica-entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/replica-entrypoint.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-geoinsight_db}"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 180s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  pgbouncer:
+    <<: *app-restart
+    image: pgbouncer/pgbouncer:1.23.1
+    container_name: geoinsight-pgbouncer
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./deploy/init/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "\"$${POSTGRES_USER}\" \"$${POSTGRES_PASSWORD}\"" > /etc/pgbouncer/userlist.txt
+        exec /opt/pgbouncer/pgbouncer /etc/pgbouncer/pgbouncer.ini
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-replica:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  redis:
+    <<: *app-restart
+    image: redis:7.4-alpine
+    container_name: geoinsight-redis
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+      - --requirepass
+      - ${REDIS_PASSWORD}
+    volumes:
+      - ./deploy/init/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 768M
 
   rabbitmq:
     <<: *app-restart
@@ -144,11 +232,18 @@ services:
     environment:
       NODE_ENV: production
       API_GATEWAY_PORT: 4000
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoinsight_db}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:6432/geoinsight_write?schema=public&pgbouncer=true&connection_limit=20
+      DATABASE_READ_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:6432/geoinsight_read?schema=public&pgbouncer=true&connection_limit=30
+      DIRECT_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoinsight_db}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
       AI_SERVICE_URL: http://ai-analytics:8000
       CORS_ORIGIN: ${CORS_ORIGIN:-https://geoinsight.gov.bd}
     depends_on:
+      pgbouncer:
+        condition: service_started
+      redis:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       rabbitmq:
@@ -172,12 +267,15 @@ services:
     environment:
       NODE_ENV: production
       AI_CORE_PORT: 8000
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
       SENTIMENT_USE_MOCK: ${SENTIMENT_USE_MOCK:-true}
       SOVEREIGN_MODE: ${SOVEREIGN_MODE:-true}
       HF_HUB_DISABLE_TELEMETRY: "1"
       HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-1}
     depends_on:
+      redis:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     healthcheck:
@@ -245,3 +343,7 @@ volumes:
     name: geoinsight_prod_rabbitmq_data
   minio_data:
     name: geoinsight_prod_minio_data
+  postgres_replica_data:
+    name: geoinsight_prod_postgres_replica_data
+  redis_data:
+    name: geoinsight_prod_redis_data

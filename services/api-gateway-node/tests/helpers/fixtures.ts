@@ -82,53 +82,60 @@ export function buildJwtPayload(role: UserRole, adminUnitId: string | null) {
 }
 
 export function installPrismaMocks(): void {
-  const { prisma } = require("../../src/core/database/prisma.client") as {
-    prisma: Record<string, Record<string, jest.Mock>>;
+  const { prismaRead, prismaWrite } = require("../../src/core/database/prisma.client") as {
+    prismaRead: Record<string, Record<string, jest.Mock>>;
+    prismaWrite: Record<string, Record<string, jest.Mock>>;
   };
 
-  prisma.adminUnit.findUnique.mockImplementation(
-    (args: { where: { id: string }; select?: unknown; include?: unknown }) => {
-      const row = UNIT_ROWS[args.where.id];
-      if (!row) return Promise.resolve(null);
+  const attachMocks = (client: Record<string, Record<string, jest.Mock>>) => {
+    client.adminUnit.findUnique.mockImplementation(
+      (args: { where: { id: string }; select?: unknown; include?: unknown }) => {
+        const row = UNIT_ROWS[args.where.id];
+        if (!row) return Promise.resolve(null);
 
-      if (args.include && typeof args.include === "object" && "children" in args.include) {
-        const childUnits =
-          row.type === AdminUnitType.DIVISION
-            ? [UNIT_ROWS[UNIT.district], UNIT_ROWS[UNIT.districtOther]]
-            : row.type === AdminUnitType.DISTRICT
-              ? [UNIT_ROWS[UNIT.upazila]]
-              : row.type === AdminUnitType.UPAZILA
-                ? [UNIT_ROWS[UNIT.union]]
-                : [];
+        if (args.include && typeof args.include === "object" && "children" in args.include) {
+          const childUnits =
+            row.type === AdminUnitType.DIVISION
+              ? [UNIT_ROWS[UNIT.district], UNIT_ROWS[UNIT.districtOther]]
+              : row.type === AdminUnitType.DISTRICT
+                ? [UNIT_ROWS[UNIT.upazila]]
+                : row.type === AdminUnitType.UPAZILA
+                  ? [UNIT_ROWS[UNIT.union]]
+                  : [];
 
-        return Promise.resolve({
-          ...row,
-          children: childUnits.map((c) => ({ ...c, children: c.children ?? [] })),
-        });
-      }
-
-      if (args.select) {
-        const picked: Record<string, unknown> = {};
-        for (const key of Object.keys(args.select as Record<string, boolean>)) {
-          if ((args.select as Record<string, boolean>)[key]) {
-            picked[key] = row[key as keyof UnitRow];
-          }
+          return Promise.resolve({
+            ...row,
+            children: childUnits.map((c) => ({ ...c, children: c.children ?? [] })),
+          });
         }
-        return Promise.resolve(picked);
-      }
 
-      return Promise.resolve(row);
-    },
-  );
+        if (args.select) {
+          const picked: Record<string, unknown> = {};
+          for (const key of Object.keys(args.select as Record<string, boolean>)) {
+            if ((args.select as Record<string, boolean>)[key]) {
+              picked[key] = row[key as keyof UnitRow];
+            }
+          }
+          return Promise.resolve(picked);
+        }
 
-  prisma.kpiDefinition.findMany.mockResolvedValue([
-    { id: "kpi-1", code: "COMPLETION", name: "Completion Rate", unit: "%" },
-  ]);
-  prisma.kpiRecord.findMany.mockResolvedValue([]);
-  prisma.redFlagAlert.findMany.mockResolvedValue([]);
-  prisma.redFlagAlert.findUnique.mockResolvedValue(null);
-  prisma.refreshToken.create.mockResolvedValue({});
-  prisma.refreshToken.findUnique.mockResolvedValue(null);
-  prisma.refreshToken.update.mockResolvedValue({});
-  prisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+        return Promise.resolve(row);
+      },
+    );
+
+    client.adminUnit.findMany.mockResolvedValue(Object.values(UNIT_ROWS));
+    client.kpiDefinition.findMany.mockResolvedValue([
+      { id: "kpi-1", code: "COMPLETION", name: "Completion Rate", unit: "%" },
+    ]);
+    client.kpiRecord.findMany.mockResolvedValue([]);
+    client.redFlagAlert.findMany.mockResolvedValue([]);
+    client.redFlagAlert.findUnique.mockResolvedValue(null);
+    client.refreshToken.create.mockResolvedValue({});
+    client.refreshToken.findUnique.mockResolvedValue(null);
+    client.refreshToken.update.mockResolvedValue({});
+    client.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+  };
+
+  attachMocks(prismaRead);
+  attachMocks(prismaWrite);
 }
