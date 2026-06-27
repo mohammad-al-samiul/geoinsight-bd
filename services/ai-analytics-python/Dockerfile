@@ -1,4 +1,5 @@
-FROM python:3.12-slim AS base
+# GeoInsight BD — AI Analytics (production)
+FROM python:3.12-slim AS builder
 
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -10,11 +11,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN grep -Ev '^(pytest|pytest-asyncio)' requirements.txt > requirements-prod.txt \
+    && pip install --no-cache-dir -r requirements-prod.txt
 
+FROM python:3.12-slim AS production
+
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    NODE_ENV=production
+
+RUN groupadd --system app && useradd --system --gid app app
+
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 COPY app ./app
 COPY ml_models ./ml_models
 
+USER app
 EXPOSE 8000
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')" || exit 1
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

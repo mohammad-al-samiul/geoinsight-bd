@@ -1,0 +1,247 @@
+# GeoInsight BD — Production stack (Ubuntu VPS)
+# Requires: .env on host, GHCR images pulled by CI/CD
+#
+# Usage on VPS:
+#   export IMAGE_TAG=<git-sha>
+#   export GHCR_OWNER=<github-org>
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+
+name: ${COMPOSE_PROJECT_NAME:-geoinsight-bd-prod}
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+x-app-restart: &app-restart
+  restart: unless-stopped
+  logging: *default-logging
+  networks:
+    - geoinsight_net
+
+services:
+  postgres:
+    <<: *app-restart
+    image: timescale/timescaledb:2.17.2-pg16
+    container_name: geoinsight-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-geoinsight_db}
+      TZ: ${TZ:-Asia/Dhaka}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/init/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-geoinsight_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  rabbitmq:
+    <<: *app-restart
+    image: rabbitmq:3.13.7-management-alpine
+    container_name: geoinsight-rabbitmq
+    hostname: geoinsight-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_LOAD_DEFINITIONS: /etc/rabbitmq/definitions/definitions.json
+      TZ: ${TZ:-Asia/Dhaka}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./deploy/init/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./deploy/init/rabbitmq/definitions.json:/etc/rabbitmq/definitions/definitions.json:ro
+      - ./deploy/init/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  rabbitmq-init:
+    image: curlimages/curl:8.13.0
+    container_name: geoinsight-rabbitmq-init
+    restart: "no"
+    logging: *default-logging
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_DEFINITIONS_FILE: /definitions/definitions.json
+      TZ: ${TZ:-Asia/Dhaka}
+    entrypoint: ["/bin/sh", "/scripts/init-topology.sh"]
+    volumes:
+      - ./deploy/init/rabbitmq/init-topology.sh:/scripts/init-topology.sh:ro
+      - ./deploy/init/rabbitmq/definitions.json:/definitions/definitions.json:ro
+    networks:
+      - geoinsight_net
+
+  minio:
+    <<: *app-restart
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: geoinsight-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      TZ: ${TZ:-Asia/Dhaka}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    container_name: geoinsight-minio-init
+    restart: "no"
+    logging: *default-logging
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_DOCS: ${MINIO_BUCKET_DOCS:-national-intelligence-docs}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ALIAS: geoinsight
+      TZ: ${TZ:-Asia/Dhaka}
+    entrypoint: ["/bin/sh", "/scripts/init-buckets.sh"]
+    volumes:
+      - ./deploy/init/minio/init-buckets.sh:/scripts/init-buckets.sh:ro
+    networks:
+      - geoinsight_net
+
+  api-gateway:
+    <<: *app-restart
+    image: ghcr.io/${GHCR_OWNER}/geoinsight-api-gateway:${IMAGE_TAG:-latest}
+    container_name: geoinsight-api-gateway
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      API_GATEWAY_PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoinsight_db}?schema=public
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      AI_SERVICE_URL: http://ai-analytics:8000
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://geoinsight.gov.bd}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/v1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+  ai-analytics:
+    <<: *app-restart
+    image: ghcr.io/${GHCR_OWNER}/geoinsight-ai-analytics:${IMAGE_TAG:-latest}
+    container_name: geoinsight-ai-analytics
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      AI_CORE_PORT: 8000
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      SENTIMENT_USE_MOCK: ${SENTIMENT_USE_MOCK:-true}
+      SOVEREIGN_MODE: ${SOVEREIGN_MODE:-true}
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-1}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  dashboard-nextjs:
+    <<: *app-restart
+    image: ghcr.io/${GHCR_OWNER}/geoinsight-dashboard:${IMAGE_TAG:-latest}
+    container_name: geoinsight-dashboard
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_TELEMETRY_DISABLED: "1"
+      API_GATEWAY_URL: http://api-gateway:4000
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  nginx:
+    <<: *app-restart
+    image: nginx:1.27-alpine
+    container_name: geoinsight-nginx
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/proxy_params.conf:/etc/nginx/proxy_params.conf:ro
+      - ./deploy/nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      dashboard-nextjs:
+        condition: service_started
+      ai-analytics:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+networks:
+  geoinsight_net:
+    name: geoinsight_prod_net
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: geoinsight_prod_postgres_data
+  rabbitmq_data:
+    name: geoinsight_prod_rabbitmq_data
+  minio_data:
+    name: geoinsight_prod_minio_data
