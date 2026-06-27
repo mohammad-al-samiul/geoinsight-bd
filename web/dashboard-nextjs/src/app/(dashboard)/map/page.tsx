@@ -2,6 +2,6 @@
 
 import { DashboardViewport } from "@/components/dashboard/dashboard-viewport";
 
-export default function NationalDashboardPage() {
+export default function MapPage() {
   return <DashboardViewport />;
 }

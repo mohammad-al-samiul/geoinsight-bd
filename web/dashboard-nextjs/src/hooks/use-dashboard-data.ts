@@ -1,0 +1,119 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import type { AdminFilterState } from "@/types";
+import {
+  buildMockMetrics,
+  fetchDashboardMetrics,
+  fetchRedFlagMarkers,
+} from "@/lib/dashboard-data";
+import type {
+  DashboardMetrics,
+  RedFlagMarker,
+  SocketAlertPayload,
+  SocketKpiPayload,
+} from "@/types/dashboard";
+import { getUnitCentroid } from "@/lib/geojson-bd";
+import { useSocket } from "@/hooks/use-socket";
+
+export function useDashboardData(filter: AdminFilterState) {
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [markers, setMarkers] = useState<RedFlagMarker[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pulseKeys, setPulseKeys] = useState<Record<string, number>>({});
+
+  const pulse = useCallback((key: string) => {
+    setPulseKeys((prev) => ({ ...prev, [key]: Date.now() }));
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [m, mk] = await Promise.all([
+        fetchDashboardMetrics(filter),
+        fetchRedFlagMarkers(filter),
+      ]);
+      setMetrics(m);
+      setMarkers(mk);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter]);
+
+  useEffect(() => {
+    load();
+  }, [
+    filter.divisionId,
+    filter.districtId,
+    filter.upazilaId,
+    filter.unionId,
+    load,
+  ]);
+
+  const handleKpiUpdate = useCallback(
+    (payload: SocketKpiPayload) => {
+      setMetrics((prev) => {
+        const base = prev ?? buildMockMetrics(filter);
+        const next = { ...base, timestamp: new Date().toISOString() };
+
+        if (payload.metric === "completion_rate" && payload.value != null) {
+          next.completionRate = payload.value;
+          pulse("completion");
+        }
+        if (payload.trend?.length) {
+          next.completionTrend = payload.trend;
+          pulse("completion");
+        }
+        if (payload.variance?.length) {
+          next.budgetVariance = payload.variance;
+          pulse("budget");
+        }
+        if (payload.metric === "compliance") {
+          pulse("arbitrage");
+        }
+        if (payload.value != null && !payload.metric) {
+          next.completionRate = payload.value;
+          pulse("completion");
+        }
+        return next;
+      });
+    },
+    [filter, pulse],
+  );
+
+  const handleRedFlag = useCallback(
+    (payload: SocketAlertPayload, adminUnitId: string) => {
+      const centroid = getUnitCentroid(payload.unitId ?? adminUnitId);
+      const marker: RedFlagMarker = {
+        id: payload.alertId ?? `live-${Date.now()}`,
+        unitId: payload.unitId ?? adminUnitId,
+        lat: payload.lat ?? centroid?.[1] ?? 23.7,
+        lng: payload.lng ?? centroid?.[0] ?? 90.4,
+        severity: payload.severity ?? "HIGH",
+        flagType: payload.flagType ?? "AI_RED_FLAG",
+        message: payload.aiExplanation ?? "AI-detected anomaly",
+        createdAt: new Date().toISOString(),
+      };
+      setMarkers((prev) => [marker, ...prev].slice(0, 30));
+      pulse("map");
+    },
+    [pulse],
+  );
+
+  const { status: socketStatus } = useSocket({
+    enabled: true,
+    onKpiUpdate: (payload, envelope) => handleKpiUpdate(payload),
+    onRedFlag: (payload, envelope) =>
+      handleRedFlag(payload, envelope.adminUnitId),
+    onDashboardRefresh: () => load(),
+  });
+
+  return {
+    metrics,
+    markers,
+    loading,
+    socketStatus,
+    pulseKeys,
+    refresh: load,
+  };
+}

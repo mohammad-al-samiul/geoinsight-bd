@@ -1,0 +1,82 @@
+"use client";
+
+import dynamic from "next/dynamic";
+import { useMemo } from "react";
+import { MapPin } from "lucide-react";
+import { MapSkeleton } from "@/components/ui/skeleton";
+import { getVisibleGeoJson } from "@/lib/geojson-bd";
+import { getDrillChildType } from "@/lib/filter-utils";
+import type { AdminFilterState } from "@/types";
+import type { GeoFeatureProperties, RedFlagMarker } from "@/types/dashboard";
+import { Badge } from "@/components/ui/badge";
+
+const ChoroplethMapInner = dynamic(
+  () =>
+    import("@/components/dashboard/choropleth-map-inner").then(
+      (m) => m.ChoroplethMapInner,
+    ),
+  { ssr: false, loading: () => <MapSkeleton /> },
+);
+
+interface BangladeshChoroplethMapProps {
+  filter: AdminFilterState;
+  markers: RedFlagMarker[];
+  mapPulseKey?: number;
+  onFeatureClick: (props: GeoFeatureProperties) => void;
+}
+
+export function BangladeshChoroplethMap({
+  filter,
+  markers,
+  mapPulseKey,
+  onFeatureClick,
+}: BangladeshChoroplethMapProps) {
+  const geoJson = useMemo(() => getVisibleGeoJson(filter), [filter]);
+  const level = getDrillChildType(filter);
+
+  return (
+    <div className="glass-panel flex h-full min-h-[360px] flex-col overflow-hidden rounded-xl shadow-panel lg:min-h-0">
+      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground">
+            Geospatial Performance Map
+          </h3>
+        </div>
+        <Badge variant="outline" className="border-primary/30 text-[10px] text-primary">
+          {level} level · {geoJson.features.length} units
+        </Badge>
+      </div>
+
+      <div className="relative min-h-[300px] flex-1">
+        <ChoroplethMapInner
+          filter={filter}
+          geoJson={geoJson}
+          markers={markers}
+          mapPulseKey={mapPulseKey}
+          onFeatureClick={onFeatureClick}
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 border-t border-border/60 px-4 py-2.5 text-[10px] text-muted-foreground">
+        <span className="font-medium text-foreground">Performance</span>
+        {[
+          { label: "≥75%", color: "#10b981" },
+          { label: "60–74%", color: "#34d399" },
+          { label: "45–59%", color: "#fbbf24" },
+          { label: "30–44%", color: "#f97316" },
+          { label: "<30%", color: "#ef4444" },
+        ].map((item) => (
+          <span key={item.label} className="flex items-center gap-1">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-sm"
+              style={{ backgroundColor: item.color }}
+            />
+            {item.label}
+          </span>
+        ))}
+        <span className="ml-auto">Click boundary to drill down</span>
+      </div>
+    </div>
+  );
+}
