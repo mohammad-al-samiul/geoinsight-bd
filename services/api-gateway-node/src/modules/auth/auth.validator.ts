@@ -22,3 +22,9 @@ export const registerSchema = z.object({
 
 export type LoginDto = z.infer<typeof loginSchema>;
 export type RegisterDto = z.infer<typeof registerSchema>;
+
+export const refreshSchema = z.object({
+  refreshToken: z.string().min(32).max(256),
+});
+
+export type RefreshDto = z.infer<typeof refreshSchema>;

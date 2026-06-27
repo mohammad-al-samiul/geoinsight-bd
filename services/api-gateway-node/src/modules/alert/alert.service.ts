@@ -13,7 +13,14 @@ export class AlertService {
         ...(query.unitId && { project: { adminUnitId: query.unitId } }),
       },
       include: {
-        project: { select: { id: true, title: true, adminUnitId: true } },
+        project: {
+          select: {
+            id: true,
+            title: true,
+            adminUnitId: true,
+            blockchainTx: true,
+          },
+        },
         resolvedBy: { select: { id: true, email: true } },
       },
       orderBy: [{ severity: "desc" }, { createdAt: "desc" }],

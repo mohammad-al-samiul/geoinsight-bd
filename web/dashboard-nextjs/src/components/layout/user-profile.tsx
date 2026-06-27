@@ -1,14 +1,16 @@
 "use client";
 
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, useAuthActions } from "@/hooks/use-auth";
 import { ROLE_META } from "@/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Shield } from "lucide-react";
+import { Shield, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function UserProfile({ collapsed }: { collapsed?: boolean }) {
   const user = useAuth();
+  const { logout } = useAuthActions();
   const meta = ROLE_META[user.role];
   const initials = user.fullName
     .split(" ")
@@ -51,6 +53,15 @@ export function UserProfile({ collapsed }: { collapsed?: boolean }) {
             </p>
           )}
           <p className="mt-0.5 text-[10px] text-muted-foreground/70">{meta.labelBn}</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-3 h-8 w-full justify-start gap-2 px-2 text-xs text-muted-foreground"
+            onClick={() => logout()}
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Sign out
+          </Button>
         </div>
       </div>
     </div>

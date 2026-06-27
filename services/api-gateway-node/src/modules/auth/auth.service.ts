@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { UserRole } from "@prisma/client";
 import { prisma } from "../../core/database/prisma.client";
@@ -11,6 +12,30 @@ import { IAdminScopeService } from "../../shared/scope/admin-scope.interface";
 import { RegisterDto } from "./auth.validator";
 
 const BCRYPT_ROUNDS = 12;
+
+function hashRefreshToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function issueAccessToken(payload: JwtPayload): string {
+  return jwt.sign(payload, env.JWT_SECRET, {
+    expiresIn: env.JWT_ACCESS_EXPIRES_IN as jwt.SignOptions["expiresIn"],
+  });
+}
+
+function userPayload(user: {
+  id: string;
+  email: string;
+  role: UserRole;
+  adminUnitId: string | null;
+}): JwtPayload {
+  return {
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+    adminUnitId: user.adminUnitId,
+  };
+}
 
 export class AuthService {
   constructor(
@@ -63,6 +88,29 @@ export class AuthService {
     return user;
   }
 
+  private async createRefreshToken(userId: string): Promise<string> {
+    const refreshToken = crypto.randomBytes(48).toString("hex");
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + env.JWT_REFRESH_EXPIRES_DAYS);
+
+    await prisma.refreshToken.create({
+      data: {
+        userId,
+        tokenHash: hashRefreshToken(refreshToken),
+        expiresAt,
+      },
+    });
+
+    return refreshToken;
+  }
+
+  private async revokeRefreshToken(refreshToken: string): Promise<void> {
+    await prisma.refreshToken.updateMany({
+      where: { tokenHash: hashRefreshToken(refreshToken), revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
   async login(email: string, password: string) {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user?.isActive) throw ApiError.unauthorized("Invalid credentials");
@@ -71,19 +119,13 @@ export class AuthService {
       throw ApiError.unauthorized("Invalid credentials");
     }
 
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      adminUnitId: user.adminUnitId,
-    };
-
-    const token = jwt.sign(payload, env.JWT_SECRET, {
-      expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"],
-    });
+    const accessToken = issueAccessToken(userPayload(user));
+    const refreshToken = await this.createRefreshToken(user.id);
 
     return {
-      token,
+      accessToken,
+      refreshToken,
+      expiresIn: env.JWT_ACCESS_EXPIRES_IN,
       user: {
         id: user.id,
         email: user.email,
@@ -92,6 +134,59 @@ export class AuthService {
         adminUnitId: user.adminUnitId,
       },
     };
+  }
+
+  async refresh(refreshToken: string) {
+    const record = await prisma.refreshToken.findUnique({
+      where: { tokenHash: hashRefreshToken(refreshToken) },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            phone: true,
+            role: true,
+            adminUnitId: true,
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (
+      !record ||
+      record.revokedAt ||
+      record.expiresAt < new Date() ||
+      !record.user.isActive
+    ) {
+      throw ApiError.unauthorized("Invalid or expired refresh token");
+    }
+
+    await prisma.refreshToken.update({
+      where: { id: record.id },
+      data: { revokedAt: new Date() },
+    });
+
+    const accessToken = issueAccessToken(userPayload(record.user));
+    const newRefreshToken = await this.createRefreshToken(record.user.id);
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      expiresIn: env.JWT_ACCESS_EXPIRES_IN,
+      user: {
+        id: record.user.id,
+        email: record.user.email,
+        phone: record.user.phone,
+        role: record.user.role,
+        adminUnitId: record.user.adminUnitId,
+      },
+    };
+  }
+
+  async logout(refreshToken: string) {
+    await this.revokeRefreshToken(refreshToken);
+    return { success: true };
   }
 
   async getProfile(userId: string) {

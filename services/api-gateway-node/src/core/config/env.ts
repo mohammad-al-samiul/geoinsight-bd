@@ -6,6 +6,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default("8h"),
+  JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
+  JWT_REFRESH_EXPIRES_DAYS: z.coerce.number().int().positive().default(7),
   RABBITMQ_URL: z.string().min(1),
   RABBITMQ_EXCHANGE: z.string().default("geoinsight_exchange"),
   RABBITMQ_GOV_QUEUE: z.string().default("gov_core_queue"),

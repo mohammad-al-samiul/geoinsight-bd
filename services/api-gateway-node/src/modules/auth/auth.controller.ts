@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { asyncHandler, sendCreated, sendSuccess } from "../../core/utils/async-handler";
 import { AuthService } from "./auth.service";
-import { LoginDto, RegisterDto } from "./auth.validator";
+import { LoginDto, RefreshDto, RegisterDto } from "./auth.validator";
 
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -22,5 +22,15 @@ export class AuthController {
 
   me = asyncHandler(async (req: Request, res: Response) => {
     sendSuccess(res, await this.authService.getProfile(req.user!.sub));
+  });
+
+  refresh = asyncHandler(async (req: Request, res: Response) => {
+    const { refreshToken } = req.body as RefreshDto;
+    sendSuccess(res, await this.authService.refresh(refreshToken));
+  });
+
+  logout = asyncHandler(async (req: Request, res: Response) => {
+    const { refreshToken } = req.body as RefreshDto;
+    sendSuccess(res, await this.authService.logout(refreshToken));
   });
 }

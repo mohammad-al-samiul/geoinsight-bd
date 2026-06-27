@@ -1,20 +1,28 @@
 "use client";
 
 import { AdminCascadeFilter } from "@/components/filters/admin-cascade-filter";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, useAuthActions } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ROLE_META } from "@/types";
-import { Bell, Menu, Radio, Search } from "lucide-react";
+import { AlertTriangle, Bell, LogOut, Menu, Radio, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CommandBarProps {
   onMenuClick: () => void;
   sidebarCollapsed: boolean;
+  onToggleFeed?: () => void;
+  feedOpen?: boolean;
 }
 
-export function CommandBar({ onMenuClick, sidebarCollapsed }: CommandBarProps) {
+export function CommandBar({
+  onMenuClick,
+  sidebarCollapsed,
+  onToggleFeed,
+  feedOpen,
+}: CommandBarProps) {
   const user = useAuth();
+  const { logout } = useAuthActions();
   const meta = ROLE_META[user.role];
 
   return (
@@ -58,9 +66,29 @@ export function CommandBar({ onMenuClick, sidebarCollapsed }: CommandBarProps) {
           >
             {user.role.replace("_", " ")}
           </Badge>
+          {onToggleFeed && (
+            <Button
+              variant={feedOpen ? "secondary" : "ghost"}
+              size="icon"
+              className="hidden xl:inline-flex"
+              onClick={onToggleFeed}
+              aria-label="Toggle anomaly feed"
+            >
+              <AlertTriangle className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="relative text-muted-foreground">
             <Bell className="h-4 w-4" />
             <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground"
+            onClick={() => logout()}
+            aria-label="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </div>

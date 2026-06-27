@@ -1,11 +1,11 @@
-import { API_BASE } from "@/lib/config";
+import { apiClient } from "@/lib/api-client";
+import { getUnitCentroid } from "@/lib/geojson-bd";
+import type { AdminFilterState } from "@/types";
 import type {
   DashboardMetrics,
   RedFlagMarker,
   UnitScore,
 } from "@/types/dashboard";
-import { getUnitCentroid } from "@/lib/geojson-bd";
-import type { AdminFilterState } from "@/types";
 
 const MOCK_COMPLETION_TREND = [
   { month: "Jan", rate: 72 },
@@ -92,11 +92,9 @@ export async function fetchDashboardMetrics(
   filter: AdminFilterState,
 ): Promise<DashboardMetrics> {
   try {
-    const res = await fetch(`${API_BASE}/dashboard/national`, {
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error("API unavailable");
-    const json = await res.json();
+    const json = await apiClient<{ success: boolean; data: unknown }>(
+      "dashboard/national",
+    );
     if (!json.success) throw new Error("API error");
     return buildMockMetrics(filter);
   } catch {
@@ -117,29 +115,39 @@ export async function fetchRedFlagMarkers(
       filter.divisionId;
     if (active) params.set("unitId", active);
 
-    const res = await fetch(`${API_BASE}/alerts?${params}`, { cache: "no-store" });
-    if (!res.ok) throw new Error("API unavailable");
-    const json = await res.json();
-    if (!json.success || !Array.isArray(json.data)) throw new Error("No data");
-    return json.data.map(
-      (a: {
+    const json = await apiClient<{
+      success: boolean;
+      data: Array<{
         id: string;
-        adminUnitId: string;
         flagType: string;
-        severity: RedFlagMarker["severity"];
+        severity: number;
         aiExplanation?: string;
         createdAt: string;
-      }) => ({
+        project: { adminUnitId: string };
+      }>;
+    }>(`alerts?${params}`);
+
+    if (!json.success || !Array.isArray(json.data)) throw new Error("No data");
+    return json.data.map((a) => {
+      const centroid = getUnitCentroid(a.project.adminUnitId);
+      return {
         id: a.id,
-        unitId: a.adminUnitId,
-        lat: 23.7,
-        lng: 90.4,
-        severity: a.severity ?? "MEDIUM",
+        unitId: a.project.adminUnitId,
+        lat: centroid?.[1] ?? 23.7,
+        lng: centroid?.[0] ?? 90.4,
+        severity:
+          a.severity >= 4
+            ? "CRITICAL"
+            : a.severity >= 3
+              ? "HIGH"
+              : a.severity >= 2
+                ? "MEDIUM"
+                : "LOW",
         flagType: a.flagType,
         message: a.aiExplanation ?? a.flagType,
         createdAt: a.createdAt,
-      }),
-    );
+      } as RedFlagMarker;
+    });
   } catch {
     const demoUnits = ["upa-keraniganj", "dist-gazipur", "div-chattogram"];
     return demoUnits

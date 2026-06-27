@@ -21,6 +21,16 @@ export function useDashboardData(filter: AdminFilterState) {
   const [markers, setMarkers] = useState<RedFlagMarker[]>([]);
   const [loading, setLoading] = useState(true);
   const [pulseKeys, setPulseKeys] = useState<Record<string, number>>({});
+  const [socketToken, setSocketToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/socket-token", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (json?.success) setSocketToken(json.data.token);
+      })
+      .catch(() => setSocketToken(null));
+  }, []);
 
   const pulse = useCallback((key: string) => {
     setPulseKeys((prev) => ({ ...prev, [key]: Date.now() }));
@@ -101,8 +111,9 @@ export function useDashboardData(filter: AdminFilterState) {
   );
 
   const { status: socketStatus } = useSocket({
-    enabled: true,
-    onKpiUpdate: (payload, envelope) => handleKpiUpdate(payload),
+    token: socketToken,
+    enabled: Boolean(socketToken),
+    onKpiUpdate: (payload) => handleKpiUpdate(payload),
     onRedFlag: (payload, envelope) =>
       handleRedFlag(payload, envelope.adminUnitId),
     onDashboardRefresh: () => load(),

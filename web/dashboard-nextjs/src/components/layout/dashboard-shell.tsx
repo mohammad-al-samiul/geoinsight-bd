@@ -3,11 +3,13 @@
 import { useState, type ReactNode } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { CommandBar } from "@/components/layout/command-bar";
+import { AnomalyFeedPanel } from "@/components/alerts/anomaly-feed-panel";
 import { cn } from "@/lib/utils";
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [feedOpen, setFeedOpen] = useState(true);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -36,14 +38,23 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         <CommandBar
           onMenuClick={() => setMobileOpen(true)}
           sidebarCollapsed={sidebarCollapsed}
+          onToggleFeed={() => setFeedOpen((o) => !o)}
+          feedOpen={feedOpen}
         />
-        <main
-          className={cn(
-            "flex-1 overflow-y-auto bg-gradient-to-b from-background to-secondary/20 p-4 lg:p-6",
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <main
+            className={cn(
+              "flex-1 overflow-y-auto bg-gradient-to-b from-background to-secondary/20 p-4 lg:p-6",
+            )}
+          >
+            {children}
+          </main>
+          {feedOpen && (
+            <aside className="hidden w-[min(100%,340px)] shrink-0 border-l border-border/60 bg-background/50 p-3 xl:block">
+              <AnomalyFeedPanel compact className="h-full" />
+            </aside>
           )}
-        >
-          {children}
-        </main>
+        </div>
       </div>
     </div>
   );
