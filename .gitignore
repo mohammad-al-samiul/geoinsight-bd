@@ -8,5 +8,5 @@ __pycache__/
 .pytest_cache/
 *.log
 .DS_Store
-ml_models/cache/*
-!ml_models/cache/.gitkeep
+deploy/hyperledger/wallet/*
+!deploy/hyperledger/wallet/.gitkeep

@@ -1,3 +1,16 @@
+// =============================================================================
+// GeoInsight BD — Production Prisma Schema
+// PostgreSQL 16 + TimescaleDB | Hierarchical Admin | Multi-tenant RBAC | KPIs
+// =============================================================================
+//
+// TimescaleDB hypertables (commodity_price_logs) are created via raw SQL migration:
+//   prisma/migrations/20250627150000_timescale_commodity_perf/migration.sql
+//
+// Hierarchy: DIVISION → DISTRICT → UPAZILA → UNION (admin_units.self-reference)
+// Denormalized location IDs (division_id, district_id, upazila_id) enable
+// sub-millisecond scoped queries without recursive CTEs.
+// =============================================================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,7 +20,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ── Enums (ERD-aligned) ──────────────────────────────────────────────────────
+// ── Enums ────────────────────────────────────────────────────────────────────
 
 enum AdminUnitType {
   DIVISION
@@ -16,6 +29,7 @@ enum AdminUnitType {
   UNION
 }
 
+/// Platform access roles (multi-tenant RBAC — scoped via admin_unit_id)
 enum UserRole {
   PMO
   MINISTER
@@ -37,6 +51,13 @@ enum KpiAppliesTo {
   ADMIN_UNIT
   PROJECT
   NATIONAL
+}
+
+enum KpiRecordStatus {
+  DRAFT
+  SUBMITTED
+  VERIFIED
+  REJECTED
 }
 
 enum ProjectStatus {
@@ -70,16 +91,32 @@ enum BlockchainTxStatus {
   DEAD_LETTER
 }
 
-// ── admin_units ──────────────────────────────────────────────────────────────
+enum RbacAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  APPROVE
+}
+
+// ── Hierarchical Administrative Structure (Bangladesh) ───────────────────────
 
 model AdminUnit {
   id       String        @id @default(uuid()) @db.Uuid
+  /// BBS / GeoINSIGHT canonical code (e.g. "30" = Dhaka Division)
+  code     String        @db.VarChar(16)
   name     String        @db.VarChar(255)
   nameBn   String?       @map("name_bn") @db.VarChar(255)
   type     AdminUnitType
   parentId String?       @map("parent_id") @db.Uuid
+  /// Materialized path for hierarchy walks (e.g. /division_id/district_id/...)
   path     String?       @db.VarChar(512)
   geoJson  Json?         @map("geo_json")
+
+  // Denormalized ancestor IDs — populated by trigger for O(1) location filters
+  divisionId String? @map("division_id") @db.Uuid
+  districtId String? @map("district_id") @db.Uuid
+  upazilaId  String? @map("upazila_id") @db.Uuid
 
   parent   AdminUnit?  @relation("AdminHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
   children AdminUnit[] @relation("AdminHierarchy")
@@ -88,16 +125,63 @@ model AdminUnit {
   users           User[]
   projects        Project[]
   agroMarkets     AgroMarket[]
+  commodityLogs   CommodityPriceLog[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  @@index([parentId])
-  @@index([type])
+  @@unique([type, code])
+  @@index([parentId, type])
+  @@index([type, code])
+  @@index([divisionId, districtId, upazilaId])
+  @@index([divisionId])
+  @@index([districtId])
+  @@index([upazilaId])
   @@map("admin_units")
 }
 
-// ── representatives ──────────────────────────────────────────────────────────
+// ── Multi-tenant RBAC ─────────────────────────────────────────────────────────
+
+/// Static role → permission matrix (national roles use admin_unit_id = NULL)
+model RolePermission {
+  id           String         @id @default(uuid()) @db.Uuid
+  role         UserRole
+  resource     String         @db.VarChar(64)
+  action       RbacAction
+  /// Minimum admin level required when permission is unit-scoped
+  minUnitType  AdminUnitType? @map("min_unit_type")
+  description  String?        @db.VarChar(255)
+
+  @@unique([role, resource, action])
+  @@index([role, resource])
+  @@map("role_permissions")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(255)
+  phone        String?  @db.VarChar(20)
+  passwordHash String   @map("password_hash")
+  role         UserRole
+  isActive     Boolean  @default(true) @map("is_active")
+  mfaSecret    String?  @map("mfa_secret")
+
+  /// Tenant scope — NULL only for PMO (national)
+  adminUnitId String?    @map("admin_unit_id") @db.Uuid
+  adminUnit   AdminUnit? @relation(fields: [adminUnitId], references: [id], onDelete: SetNull)
+
+  auditLogs        AuditLog[]
+  resolvedRedFlags RedFlagAlert[] @relation("ResolvedBy")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([adminUnitId, role, isActive])
+  @@index([role, isActive])
+  @@map("users")
+}
+
+// ── Representatives ───────────────────────────────────────────────────────────
 
 model Representative {
   id          String             @id @default(uuid()) @db.Uuid
@@ -111,66 +195,43 @@ model Representative {
   adminUnitId String    @map("admin_unit_id") @db.Uuid
   adminUnit   AdminUnit @relation(fields: [adminUnitId], references: [id], onDelete: Restrict)
 
-  kpiRecords KpiRecord[]
+  kpiRecords    KpiRecord[]
+  commodityLogs CommodityPriceLog[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  @@index([adminUnitId])
-  @@index([role])
+  @@index([adminUnitId, role])
+  @@index([adminUnitId, tenureEnd])
+  @@index([role, tenureEnd])
   @@map("representatives")
 }
 
-// ── users ────────────────────────────────────────────────────────────────────
-
-model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique @db.VarChar(255)
-  phone        String?  @db.VarChar(20)
-  passwordHash String   @map("password_hash")
-  role         UserRole
-  isActive     Boolean  @default(true) @map("is_active")
-  mfaSecret    String?  @map("mfa_secret")
-
-  adminUnitId String?    @map("admin_unit_id") @db.Uuid
-  adminUnit   AdminUnit? @relation(fields: [adminUnitId], references: [id], onDelete: SetNull)
-
-  auditLogs        AuditLog[]
-  resolvedRedFlags RedFlagAlert[] @relation("ResolvedBy")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([adminUnitId])
-  @@index([role])
-  @@map("users")
-}
-
-// ── kpi_definitions ──────────────────────────────────────────────────────────
+// ── Representative KPIs ───────────────────────────────────────────────────────
 
 model KpiDefinition {
   id        String       @id @default(uuid()) @db.Uuid
   code      String       @unique @db.VarChar(50)
   name      String       @db.VarChar(255)
+  nameBn    String?      @map("name_bn") @db.VarChar(255)
   unit      String       @db.VarChar(32)
   appliesTo KpiAppliesTo @map("applies_to")
 
   records KpiRecord[]
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@map("kpi_definitions")
 }
 
-// ── kpi_records ──────────────────────────────────────────────────────────────
-
 model KpiRecord {
-  id             String   @id @default(uuid()) @db.Uuid
-  value          Decimal  @db.Decimal(18, 4)
-  recordedAt     DateTime @map("recorded_at") @db.Timestamptz
-  fiscalYear     String   @map("fiscal_year") @db.Char(4)
-  verified       Boolean  @default(false)
-  blockchainHash String?  @map("blockchain_hash") @db.VarChar(128)
+  id             String          @id @default(uuid()) @db.Uuid
+  value          Decimal         @db.Decimal(18, 4)
+  recordedAt     DateTime        @map("recorded_at") @db.Timestamptz
+  fiscalYear     String          @map("fiscal_year") @db.Char(4)
+  status         KpiRecordStatus @default(SUBMITTED)
+  verified       Boolean         @default(false)
+  blockchainHash String?         @map("blockchain_hash") @db.VarChar(128)
 
   representativeId String         @map("representative_id") @db.Uuid
   representative   Representative @relation(fields: [representativeId], references: [id], onDelete: Cascade)
@@ -178,13 +239,53 @@ model KpiRecord {
   kpiDefId String        @map("kpi_def_id") @db.Uuid
   kpiDef   KpiDefinition @relation(fields: [kpiDefId], references: [id], onDelete: Restrict)
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  @@index([representativeId, kpiDefId, recordedAt])
+  @@index([representativeId, status, recordedAt(sort: Desc)])
+  @@index([representativeId, kpiDefId, fiscalYear])
+  @@index([kpiDefId, fiscalYear, status])
+  @@index([recordedAt(sort: Desc)])
   @@map("kpi_records")
 }
 
-// ── projects ─────────────────────────────────────────────────────────────────
+// ── Global Trade & Agri-Economic Time-Series ───────────────────────────────────
+// NOTE: TimescaleDB hypertable conversion applied in SQL migration (created_at).
+
+model CommodityPriceLog {
+  id              String   @default(uuid()) @db.Uuid
+  commodityCode   String   @map("commodity_code") @db.VarChar(50)
+  countryCode     String   @map("country_code") @db.Char(3)
+  countryName     String   @map("country_name") @db.VarChar(120)
+  unitPriceUsd    Decimal  @map("unit_price_usd") @db.Decimal(18, 4)
+  shippingCostUsd Decimal? @map("shipping_cost_usd") @db.Decimal(18, 2)
+  tariffRate      Decimal? @map("tariff_rate") @db.Decimal(8, 4)
+  landedCostUsd   Decimal? @map("landed_cost_usd") @db.Decimal(18, 2)
+  sourceRank      Int?     @map("source_rank")
+  metadata        Json?
+
+  /// BD administrative context (optional — for domestic arbitrage overlays)
+  adminUnitId String?    @map("admin_unit_id") @db.Uuid
+  adminUnit   AdminUnit? @relation(fields: [adminUnitId], references: [id], onDelete: SetNull)
+
+  divisionId String? @map("division_id") @db.Uuid
+  districtId String? @map("district_id") @db.Uuid
+  upazilaId  String? @map("upazila_id") @db.Uuid
+
+  representativeId String?         @map("representative_id") @db.Uuid
+  representative   Representative? @relation(fields: [representativeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@id([id, createdAt])
+  @@index([commodityCode, countryCode, createdAt(sort: Desc)])
+  @@index([representativeId, createdAt(sort: Desc)])
+  @@index([divisionId, districtId, createdAt(sort: Desc)])
+  @@index([districtId, upazilaId, createdAt(sort: Desc)])
+  @@index([adminUnitId, createdAt(sort: Desc)])
+  @@map("commodity_price_logs")
+}
+
+// ── Projects & Alerts ─────────────────────────────────────────────────────────
 
 model Project {
   id              String        @id @default(uuid()) @db.Uuid
@@ -199,18 +300,17 @@ model Project {
   adminUnitId String    @map("admin_unit_id") @db.Uuid
   adminUnit   AdminUnit @relation(fields: [adminUnitId], references: [id], onDelete: Restrict)
 
-  redFlagAlerts RedFlagAlert[]
-  milestoneQueue  BlockchainMilestoneQueue[]
+  redFlagAlerts  RedFlagAlert[]
+  milestoneQueue BlockchainMilestoneQueue[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  @@index([adminUnitId])
-  @@index([status])
+  @@index([adminUnitId, status])
+  @@index([status, adminUnitId])
+  @@index([status, startDate(sort: Desc)])
   @@map("projects")
 }
-
-// ── red_flag_alerts ──────────────────────────────────────────────────────────
 
 model RedFlagAlert {
   id            String       @id @default(uuid()) @db.Uuid
@@ -225,14 +325,12 @@ model RedFlagAlert {
   resolvedById String? @map("resolved_by") @db.Uuid
   resolvedBy   User?   @relation("ResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  @@index([projectId])
-  @@index([resolvedAt])
+  @@index([projectId, resolvedAt])
+  @@index([severity, resolvedAt])
   @@map("red_flag_alerts")
 }
-
-// ── audit_logs ───────────────────────────────────────────────────────────────
 
 model AuditLog {
   id        BigInt   @id @default(autoincrement())
@@ -247,12 +345,10 @@ model AuditLog {
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
+  @@index([userId, createdAt(sort: Desc)])
   @@index([tableName, recordId])
   @@map("audit_logs")
 }
-
-// ── agro_markets ─────────────────────────────────────────────────────────────
 
 model AgroMarket {
   id   String         @id @default(uuid()) @db.Uuid
@@ -264,36 +360,35 @@ model AgroMarket {
   adminUnitId String    @map("admin_unit_id") @db.Uuid
   adminUnit   AdminUnit @relation(fields: [adminUnitId], references: [id], onDelete: Restrict)
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  @@index([adminUnitId])
+  @@index([adminUnitId, type])
   @@map("agro_markets")
 }
 
-// ── blockchain_milestone_queue (Fabric fallback + retry) ───────────────────────
-
 model BlockchainMilestoneQueue {
-  id                 String              @id @default(uuid()) @db.Uuid
-  projectId          String              @map("project_id") @db.Uuid
-  representativeId   String              @map("representative_id") @db.Uuid
-  allocatedBudget    Decimal             @map("allocated_budget") @db.Decimal(18, 2)
-  spendingVariance   Decimal             @map("spending_variance") @db.Decimal(18, 4)
-  progressPercentage Decimal             @map("progress_percentage") @db.Decimal(5, 2)
-  payloadHash        String              @unique @map("payload_hash") @db.VarChar(64)
-  status             BlockchainTxStatus  @default(PENDING)
-  retryCount         Int                 @default(0) @map("retry_count")
-  maxRetries         Int                 @default(5) @map("max_retries")
-  lastError          String?             @map("last_error")
-  fabricTxId         String?             @map("fabric_tx_id") @db.VarChar(128)
-  chaincodeName      String              @map("chaincode_name") @db.VarChar(120)
-  nextRetryAt        DateTime            @default(now()) @map("next_retry_at")
+  id                 String             @id @default(uuid()) @db.Uuid
+  projectId          String             @map("project_id") @db.Uuid
+  representativeId   String             @map("representative_id") @db.Uuid
+  allocatedBudget    Decimal            @map("allocated_budget") @db.Decimal(18, 2)
+  spendingVariance   Decimal            @map("spending_variance") @db.Decimal(18, 4)
+  progressPercentage Decimal            @map("progress_percentage") @db.Decimal(5, 2)
+  payloadHash        String             @unique @map("payload_hash") @db.VarChar(64)
+  status             BlockchainTxStatus @default(PENDING)
+  retryCount         Int                @default(0) @map("retry_count")
+  maxRetries         Int                @default(5) @map("max_retries")
+  lastError          String?            @map("last_error")
+  fabricTxId         String?            @map("fabric_tx_id") @db.VarChar(128)
+  chaincodeName      String             @map("chaincode_name") @db.VarChar(120)
+  nextRetryAt        DateTime           @default(now()) @map("next_retry_at") @db.Timestamptz
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([status, nextRetryAt])
-  @@index([projectId])
+  @@index([representativeId, status])
+  @@index([projectId, status])
   @@map("blockchain_milestone_queue")
 }

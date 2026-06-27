@@ -16,6 +16,7 @@ import {
 } from "./infrastructure/messaging/gov-queue.consumer";
 import { initSocketServer } from "./infrastructure/socket/socket.server";
 import { registerModules } from "./modules/register-modules";
+import { container } from "./core/di/container";
 
 const app = express();
 const httpServer = createServer(app);
@@ -38,6 +39,7 @@ initSocketServer(httpServer);
 async function bootstrap(): Promise<void> {
   await prisma.$connect();
   await startGovQueueConsumer();
+  container.blockchainRetryWorker.start();
 
   httpServer.listen(env.API_GATEWAY_PORT, () => {
     console.info(`[gateway] Port ${env.API_GATEWAY_PORT} (${env.NODE_ENV})`);
@@ -46,6 +48,8 @@ async function bootstrap(): Promise<void> {
 
 async function shutdown(signal: string): Promise<void> {
   console.info(`[gateway] ${signal} — shutting down`);
+  container.blockchainRetryWorker.stop();
+  await container.fabricClient.disconnect();
   httpServer.close();
   await closeRabbitMq();
   await prisma.$disconnect();

@@ -13,10 +13,7 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
 
-  FABRIC_ENABLED: z
-    .string()
-    .optional()
-    .transform((v) => v === "true"),
+  FABRIC_ENABLED: z.string().default("false").transform((v) => v === "true"),
   FABRIC_CONNECTION_PROFILE_PATH: z
     .string()
     .default("../../deploy/hyperledger/connection-profile.example.json"),
@@ -26,7 +23,7 @@ const envSchema = z.object({
   FABRIC_CHAINCODE_NAME: z.string().default("project-tracker"),
   FABRIC_DISCOVERY_AS_LOCALHOST: z
     .string()
-    .optional()
+    .default("true")
     .transform((v) => v !== "false"),
   FABRIC_MAX_RETRIES: z.coerce.number().int().positive().default(5),
   FABRIC_RETRY_INTERVAL_MS: z.coerce.number().int().positive().default(30_000),

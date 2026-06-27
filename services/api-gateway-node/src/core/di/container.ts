@@ -9,13 +9,13 @@ import { BlockchainMilestoneService } from "../../modules/blockchain/blockchain.
 import { BlockchainRetryWorker } from "../../infrastructure/blockchain/retry.worker";
 
 const fabricSettings = resolveFabricSettings({
-  fabricEnabled: env.FABRIC_ENABLED ?? false,
+  fabricEnabled: env.FABRIC_ENABLED,
   fabricConnectionProfilePath: env.FABRIC_CONNECTION_PROFILE_PATH,
   fabricWalletPath: env.FABRIC_WALLET_PATH,
   fabricIdentityLabel: env.FABRIC_IDENTITY_LABEL,
   fabricChannelName: env.FABRIC_CHANNEL_NAME,
   fabricChaincodeName: env.FABRIC_CHAINCODE_NAME,
-  fabricDiscoveryAsLocalhost: env.FABRIC_DISCOVERY_AS_LOCALHOST ?? true,
+  fabricDiscoveryAsLocalhost: env.FABRIC_DISCOVERY_AS_LOCALHOST,
 });
 
 const fabricClient = new FabricGatewayClient(fabricSettings);

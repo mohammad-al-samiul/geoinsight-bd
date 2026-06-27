@@ -1,0 +1,2 @@
+# Enrolled Fabric identities are stored here (gitignored)
+# Use: node enrollAdmin.js && node registerUser.js (Fabric CA scripts)
