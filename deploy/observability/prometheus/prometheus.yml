@@ -1,0 +1,115 @@
+# GeoInsight BD — Prometheus scrape configuration
+# Mount into prometheus container; targets resolve on geoinsight_prod_net.
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+  external_labels:
+    cluster: geoinsight-bd
+    environment: production
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+rule_files:
+  - /etc/prometheus/alerts/*.yml
+
+scrape_configs:
+  # ---------------------------------------------------------------------------
+  # Prometheus self-monitoring
+  # ---------------------------------------------------------------------------
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ---------------------------------------------------------------------------
+  # Node.js API Gateway — express-prom-bundle @ /metrics
+  # ---------------------------------------------------------------------------
+  - job_name: api-gateway
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["api-gateway:4000"]
+        labels:
+          service: api-gateway
+          stack: geoinsight-bd
+
+  # ---------------------------------------------------------------------------
+  # Python AI Analytics — prometheus-fastapi-instrumentator @ /metrics
+  # ---------------------------------------------------------------------------
+  - job_name: ai-analytics
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["ai-analytics:8000"]
+        labels:
+          service: ai-analytics
+          stack: geoinsight-bd
+
+  # ---------------------------------------------------------------------------
+  # Next.js dashboard (optional process metrics if exposed)
+  # ---------------------------------------------------------------------------
+  - job_name: dashboard-nextjs
+    metrics_path: /metrics
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["dashboard-nextjs:3000"]
+        labels:
+          service: dashboard-nextjs
+          stack: geoinsight-bd
+    # Dashboard may not expose /metrics until instrumented — drop target if down.
+
+  # ---------------------------------------------------------------------------
+  # RabbitMQ — rabbitmq_prometheus plugin (port 15692)
+  # ---------------------------------------------------------------------------
+  - job_name: rabbitmq
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["rabbitmq:15692"]
+        labels:
+          service: rabbitmq
+          stack: geoinsight-bd
+
+  # ---------------------------------------------------------------------------
+  # Container CPU / memory per microservice (cAdvisor)
+  # ---------------------------------------------------------------------------
+  - job_name: cadvisor
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels:
+          stack: geoinsight-bd
+
+  # ---------------------------------------------------------------------------
+  # Host-level metrics (node_exporter)
+  # ---------------------------------------------------------------------------
+  - job_name: node
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          stack: geoinsight-bd
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL / TimescaleDB
+  # ---------------------------------------------------------------------------
+  - job_name: postgres
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          service: postgres
+          stack: geoinsight-bd
+
+  # ---------------------------------------------------------------------------
+  # Redis (optional — uncomment when cache layer is deployed)
+  # ---------------------------------------------------------------------------
+  # - job_name: redis
+  #   static_configs:
+  #     - targets: ["redis-exporter:9121"]
+  #       labels:
+  #         service: redis
+  #         stack: geoinsight-bd

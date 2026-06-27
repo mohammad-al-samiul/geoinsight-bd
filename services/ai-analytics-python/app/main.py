@@ -5,6 +5,7 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.exceptions import AppError, app_error_handler
 from app.core.lifespan import lifespan
+from app.core.metrics import setup_metrics
 from app.core.rate_limit import PublicFeedRateLimitMiddleware
 
 settings = get_settings()
@@ -30,3 +31,4 @@ app.add_middleware(
 
 app.add_exception_handler(AppError, app_error_handler)
 app.include_router(api_router)
+setup_metrics(app)

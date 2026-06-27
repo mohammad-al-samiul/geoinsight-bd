@@ -1,0 +1,206 @@
+# GeoInsight BD — Prometheus alerting rules
+# Loaded by deploy/observability/prometheus/prometheus.yml
+
+groups:
+  - name: geoinsight-api
+    interval: 30s
+    rules:
+      - alert: ApiGatewayDown
+        expr: up{job="api-gateway"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "API Gateway is unreachable"
+          description: "Prometheus cannot scrape api-gateway:4000/metrics for more than 2 minutes."
+
+      - alert: ApiGatewayHighErrorRate
+        expr: |
+          (
+            sum(rate(http_request_duration_seconds_count{job="api-gateway",status_code=~"5.."}[5m]))
+            /
+            sum(rate(http_request_duration_seconds_count{job="api-gateway"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "API Gateway 5xx error rate above 5%"
+          description: "HTTP 5xx ratio is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      - alert: ApiGatewayHighLatencyP99
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(http_request_duration_seconds_bucket{job="api-gateway"}[5m])) by (le)
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "API Gateway p99 latency above 2s"
+          description: "p99 request latency is {{ $value | humanizeDuration }}."
+
+      - alert: AiAnalyticsDown
+        expr: up{job="ai-analytics"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: ml-platform
+        annotations:
+          summary: "AI Analytics service is down"
+          description: "FastAPI metrics endpoint unreachable for more than 2 minutes."
+
+      - alert: AiAnalyticsHighErrorRate
+        expr: |
+          (
+            sum(rate(http_request_duration_seconds_count{job="ai-analytics",status=~"5.."}[5m]))
+            /
+            sum(rate(http_request_duration_seconds_count{job="ai-analytics"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: ml-platform
+        annotations:
+          summary: "AI Analytics 5xx error rate above 5%"
+          description: "HTTP 5xx ratio is {{ $value | humanizePercentage }}."
+
+  - name: geoinsight-messaging
+    interval: 30s
+    rules:
+      - alert: RabbitMQDown
+        expr: up{job="rabbitmq"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "RabbitMQ cluster node is down"
+          description: "rabbitmq_prometheus plugin on :15692 is not responding."
+
+      - alert: RabbitMQNoConsumers
+        expr: |
+          sum(rabbitmq_queue_consumers{job="rabbitmq", queue=~"gov_core_queue|ai.*"}) == 0
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Critical RabbitMQ queues have zero consumers"
+          description: "Gov/AI workload queues report no active consumers."
+
+      - alert: RabbitMQQueueDepthHigh
+        expr: |
+          rabbitmq_queue_messages{job="rabbitmq", queue!~".*\\.pid$"} > 10000
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "RabbitMQ queue depth exceeds 10k messages"
+          description: "Queue {{ $labels.queue }} has {{ $value }} ready messages."
+
+      - alert: RabbitMQMemoryAlarm
+        expr: rabbitmq_process_resident_memory_bytes{job="rabbitmq"} > 900000000
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "RabbitMQ memory usage high"
+          description: "Broker resident memory is {{ $value | humanize1024 }}B — risk of memory alarm."
+
+  - name: geoinsight-datastores
+    interval: 30s
+    rules:
+      - alert: PostgresDown
+        expr: up{job="postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: dba
+        annotations:
+          summary: "PostgreSQL exporter unreachable"
+          description: "TimescaleDB metrics endpoint down for more than 2 minutes."
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Redis node is down"
+          description: "Redis exporter not responding — enable redis job in prometheus.yml when deployed."
+
+  - name: geoinsight-blockchain
+    interval: 30s
+    rules:
+      - alert: BlockchainSubmissionStalled
+        expr: |
+          increase(geoinsight_blockchain_blocks_total[1h]) == 0
+          and geoinsight_blockchain_queue_depth{status="pending"} > 0
+        for: 30m
+        labels:
+          severity: warning
+          team: ledger
+        annotations:
+          summary: "Blockchain submissions stalled with pending queue"
+          description: "No blocks anchored in 1h while {{ $value }} milestones remain pending."
+
+      - alert: BlockchainQueueBacklog
+        expr: sum(geoinsight_blockchain_queue_depth{status="pending"}) > 50
+        for: 15m
+        labels:
+          severity: warning
+          team: ledger
+        annotations:
+          summary: "Blockchain retry queue backlog"
+          description: "{{ $value }} milestone submissions awaiting Fabric retry."
+
+      - alert: BlockchainBlockIntervalSlow
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(geoinsight_blockchain_block_interval_seconds_bucket[1h])) by (le)
+          ) > 1800
+        for: 1h
+        labels:
+          severity: info
+          team: ledger
+        annotations:
+          summary: "Blockchain block-generation interval p95 exceeds 30 minutes"
+          description: "p95 inter-block interval is {{ $value | humanizeDuration }}."
+
+  - name: geoinsight-containers
+    interval: 30s
+    rules:
+      - alert: ContainerHighMemory
+        expr: |
+          (
+            container_memory_usage_bytes{name=~"geoinsight-.*"}
+            /
+            container_spec_memory_limit_bytes{name=~"geoinsight-.*"}
+          ) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Container memory above 90% of limit"
+          description: "{{ $labels.name }} memory utilization is {{ $value | humanizePercentage }}."
+
+      - alert: ContainerCpuThrottling
+        expr: |
+          rate(container_cpu_cfs_throttled_seconds_total{name=~"geoinsight-.*"}[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Container CPU throttling detected"
+          description: "{{ $labels.name }} is being CPU-throttled."

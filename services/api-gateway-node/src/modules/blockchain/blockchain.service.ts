@@ -7,6 +7,10 @@ import {
 } from "../../infrastructure/blockchain/payload-hasher";
 import { BlockchainQueueRepository } from "../../infrastructure/blockchain/queue.repository";
 import { SubmitMilestoneDto } from "./blockchain.validator";
+import {
+  recordBlockchainBlock,
+  refreshBlockchainQueueGauges,
+} from "../../core/metrics/metrics";
 
 export type MilestoneSubmitStatus = "submitted" | "queued" | "duplicate";
 
@@ -50,6 +54,7 @@ export class BlockchainMilestoneService {
       );
 
       await this.persistSuccess(dto.projectId, payloadHash, transactionId, existing?.id);
+      recordBlockchainBlock("direct");
 
       return {
         status: "submitted",
@@ -86,6 +91,7 @@ export class BlockchainMilestoneService {
           where: { id: record.projectId },
           data: { blockchainTx: transactionId },
         });
+        recordBlockchainBlock("retry_worker");
         processed += 1;
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
@@ -98,6 +104,7 @@ export class BlockchainMilestoneService {
       }
     }
 
+    await refreshBlockchainQueueGauges().catch(() => undefined);
     return processed;
   }
 

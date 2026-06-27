@@ -1,0 +1,140 @@
+# GeoInsight BD — Observability overlay (Prometheus + Grafana + Alertmanager)
+# Run alongside production stack on the same Docker network.
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up -d
+#
+# Grafana: http://localhost:3001 (default admin / see GRAFANA_ADMIN_PASSWORD)
+# Prometheus: http://localhost:9090
+
+name: ${COMPOSE_PROJECT_NAME:-geoinsight-bd-prod}-observability
+
+x-obs-logging: &obs-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    container_name: geoinsight-prometheus
+    restart: unless-stopped
+    logging: *obs-logging
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+      - --web.enable-admin-api
+    volumes:
+      - ./deploy/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/observability/prometheus/alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - geoinsight_net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: geoinsight-alertmanager
+    restart: unless-stopped
+    logging: *obs-logging
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./deploy/observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    networks:
+      - geoinsight_net
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: geoinsight-grafana
+    restart: unless-stopped
+    logging: *obs-logging
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-changeme}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
+      GF_INSTALL_PLUGINS: ""
+    volumes:
+      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    networks:
+      - geoinsight_net
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.51.0
+    container_name: geoinsight-cadvisor
+    restart: unless-stopped
+    logging: *obs-logging
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - geoinsight_net
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.0
+    container_name: geoinsight-node-exporter
+    restart: unless-stopped
+    logging: *obs-logging
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - geoinsight_net
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: geoinsight-postgres-exporter
+    restart: unless-stopped
+    logging: *obs-logging
+    environment:
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoinsight_db}?sslmode=disable
+    networks:
+      - geoinsight_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  geoinsight_net:
+    name: geoinsight_prod_net
+    external: true
+
+volumes:
+  prometheus_data:
+    name: geoinsight_prometheus_data
+  alertmanager_data:
+    name: geoinsight_alertmanager_data
+  grafana_data:
+    name: geoinsight_grafana_data

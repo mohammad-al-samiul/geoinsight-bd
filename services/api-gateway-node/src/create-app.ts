@@ -8,6 +8,7 @@ import {
   notFoundHandler,
 } from "./core/middlewares/error-handler.middleware";
 import { globalRateLimiter } from "./core/middlewares/rate-limiter.middleware";
+import { prometheusMiddleware } from "./core/metrics/prometheus.middleware";
 import { registerModules } from "./modules/register-modules";
 
 /** Express app factory — safe for supertest (no listen, no RabbitMQ, no sockets). */
@@ -20,6 +21,7 @@ export function createApp(): Express {
   app.use(express.json({ limit: "1mb" }));
 
   if (env.NODE_ENV !== "test") {
+    app.use(prometheusMiddleware);
     app.use(globalRateLimiter);
   }
 
