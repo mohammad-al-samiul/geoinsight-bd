@@ -90,7 +90,10 @@ services:
 
   pgbouncer:
     <<: *app-restart
-    image: pgbouncer/pgbouncer:1.23.1
+    build:
+      context: .
+      dockerfile: deploy/pgbouncer/Dockerfile
+    image: geoinsight/pgbouncer:1.23.1
     container_name: geoinsight-pgbouncer
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -100,8 +103,11 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        echo "\"$${POSTGRES_USER}\" \"$${POSTGRES_PASSWORD}\"" > /etc/pgbouncer/userlist.txt
-        exec /opt/pgbouncer/pgbouncer /etc/pgbouncer/pgbouncer.ini
+        echo "\"$${POSTGRES_USER}\" \"$${POSTGRES_PASSWORD}\"" > /tmp/userlist.txt
+        chown pgbouncer:pgbouncer /tmp/userlist.txt
+        exec su-exec pgbouncer /usr/bin/pgbouncer /etc/pgbouncer/pgbouncer.ini
+    ports:
+      - "${PGBOUNCER_PORT:-6432}:6432"
     depends_on:
       postgres:
         condition: service_healthy

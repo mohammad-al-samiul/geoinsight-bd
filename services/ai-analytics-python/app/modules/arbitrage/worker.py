@@ -56,7 +56,7 @@ class ArbitrageBackgroundWorker:
                         ArbitrageRequest(commodity=commodity, quantity_mt=1000.0),
                     )
                     await self._publisher.publish(
-                        routing_key="agro.arbitrage",
+                        routing_key="gov.arbitrage",
                         payload={
                             "type": "arbitrage_update",
                             "job_id": str(uuid.uuid4()),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CircleMarker, GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 import type { GeoJSON as GeoJSONLayer, Layer, Path, PathOptions } from "leaflet";
@@ -12,8 +12,9 @@ import {
 } from "@/lib/geojson-bd";
 import type { AdminFilterState } from "@/types";
 import type { GeoFeatureProperties, RedFlagMarker } from "@/types/dashboard";
-import { getDrillChildType } from "@/lib/filter-utils";
+import { getDrillChildType, getDrillParentId } from "@/lib/filter-utils";
 import { cn } from "@/lib/utils";
+import { MapSkeleton } from "@/components/ui/skeleton";
 
 interface ChoroplethMapInnerProps {
   filter: AdminFilterState;
@@ -26,11 +27,15 @@ interface ChoroplethMapInnerProps {
 function MapBoundsSync({ filter }: { filter: AdminFilterState }) {
   const map = useMap();
   useEffect(() => {
-    const bounds = getMapBoundsForFilter(filter);
-    if (bounds) {
-      map.fitBounds(bounds, { padding: [24, 24], maxZoom: 10, animate: true });
-    } else {
-      map.setView(BD_MAP_CENTER, BD_MAP_ZOOM, { animate: true });
+    try {
+      const bounds = getMapBoundsForFilter(filter);
+      if (bounds) {
+        map.fitBounds(bounds, { padding: [24, 24], maxZoom: 10, animate: true });
+      } else {
+        map.setView(BD_MAP_CENTER, BD_MAP_ZOOM, { animate: true });
+      }
+    } catch {
+      map.setView(BD_MAP_CENTER, BD_MAP_ZOOM, { animate: false });
     }
   }, [filter, map]);
   return null;
@@ -51,6 +56,11 @@ export function ChoroplethMapInner({
   onFeatureClick,
 }: ChoroplethMapInnerProps) {
   const layerRef = useRef<GeoJSONLayer | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const style = (feature?: Feature): PathOptions => {
     const score = feature?.properties?.performanceScore ?? 50;
@@ -71,17 +81,36 @@ export function ChoroplethMapInner({
     );
     layer.on({
       mouseover: (e) => {
-        const l = e.target as Path;
-        l.setStyle({ weight: 2.5, fillOpacity: 0.88, color: "#34d399" });
+        try {
+          const l = e.target as Path;
+          l.setStyle({ weight: 2.5, fillOpacity: 0.88, color: "#34d399" });
+        } catch {
+          // layer detached during re-render
+        }
       },
       mouseout: (e) => {
-        layerRef.current?.resetStyle(e.target as Path);
+        try {
+          const target = e.target as Path;
+          if (layerRef.current) {
+            layerRef.current.resetStyle(target);
+          } else {
+            target.setStyle(style(feature));
+          }
+        } catch {
+          // GeoJSON layer was replaced while pointer was over a feature
+        }
       },
       click: () => onFeatureClick(props),
     });
   };
 
   const childLabel = getDrillChildType(filter);
+  const parentId = getDrillParentId(filter);
+  const geoKey = `${childLabel}-${parentId ?? "root"}-${geoJson.features.length}`;
+
+  if (!mounted) {
+    return <MapSkeleton />;
+  }
 
   return (
     <div
@@ -103,7 +132,7 @@ export function ChoroplethMapInner({
         />
         <MapBoundsSync filter={filter} />
         <GeoJSON
-          key={`${childLabel}-${geoJson.features.map((f) => f.properties?.id).join(",")}`}
+          key={geoKey}
           ref={layerRef}
           data={geoJson}
           style={style}
@@ -121,8 +150,7 @@ export function ChoroplethMapInner({
               weight: 2,
               className: "marker-pulse",
             }}
-          >
-          </CircleMarker>
+          />
         ))}
       </MapContainer>
     </div>

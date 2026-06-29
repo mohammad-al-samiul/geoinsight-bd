@@ -36,6 +36,15 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const LOADING_USER: AuthUser = {
+  id: "loading",
+  email: "loading@geoinsight.gov.bd",
+  fullName: "Authenticating…",
+  role: "PMO",
+  adminUnitId: null,
+  adminUnitName: ROLE_META.PMO.label,
+};
+
 function mapProfile(data: MeResponse["data"]): AuthUser {
   return {
     id: data.id,
@@ -45,6 +54,14 @@ function mapProfile(data: MeResponse["data"]): AuthUser {
     adminUnitId: data.adminUnitId,
     adminUnitName: data.adminUnit?.name,
   };
+}
+
+function redirectToLogin() {
+  if (typeof window === "undefined") return;
+  const redirect = encodeURIComponent(
+    window.location.pathname + window.location.search,
+  );
+  window.location.href = `/login?redirect=${redirect}`;
 }
 
 export function AuthProvider({
@@ -60,8 +77,28 @@ export function AuthProvider({
   const refreshProfile = useCallback(async () => {
     try {
       const json = await authFetch<MeResponse>("/api/auth/me");
-      if (json.success) setUser(mapProfile(json.data));
+      if (json.success) {
+        setUser(mapProfile(json.data));
+        return;
+      }
+      setUser(null);
     } catch {
+      const refreshed = await fetch("/api/auth/refresh", {
+        method: "POST",
+        credentials: "include",
+      }).then((r) => r.ok);
+
+      if (refreshed) {
+        try {
+          const json = await authFetch<MeResponse>("/api/auth/me");
+          if (json.success) {
+            setUser(mapProfile(json.data));
+            return;
+          }
+        } catch {
+          // fall through
+        }
+      }
       setUser(null);
     }
   }, []);
@@ -72,13 +109,39 @@ export function AuthProvider({
     }
   }, [initialUser, refreshProfile]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    await authFetch("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
-    await refreshProfile();
-  }, [refreshProfile]);
+  // Proactive refresh before access token expires (15 min TTL)
+  useEffect(() => {
+    if (!user) return;
+
+    const refreshSession = async () => {
+      try {
+        const res = await fetch("/api/auth/refresh", {
+          method: "POST",
+          credentials: "include",
+        });
+        if (!res.ok) {
+          setUser(null);
+          redirectToLogin();
+        }
+      } catch {
+        // ignore transient network errors
+      }
+    };
+
+    const interval = setInterval(refreshSession, 12 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      await authFetch("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      await refreshProfile();
+    },
+    [refreshProfile],
+  );
 
   const logout = useCallback(async () => {
     await authFetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
@@ -103,18 +166,18 @@ export function AuthProvider({
 
 export function useAuth(): AuthUser {
   const ctx = useContext(AuthContext);
-  if (!ctx?.user) {
-    if (ctx?.isLoading) {
-      return {
-        id: "loading",
-        email: "loading@geoinsight.gov.bd",
-        fullName: "Authenticating…",
-        role: "PMO",
-        adminUnitId: null,
-        adminUnitName: ROLE_META.PMO.label,
-      };
+  if (!ctx) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+
+  useEffect(() => {
+    if (!ctx.isLoading && !ctx.user) {
+      redirectToLogin();
     }
-    throw new Error("useAuth requires an authenticated session");
+  }, [ctx.isLoading, ctx.user]);
+
+  if (!ctx.user) {
+    return LOADING_USER;
   }
   return ctx.user;
 }

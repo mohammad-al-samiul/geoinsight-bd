@@ -26,7 +26,7 @@ export function CommandBar({
   const meta = ROLE_META[user.role];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-command-border bg-command/95 backdrop-blur-md">
+    <header className="sticky top-0 z-[100] overflow-visible border-b border-command-border bg-command shadow-panel">
       <div className="flex h-14 items-center gap-3 px-4 lg:px-6">
         <Button
           variant="ghost"
@@ -94,7 +94,7 @@ export function CommandBar({
       </div>
 
       <div className={cn("border-t border-command-border/50 px-4 py-3 lg:px-6", sidebarCollapsed && "lg:pl-4")}>
-        <AdminCascadeFilter />
+      <AdminCascadeFilter variant="solid" />
       </div>
     </header>
   );

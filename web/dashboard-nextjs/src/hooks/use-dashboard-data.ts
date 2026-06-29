@@ -2,11 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { AdminFilterState } from "@/types";
-import {
-  buildMockMetrics,
-  fetchDashboardMetrics,
-  fetchRedFlagMarkers,
-} from "@/lib/dashboard-data";
+import { fetchDashboardMetrics, fetchRedFlagMarkers } from "@/lib/dashboard-data";
+import { buildMockMetrics } from "@/lib/dashboard-mock";
 import type {
   DashboardMetrics,
   RedFlagMarker,

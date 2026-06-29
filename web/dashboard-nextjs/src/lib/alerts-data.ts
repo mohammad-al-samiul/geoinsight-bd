@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 import { getUnitById } from "@/lib/admin-units";
+import { resolveUnitName } from "@/lib/unit-names";
 import type { AdminFilterState } from "@/types";
 import type { AnomalyAlert } from "@/types/alerts";
 import {
@@ -39,8 +40,8 @@ function buildHeadline(row: ApiAlertRow, unitName: string): string {
 }
 
 function mapApiAlert(row: ApiAlertRow): AnomalyAlert {
-  const mockUnit = getUnitById(row.project.adminUnitId);
-  const unitName = mockUnit?.name ?? "Administrative Unit";
+  const unitName = getUnitById(row.project.adminUnitId)?.name
+    ?? resolveUnitName(row.project.adminUnitId);
 
   return {
     id: row.id,

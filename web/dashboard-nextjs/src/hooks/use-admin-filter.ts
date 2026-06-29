@@ -4,6 +4,7 @@ import { useCallback, useMemo, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { AdminFilterState, AdminUnitType } from "@/types";
 import { ADMIN_FILTER_PARAMS } from "@/types";
+import { getAncestorFilter } from "@/lib/admin-units";
 
 const EMPTY: AdminFilterState = {
   divisionId: null,
@@ -12,12 +13,22 @@ const EMPTY: AdminFilterState = {
   unionId: null,
 };
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function readId(params: URLSearchParams, key: string): string | null {
+  const value = params.get(key);
+  if (!value) return null;
+  if (!UUID_RE.test(value)) return null;
+  return value;
+}
+
 function readFilter(params: URLSearchParams): AdminFilterState {
   return {
-    divisionId: params.get(ADMIN_FILTER_PARAMS.division),
-    districtId: params.get(ADMIN_FILTER_PARAMS.district),
-    upazilaId: params.get(ADMIN_FILTER_PARAMS.upazila),
-    unionId: params.get(ADMIN_FILTER_PARAMS.union),
+    divisionId: readId(params, ADMIN_FILTER_PARAMS.division),
+    districtId: readId(params, ADMIN_FILTER_PARAMS.district),
+    upazilaId: readId(params, ADMIN_FILTER_PARAMS.upazila),
+    unionId: readId(params, ADMIN_FILTER_PARAMS.union),
   };
 }
 
@@ -85,34 +96,7 @@ export function useAdminFilter() {
 
   const drillToUnit = useCallback(
     (unit: { id: string; type: AdminUnitType; parentId: string | null }) => {
-      switch (unit.type) {
-        case "DIVISION":
-          setFilter({
-            divisionId: unit.id,
-            districtId: null,
-            upazilaId: null,
-            unionId: null,
-          });
-          break;
-        case "DISTRICT":
-          setFilter({
-            divisionId: unit.parentId,
-            districtId: unit.id,
-            upazilaId: null,
-            unionId: null,
-          });
-          break;
-        case "UPAZILA":
-          setFilter({
-            districtId: unit.parentId,
-            upazilaId: unit.id,
-            unionId: null,
-          });
-          break;
-        case "UNION":
-          setFilter({ upazilaId: unit.parentId, unionId: unit.id });
-          break;
-      }
+      setFilter(getAncestorFilter(unit.id));
     },
     [setFilter],
   );

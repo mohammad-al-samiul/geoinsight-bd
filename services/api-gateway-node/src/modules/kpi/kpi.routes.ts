@@ -32,6 +32,7 @@ export function createKpiRoutes(
     "/records",
     authenticate(),
     validate(listKpiRecordsSchema, "query"),
+    rbac.authorize({ unitIdKey: "unitId", source: "query", requireUnit: false }),
     controller.listRecords,
   );
   router.post(

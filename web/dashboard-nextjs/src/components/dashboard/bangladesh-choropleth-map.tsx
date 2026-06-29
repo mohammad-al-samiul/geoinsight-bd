@@ -6,6 +6,7 @@ import { MapPin } from "lucide-react";
 import { MapSkeleton } from "@/components/ui/skeleton";
 import { getVisibleGeoJson } from "@/lib/geojson-bd";
 import { getDrillChildType } from "@/lib/filter-utils";
+import { useAdminHierarchy } from "@/hooks/use-admin-hierarchy";
 import type { AdminFilterState } from "@/types";
 import type { GeoFeatureProperties, RedFlagMarker } from "@/types/dashboard";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +32,11 @@ export function BangladeshChoroplethMap({
   mapPulseKey,
   onFeatureClick,
 }: BangladeshChoroplethMapProps) {
-  const geoJson = useMemo(() => getVisibleGeoJson(filter), [filter]);
+  const { ready: hierarchyReady } = useAdminHierarchy();
+  const geoJson = useMemo(
+    () => getVisibleGeoJson(filter),
+    [filter, hierarchyReady],
+  );
   const level = getDrillChildType(filter);
 
   return (
@@ -48,7 +53,7 @@ export function BangladeshChoroplethMap({
         </Badge>
       </div>
 
-      <div className="relative min-h-[300px] flex-1">
+      <div className="relative z-0 min-h-[300px] flex-1 isolate">
         <ChoroplethMapInner
           filter={filter}
           geoJson={geoJson}

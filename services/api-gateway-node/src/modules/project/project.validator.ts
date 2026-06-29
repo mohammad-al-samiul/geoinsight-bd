@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ProjectStatus } from "@prisma/client";
 
 export const listProjectsSchema = z.object({
-  unitId: z.string().uuid(),
+  unitId: z.string().uuid().optional(),
   status: z.nativeEnum(ProjectStatus).optional(),
 });
 

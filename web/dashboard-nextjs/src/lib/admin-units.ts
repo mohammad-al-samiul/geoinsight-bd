@@ -1,34 +1,58 @@
 import type { AdminUnit } from "@/types";
+import { getCachedAdminUnits, loadAdminHierarchy } from "@/lib/admin-hierarchy";
 
-/**
- * Representative Bangladesh admin hierarchy (sample nodes).
- * Production: fetched from GET /api/v1/admin-units/:id/tree
- */
-export const ADMIN_UNITS: AdminUnit[] = [
-  { id: "div-dhaka", code: "30", name: "Dhaka", nameBn: "ঢাকা", type: "DIVISION", parentId: null },
-  { id: "div-chattogram", code: "20", name: "Chattogram", nameBn: "চট্টগ্রাম", type: "DIVISION", parentId: null },
-  { id: "div-rajshahi", code: "50", name: "Rajshahi", nameBn: "রাজশাহী", type: "DIVISION", parentId: null },
+/** Fallback sample nodes when API hierarchy is not yet loaded. */
+const FALLBACK_UNITS: AdminUnit[] = [];
 
-  { id: "dist-dhaka", code: "3026", name: "Dhaka", nameBn: "ঢাকা", type: "DISTRICT", parentId: "div-dhaka" },
-  { id: "dist-gazipur", code: "3033", name: "Gazipur", nameBn: "গাজীপুর", type: "DISTRICT", parentId: "div-dhaka" },
-  { id: "dist-cumilla", code: "2019", name: "Cumilla", nameBn: "কুমিল্লা", type: "DISTRICT", parentId: "div-chattogram" },
-
-  { id: "upa-savar", code: "302604", name: "Savar", nameBn: "সাভার", type: "UPAZILA", parentId: "dist-dhaka" },
-  { id: "upa-keraniganj", code: "302605", name: "Keraniganj", nameBn: "কেরানীগঞ্জ", type: "UPAZILA", parentId: "dist-dhaka" },
-  { id: "upa-tongi", code: "303304", name: "Tongi", nameBn: "টঙ্গী", type: "UPAZILA", parentId: "dist-gazipur" },
-
-  { id: "uni-ashulia", code: "30260401", name: "Ashulia", nameBn: "আশুলিয়া", type: "UNION", parentId: "upa-savar" },
-  { id: "uni-birulia", code: "30260402", name: "Birulia", nameBn: "বিরুলিয়া", type: "UNION", parentId: "upa-savar" },
-  { id: "uni-keraniganj-s", code: "30260501", name: "South Keraniganj", nameBn: "দক্ষিণ কেরানীগঞ্জ", type: "UNION", parentId: "upa-keraniganj" },
-];
+export async function ensureAdminUnits(): Promise<AdminUnit[]> {
+  const loaded = await loadAdminHierarchy();
+  return loaded.length > 0 ? loaded : FALLBACK_UNITS;
+}
 
 export function getChildren(parentId: string | null, type: AdminUnit["type"]): AdminUnit[] {
-  return ADMIN_UNITS.filter((u) => u.parentId === parentId && u.type === type);
+  const units = getCachedAdminUnits();
+  return units.filter((u) => u.parentId === parentId && u.type === type);
 }
 
 export function getUnitById(id: string | null): AdminUnit | undefined {
   if (!id) return undefined;
-  return ADMIN_UNITS.find((u) => u.id === id);
+  return getCachedAdminUnits().find((u) => u.id === id);
+}
+
+/** Walk parent chain from a unit up to division. */
+export function getAncestorFilter(unitId: string): {
+  divisionId: string | null;
+  districtId: string | null;
+  upazilaId: string | null;
+  unionId: string | null;
+} {
+  const result = {
+    divisionId: null as string | null,
+    districtId: null as string | null,
+    upazilaId: null as string | null,
+    unionId: null as string | null,
+  };
+
+  let current = getUnitById(unitId);
+  while (current) {
+    switch (current.type) {
+      case "DIVISION":
+        result.divisionId = current.id;
+        break;
+      case "DISTRICT":
+        result.districtId = current.id;
+        break;
+      case "UPAZILA":
+        result.upazilaId = current.id;
+        break;
+      case "UNION":
+        result.unionId = current.id;
+        break;
+    }
+    current = current.parentId ? getUnitById(current.parentId) : undefined;
+  }
+
+  return result;
 }
 
 export function getBreadcrumb(filter: {

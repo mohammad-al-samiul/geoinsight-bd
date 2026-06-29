@@ -1,4 +1,15 @@
+import { config as loadDotenv } from "dotenv";
+import { existsSync } from "fs";
+import { resolve } from "path";
 import { z } from "zod";
+
+const serviceDir = resolve(__dirname, "../../..");
+const monorepoRoot = resolve(serviceDir, "../..");
+
+if (existsSync(resolve(monorepoRoot, ".env"))) {
+  loadDotenv({ path: resolve(monorepoRoot, ".env") });
+}
+loadDotenv({ path: resolve(serviceDir, ".env"), override: true });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),

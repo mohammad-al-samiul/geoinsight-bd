@@ -46,7 +46,11 @@
 
 @layer utilities {
   .glass-panel {
-    @apply border border-border/60 bg-card/80 backdrop-blur-md;
+    @apply border border-border/60 bg-card/90 backdrop-blur-sm;
+  }
+
+  .font-bengali {
+    font-family: var(--font-bengali), var(--font-geist-sans), system-ui, sans-serif;
   }
 
   .text-gradient-gov {

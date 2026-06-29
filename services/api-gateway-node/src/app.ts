@@ -16,13 +16,12 @@ import { createApp } from "./create-app";
 const app = createApp();
 const httpServer = createServer(app);
 
-if (env.NODE_ENV !== "test") {
-  initSocketServer(httpServer);
-}
-
 async function bootstrap(): Promise<void> {
   await connectDatabase();
   await connectRedis();
+  if (env.NODE_ENV !== "test") {
+    initSocketServer(httpServer);
+  }
   await startGovQueueConsumer();
   container.blockchainRetryWorker.start();
 

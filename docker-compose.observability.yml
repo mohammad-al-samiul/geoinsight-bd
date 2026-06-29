@@ -3,7 +3,7 @@
 #
 #   docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up -d
 #
-# Grafana: http://localhost:3001 (default admin / see GRAFANA_ADMIN_PASSWORD)
+# Grafana: http://localhost:3002 (default admin / see GRAFANA_ADMIN_PASSWORD)
 # Prometheus: http://localhost:9090
 
 name: ${COMPOSE_PROJECT_NAME:-geoinsight-bd-prod}-observability
@@ -68,14 +68,14 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-changeme}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3002}
       GF_INSTALL_PLUGINS: ""
     volumes:
       - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./deploy/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     ports:
-      - "${GRAFANA_PORT:-3001}:3000"
+      - "${GRAFANA_PORT:-3002}:3000"
     networks:
       - geoinsight_net
     depends_on:

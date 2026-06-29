@@ -5,7 +5,10 @@ import { CreateKpiRecordDto, ListKpiRecordsQuery } from "./kpi.validator";
 
 export class KpiService {
   async listDefinitions() {
-    return prismaRead.kpiDefinition.findMany({ orderBy: { code: "asc" } });
+    return prismaRead.kpiDefinition.findMany({
+      select: { id: true, code: true, name: true, unit: true, appliesTo: true },
+      orderBy: { code: "asc" },
+    });
   }
 
   async listRecords(query: ListKpiRecordsQuery) {
@@ -14,10 +17,37 @@ export class KpiService {
         ...(query.representativeId && { representativeId: query.representativeId }),
         ...(query.kpiDefId && { kpiDefId: query.kpiDefId }),
         ...(query.fiscalYear && { fiscalYear: query.fiscalYear }),
+        ...(query.unitId && {
+          representative: {
+            OR: [
+              { adminUnitId: query.unitId },
+              {
+                adminUnit: {
+                  OR: [
+                    { id: query.unitId },
+                    { divisionId: query.unitId },
+                    { districtId: query.unitId },
+                    { upazilaId: query.unitId },
+                    { parentId: query.unitId },
+                  ],
+                },
+              },
+            ],
+          },
+        }),
       },
       include: {
         kpiDef: { select: { code: true, name: true, unit: true } },
-        representative: { select: { id: true, name: true, adminUnitId: true } },
+        representative: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            party: true,
+            adminUnitId: true,
+            adminUnit: { select: { id: true, name: true, nameBn: true, type: true } },
+          },
+        },
       },
       orderBy: { recordedAt: "desc" },
       take: query.limit,

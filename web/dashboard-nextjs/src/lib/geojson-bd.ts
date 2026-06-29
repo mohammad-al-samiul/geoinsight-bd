@@ -1,16 +1,13 @@
 import type { Feature, FeatureCollection, Polygon } from "geojson";
-import type { AdminFilterState } from "@/types";
+import type { AdminFilterState, AdminUnit } from "@/types";
 import { getDrillChildType, getDrillParentId } from "@/lib/filter-utils";
+import { resolveBnLabel } from "@/lib/admin-labels";
+import { getCachedAdminUnits } from "@/lib/admin-hierarchy";
 import type { GeoFeatureProperties } from "@/types/dashboard";
 
 type Ring = [number, number][];
 
-function box(
-  west: number,
-  south: number,
-  east: number,
-  north: number,
-): Ring {
+function box(west: number, south: number, east: number, north: number): Ring {
   return [
     [west, south],
     [east, south],
@@ -20,155 +17,103 @@ function box(
   ];
 }
 
-interface UnitGeo {
+const BOX_DELTA: Record<AdminUnit["type"], number> = {
+  DIVISION: 0.55,
+  DISTRICT: 0.22,
+  UPAZILA: 0.1,
+  UNION: 0.05,
+};
+
+/** Fallback division/district polygons when hierarchy API has not loaded yet. */
+const FALLBACK_GEO: Array<{
   id: string;
   name: string;
   nameBn: string;
-  type: GeoFeatureProperties["type"];
+  type: AdminUnit["type"];
   parentId: string | null;
   ring: Ring;
-  performanceScore: number;
-  riskScore: number;
-}
-
-/** Simplified administrative polygons for choropleth demo (production: API geoJson). */
-const UNIT_GEO: UnitGeo[] = [
+}> = [
   {
-    id: "div-dhaka",
+    id: "a1000001-0001-4001-8001-000000000001",
     name: "Dhaka",
     nameBn: "ঢাকা",
     type: "DIVISION",
     parentId: null,
     ring: box(89.5, 23.2, 91.2, 24.8),
-    performanceScore: 78,
-    riskScore: 32,
   },
   {
-    id: "div-chattogram",
+    id: "a1000001-0001-4001-8001-000000000002",
     name: "Chattogram",
     nameBn: "চট্টগ্রাম",
     type: "DIVISION",
     parentId: null,
     ring: box(91.0, 20.8, 92.7, 23.5),
-    performanceScore: 71,
-    riskScore: 41,
   },
   {
-    id: "div-rajshahi",
-    name: "Rajshahi",
-    nameBn: "রাজশাহী",
-    type: "DIVISION",
-    parentId: null,
-    ring: box(88.0, 24.0, 89.8, 26.0),
-    performanceScore: 82,
-    riskScore: 24,
-  },
-  {
-    id: "dist-dhaka",
+    id: "b2000001-0001-4001-8001-000000000001",
     name: "Dhaka",
     nameBn: "ঢাকা",
     type: "DISTRICT",
-    parentId: "div-dhaka",
+    parentId: "a1000001-0001-4001-8001-000000000001",
     ring: box(90.2, 23.6, 90.55, 24.0),
-    performanceScore: 74,
-    riskScore: 38,
   },
   {
-    id: "dist-gazipur",
+    id: "b2000001-0001-4001-8001-000000000002",
     name: "Gazipur",
     nameBn: "গাজীপুর",
     type: "DISTRICT",
-    parentId: "div-dhaka",
+    parentId: "a1000001-0001-4001-8001-000000000001",
     ring: box(90.2, 23.9, 90.7, 24.3),
-    performanceScore: 69,
-    riskScore: 45,
-  },
-  {
-    id: "dist-cumilla",
-    name: "Cumilla",
-    nameBn: "কুমিল্লা",
-    type: "DISTRICT",
-    parentId: "div-chattogram",
-    ring: box(91.0, 22.8, 91.5, 23.3),
-    performanceScore: 76,
-    riskScore: 35,
-  },
-  {
-    id: "upa-savar",
-    name: "Savar",
-    nameBn: "সাভার",
-    type: "UPAZILA",
-    parentId: "dist-dhaka",
-    ring: box(90.22, 23.75, 90.42, 23.92),
-    performanceScore: 81,
-    riskScore: 28,
-  },
-  {
-    id: "upa-keraniganj",
-    name: "Keraniganj",
-    nameBn: "কেরানীগঞ্জ",
-    type: "UPAZILA",
-    parentId: "dist-dhaka",
-    ring: box(90.32, 23.62, 90.52, 23.78),
-    performanceScore: 65,
-    riskScore: 52,
-  },
-  {
-    id: "upa-tongi",
-    name: "Tongi",
-    nameBn: "টঙ্গী",
-    type: "UPAZILA",
-    parentId: "dist-gazipur",
-    ring: box(90.38, 23.88, 90.52, 24.02),
-    performanceScore: 72,
-    riskScore: 40,
-  },
-  {
-    id: "uni-ashulia",
-    name: "Ashulia",
-    nameBn: "আশুলিয়া",
-    type: "UNION",
-    parentId: "upa-savar",
-    ring: box(90.28, 23.82, 90.36, 23.9),
-    performanceScore: 84,
-    riskScore: 22,
-  },
-  {
-    id: "uni-birulia",
-    name: "Birulia",
-    nameBn: "বিরুলিয়া",
-    type: "UNION",
-    parentId: "upa-savar",
-    ring: box(90.36, 23.84, 90.42, 23.9),
-    performanceScore: 77,
-    riskScore: 30,
-  },
-  {
-    id: "uni-keraniganj-s",
-    name: "South Keraniganj",
-    nameBn: "দক্ষিণ কেরানীগঞ্জ",
-    type: "UNION",
-    parentId: "upa-keraniganj",
-    ring: box(90.38, 23.64, 90.48, 23.72),
-    performanceScore: 58,
-    riskScore: 61,
   },
 ];
 
-function toFeature(unit: UnitGeo): Feature<Polygon, GeoFeatureProperties> {
+function pseudoScore(id: string, offset: number): number {
+  let h = offset;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 100;
+  return 42 + (h % 45);
+}
+
+function ringForUnit(unit: AdminUnit): Ring | null {
+  if (unit.lng != null && unit.lat != null) {
+    const d = BOX_DELTA[unit.type];
+    return box(unit.lng - d, unit.lat - d, unit.lng + d, unit.lat + d);
+  }
+  const fallback = FALLBACK_GEO.find((f) => f.id === unit.id);
+  return fallback?.ring ?? null;
+}
+
+function toFeature(
+  unit: AdminUnit,
+  ring: Ring,
+): Feature<Polygon, GeoFeatureProperties> {
+  const nameBn = resolveBnLabel(unit.name, unit.nameBn) ?? unit.name;
   return {
     type: "Feature",
     properties: {
       id: unit.id,
       name: unit.name,
-      nameBn: unit.nameBn,
+      nameBn,
       type: unit.type,
       parentId: unit.parentId,
-      performanceScore: unit.performanceScore,
-      riskScore: unit.riskScore,
+      performanceScore: pseudoScore(unit.id, 1),
+      riskScore: pseudoScore(unit.id, 2),
     },
-    geometry: { type: "Polygon", coordinates: [unit.ring] },
+    geometry: { type: "Polygon", coordinates: [ring] },
   };
+}
+
+function allMapUnits(): AdminUnit[] {
+  const cached = getCachedAdminUnits();
+  if (cached.length > 0) return cached;
+
+  return FALLBACK_GEO.map((f) => ({
+    id: f.id,
+    code: f.id.slice(0, 8),
+    name: f.name,
+    nameBn: f.nameBn,
+    type: f.type,
+    parentId: f.parentId,
+  }));
 }
 
 export function getVisibleGeoJson(
@@ -177,18 +122,30 @@ export function getVisibleGeoJson(
   const childType = getDrillChildType(filter);
   const parentId = getDrillParentId(filter);
 
-  const features = UNIT_GEO.filter(
-    (u) => u.type === childType && u.parentId === parentId,
-  ).map(toFeature);
+  const features = allMapUnits()
+    .filter((u) => u.type === childType && u.parentId === parentId)
+    .map((u) => {
+      const ring = ringForUnit(u);
+      return ring ? toFeature(u, ring) : null;
+    })
+    .filter((f): f is Feature<Polygon, GeoFeatureProperties> => f !== null);
 
   return { type: "FeatureCollection", features };
 }
 
 export function getUnitCentroid(unitId: string): [number, number] | null {
-  const unit = UNIT_GEO.find((u) => u.id === unitId);
+  const unit = allMapUnits().find((u) => u.id === unitId);
   if (!unit) return null;
-  const lngs = unit.ring.map((c) => c[0]);
-  const lats = unit.ring.map((c) => c[1]);
+
+  if (unit.lng != null && unit.lat != null) {
+    return [unit.lng, unit.lat];
+  }
+
+  const ring = ringForUnit(unit);
+  if (!ring) return null;
+
+  const lngs = ring.map((c) => c[0]);
+  const lats = ring.map((c) => c[1]);
   return [
     (Math.min(...lngs) + Math.max(...lngs)) / 2,
     (Math.min(...lats) + Math.max(...lats)) / 2,
@@ -224,6 +181,18 @@ export function getMapBoundsForFilter(
       minLng = Math.min(minLng, lng);
       maxLng = Math.max(maxLng, lng);
     }
+  }
+
+  if (
+    !Number.isFinite(minLat) ||
+    !Number.isFinite(maxLat) ||
+    !Number.isFinite(minLng) ||
+    !Number.isFinite(maxLng)
+  ) {
+    return null;
+  }
+  if (minLat === maxLat && minLng === maxLng) {
+    return null;
   }
 
   return [

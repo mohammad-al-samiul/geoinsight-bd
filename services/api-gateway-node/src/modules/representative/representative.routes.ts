@@ -15,7 +15,7 @@ export function createRepresentativeRoutes(
     "/",
     authenticate(),
     validate(listRepresentativesSchema, "query"),
-    rbac.authorize({ unitIdKey: "unitId", source: "query" }),
+    rbac.authorize({ unitIdKey: "unitId", source: "query", requireUnit: false }),
     controller.list,
   );
 

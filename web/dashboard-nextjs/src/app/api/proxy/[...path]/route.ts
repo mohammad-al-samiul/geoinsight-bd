@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AUTH_COOKIES } from "@/lib/auth/cookies";
-import { GATEWAY_API } from "@/lib/auth/gateway";
+import { GATEWAY_API, GATEWAY_URL } from "@/lib/auth/gateway";
 
 const FORWARD_HEADERS = ["content-type", "accept"];
 
@@ -39,7 +39,21 @@ async function proxyRequest(
     init.body = await request.text();
   }
 
-  const upstream = await fetch(url, init);
+  let upstream: Response;
+  try {
+    upstream = await fetch(url, init);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Upstream request failed";
+    return NextResponse.json(
+      {
+        success: false,
+        message: `API gateway unreachable (${GATEWAY_URL}). ${message}`,
+      },
+      { status: 502 },
+    );
+  }
+
   const text = await upstream.text();
 
   return new NextResponse(text, {

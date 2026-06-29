@@ -9,6 +9,8 @@ export interface AdminUnit {
   nameBn?: string;
   type: AdminUnitType;
   parentId: string | null;
+  lng?: number;
+  lat?: number;
 }
 
 export interface AuthUser {

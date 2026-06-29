@@ -14,6 +14,7 @@ export const listKpiRecordsSchema = z.object({
   representativeId: z.string().uuid().optional(),
   kpiDefId: z.string().uuid().optional(),
   fiscalYear: z.string().length(4).optional(),
+  unitId: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(500).default(100),
 });
 

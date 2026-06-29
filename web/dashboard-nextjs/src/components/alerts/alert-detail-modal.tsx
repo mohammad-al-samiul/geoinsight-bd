@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { apiClient } from "@/lib/api-client";
 import type { AnomalyAlert, BlockchainVerificationStatus } from "@/types/alerts";
 import { cn } from "@/lib/utils";
 import {
@@ -20,7 +22,6 @@ import {
   ShieldCheck,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
 
 const STATUS_META: Record<
   BlockchainVerificationStatus,
@@ -52,21 +53,44 @@ interface AlertDetailModalProps {
   alert: AnomalyAlert | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onResolved?: () => void;
 }
 
-export function AlertDetailModal({ alert, open, onOpenChange }: AlertDetailModalProps) {
+export function AlertDetailModal({
+  alert,
+  open,
+  onOpenChange,
+  onResolved,
+}: AlertDetailModalProps) {
   const [copied, setCopied] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
 
   if (!alert) return null;
 
   const status = STATUS_META[alert.verificationStatus];
   const StatusIcon = status.icon;
+  const isResolved = Boolean(alert.resolvedAt);
 
   const copyHash = async () => {
     if (!alert.blockchainHash) return;
     await navigator.clipboard.writeText(alert.blockchainHash);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const resolveAlert = async () => {
+    setResolving(true);
+    setResolveError(null);
+    try {
+      await apiClient(`alerts/${alert.id}/resolve`, { method: "PATCH" });
+      onResolved?.();
+      onOpenChange(false);
+    } catch (err) {
+      setResolveError(err instanceof Error ? err.message : "Could not resolve alert");
+    } finally {
+      setResolving(false);
+    }
   };
 
   return (
@@ -98,6 +122,14 @@ export function AlertDetailModal({ alert, open, onOpenChange }: AlertDetailModal
               <span className="text-muted-foreground">Administrative Unit</span>
               <span className="font-medium">{alert.unitName}</span>
             </div>
+            {isResolved && (
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Resolved</span>
+                <span className="font-medium text-emerald-400">
+                  {new Date(alert.resolvedAt!).toLocaleString("en-BD")}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="rounded-lg border border-border/60 p-4">
@@ -156,6 +188,26 @@ export function AlertDetailModal({ alert, open, onOpenChange }: AlertDetailModal
                 is queued by the blockchain milestone worker.
               </p>
             )}
+          </div>
+
+          {resolveError && (
+            <p className="text-sm text-destructive">{resolveError}</p>
+          )}
+
+          <div className="flex justify-end gap-2">
+            {!isResolved && (
+              <Button
+                variant="default"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={resolveAlert}
+                disabled={resolving}
+              >
+                {resolving ? "Resolving…" : "Mark Resolved"}
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
           </div>
         </div>
       </DialogContent>

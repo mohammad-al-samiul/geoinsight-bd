@@ -15,7 +15,7 @@ export function createProjectRoutes(
     "/",
     authenticate(),
     validate(listProjectsSchema, "query"),
-    rbac.authorize({ unitIdKey: "unitId", source: "query" }),
+    rbac.authorize({ unitIdKey: "unitId", source: "query", requireUnit: false }),
     controller.list,
   );
 

@@ -127,6 +127,7 @@ export function AnomalyFeedPanel({ className, compact = false }: AnomalyFeedPane
         alert={selected}
         open={modalOpen}
         onOpenChange={setModalOpen}
+        onResolved={refresh}
       />
     </>
   );

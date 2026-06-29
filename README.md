@@ -391,7 +391,7 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 | MinIO API | 9000 | HTTP |
 | MinIO Console | 9001 | HTTP |
 | Prometheus (observability) | 9090 | HTTP |
-| Grafana (observability) | 3001 | HTTP |
+| Grafana (observability) | 3002 | HTTP |
 
 ---
 

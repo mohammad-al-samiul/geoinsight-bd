@@ -48,12 +48,17 @@ class AiQueueConsumer:
     async def _dispatch(self, payload: dict[str, Any]) -> None:
         task_type = payload.get("type", "")
 
+        # Outbound events (legacy routing via agro.*); drain without reprocessing.
+        if task_type in ("arbitrage_update", "arbitrage_result"):
+            logger.debug("Skipping outbound event: %s", task_type)
+            return
+
         if task_type == "arbitrage_request":
             scraper = CommodityScraper(self._settings.mock_country_count)
             req = ArbitrageRequest(**payload["data"])
             result = await scraper.run_arbitrage(req)
             await self._publisher.publish(
-                routing_key="agro.arbitrage",
+                routing_key="gov.arbitrage",
                 payload={"type": "arbitrage_result", "result": result.model_dump()},
             )
             return

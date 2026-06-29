@@ -15,7 +15,7 @@ export function createAgroMarketRoutes(
     "/",
     authenticate(),
     validate(listAgroMarketsSchema, "query"),
-    rbac.authorize({ unitIdKey: "unitId", source: "query" }),
+    rbac.authorize({ unitIdKey: "unitId", source: "query", requireUnit: false }),
     controller.list,
   );
 

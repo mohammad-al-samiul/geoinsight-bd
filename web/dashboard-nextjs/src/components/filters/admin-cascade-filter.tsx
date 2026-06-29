@@ -1,7 +1,9 @@
 "use client";
 
 import { getChildren, getBreadcrumb } from "@/lib/admin-units";
+import { formatUnitInline, formatUnitOptionLabel } from "@/lib/admin-labels";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
+import { useAdminHierarchy } from "@/hooks/use-admin-hierarchy";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,14 +15,28 @@ import {
 } from "@/components/ui/select";
 import { ChevronRight, MapPin, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { AdminUnit } from "@/types";
 
 interface CascadeSelectProps {
   label: string;
   placeholder: string;
   value: string | null;
-  options: { id: string; name: string; nameBn?: string }[];
+  options: AdminUnit[];
   onChange: (id: string | null) => void;
   disabled?: boolean;
+}
+
+function UnitOptionLabel({ unit }: { unit: Pick<AdminUnit, "name" | "nameBn"> }) {
+  const { primary, secondary } = formatUnitOptionLabel(unit);
+  if (!secondary) {
+    return <span className="truncate">{primary}</span>;
+  }
+  return (
+    <span className="flex min-w-0 flex-col gap-0.5 leading-tight">
+      <span className="truncate font-medium">{primary}</span>
+      <span className="truncate font-bengali text-xs text-muted-foreground">{secondary}</span>
+    </span>
+  );
 }
 
 function CascadeSelect({
@@ -32,7 +48,7 @@ function CascadeSelect({
   disabled,
 }: CascadeSelectProps) {
   return (
-    <div className="flex min-w-[140px] flex-1 flex-col gap-1.5 sm:min-w-[160px]">
+    <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:min-w-[150px] sm:max-w-[200px]">
       <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {label}
       </span>
@@ -41,17 +57,16 @@ function CascadeSelect({
         onValueChange={(v) => onChange(v === "__all__" ? null : v)}
         disabled={disabled}
       >
-        <SelectTrigger className="h-9 border-command-border bg-command/50">
+        <SelectTrigger className="h-10 border-command-border bg-card">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="__all__">— All —</SelectItem>
+          <SelectItem value="__all__">
+            <span className="text-muted-foreground">— All —</span>
+          </SelectItem>
           {options.map((o) => (
             <SelectItem key={o.id} value={o.id}>
-              <span>{o.name}</span>
-              {o.nameBn && (
-                <span className="ml-1 text-muted-foreground">({o.nameBn})</span>
-              )}
+              <UnitOptionLabel unit={o} />
             </SelectItem>
           ))}
         </SelectContent>
@@ -60,9 +75,19 @@ function CascadeSelect({
   );
 }
 
-export function AdminCascadeFilter({ className }: { className?: string }) {
+interface AdminCascadeFilterProps {
+  className?: string;
+  /** Solid panel for sticky command bar; glass for in-page modules */
+  variant?: "solid" | "glass";
+}
+
+export function AdminCascadeFilter({
+  className,
+  variant = "solid",
+}: AdminCascadeFilterProps) {
   const { filter, isPending, setDivision, setDistrict, setUpazila, setUnion, clearFilter, isFiltered } =
     useAdminFilter();
+  const { ready } = useAdminHierarchy();
   const user = useAuth();
 
   const divisions = getChildren(null, "DIVISION");
@@ -83,55 +108,59 @@ export function AdminCascadeFilter({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "glass-panel animate-slide-in rounded-lg p-3 shadow-panel sm:p-4",
+        "animate-slide-in rounded-lg p-3 sm:p-4",
+        variant === "glass"
+          ? "glass-panel shadow-panel"
+          : "border border-command-border/60 bg-card shadow-sm",
         isPending && "opacity-70",
+        !ready && "opacity-60",
         className,
       )}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <MapPin className="h-4 w-4 text-primary" />
+          <MapPin className="h-4 w-4 shrink-0 text-primary" />
           Administrative Scope
         </div>
         {isFiltered && (
-          <Button variant="ghost" size="sm" onClick={clearFilter} className="h-7 text-xs">
+          <Button variant="ghost" size="sm" onClick={clearFilter} className="h-7 shrink-0 text-xs">
             <RotateCcw className="mr-1 h-3 w-3" />
             Reset
           </Button>
         )}
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <CascadeSelect
           label="Division"
-          placeholder="Select division"
+          placeholder="All divisions"
           value={filter.divisionId}
           options={divisions}
           onChange={setDivision}
           disabled={roleLocked === "division" || roleLocked === "district" || roleLocked === "union"}
         />
-        <ChevronRight className="hidden h-4 w-4 shrink-0 self-end pb-2.5 text-muted-foreground sm:block" />
+        <ChevronRight className="hidden h-4 w-4 shrink-0 self-end pb-3 text-muted-foreground sm:block" />
         <CascadeSelect
           label="District"
-          placeholder="Select district"
+          placeholder="All districts"
           value={filter.districtId}
           options={districts}
           onChange={setDistrict}
           disabled={!filter.divisionId || roleLocked === "district" || roleLocked === "union"}
         />
-        <ChevronRight className="hidden h-4 w-4 shrink-0 self-end pb-2.5 text-muted-foreground sm:block" />
+        <ChevronRight className="hidden h-4 w-4 shrink-0 self-end pb-3 text-muted-foreground sm:block" />
         <CascadeSelect
           label="Upazila"
-          placeholder="Select upazila"
+          placeholder="All upazilas"
           value={filter.upazilaId}
           options={upazilas}
           onChange={setUpazila}
           disabled={!filter.districtId || roleLocked === "union"}
         />
-        <ChevronRight className="hidden h-4 w-4 shrink-0 self-end pb-2.5 text-muted-foreground sm:block" />
+        <ChevronRight className="hidden h-4 w-4 shrink-0 self-end pb-3 text-muted-foreground sm:block" />
         <CascadeSelect
           label="Union"
-          placeholder="Select union"
+          placeholder="All unions"
           value={filter.unionId}
           options={unions}
           onChange={setUnion}
@@ -145,7 +174,7 @@ export function AdminCascadeFilter({ className }: { className?: string }) {
           {breadcrumb.map((unit, i) => (
             <span key={unit.id} className="flex items-center gap-1">
               {i > 0 && <ChevronRight className="h-3 w-3" />}
-              <span className="text-foreground">{unit.name}</span>
+              <span className="text-foreground">{formatUnitInline(unit)}</span>
             </span>
           ))}
         </div>

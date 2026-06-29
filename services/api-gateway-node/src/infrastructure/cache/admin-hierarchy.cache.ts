@@ -1,4 +1,4 @@
-import { AdminUnitType } from "@prisma/client";
+import { AdminUnitType, Prisma } from "@prisma/client";
 import { prismaRead } from "../../core/database/prisma.client";
 import { redisCacheService } from "./redis-cache.service";
 
@@ -8,19 +8,23 @@ const TREE_KEY_PREFIX = "geoinsight:admin:tree:";
 
 export interface AdminHierarchyNode {
   id: string;
+  code: string;
   name: string;
   nameBn: string | null;
   type: AdminUnitType;
   parentId: string | null;
+  geoJson?: Prisma.JsonValue;
   children?: AdminHierarchyNode[];
 }
 
 type FlatUnit = {
   id: string;
+  code: string;
   name: string;
   nameBn: string | null;
   type: AdminUnitType;
   parentId: string | null;
+  geoJson: Prisma.JsonValue;
 };
 
 function buildForest(units: FlatUnit[]): AdminHierarchyNode[] {
@@ -58,10 +62,12 @@ export class AdminHierarchyCacheService {
     const units = await prismaRead.adminUnit.findMany({
       select: {
         id: true,
+        code: true,
         name: true,
         nameBn: true,
         type: true,
         parentId: true,
+        geoJson: true,
       },
       orderBy: [{ type: "asc" }, { name: "asc" }],
     });

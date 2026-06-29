@@ -59,11 +59,10 @@ BEGIN
     INNER JOIN ancestors a ON p.id = a."parent_id"
   )
   SELECT
-    MAX(id) FILTER (WHERE "type" = 'DIVISION'),
-    MAX(id) FILTER (WHERE "type" = 'DISTRICT'),
-    MAX(id) FILTER (WHERE "type" = 'UPAZILA')
-  INTO div_id, dist_id, upa_id
-  FROM ancestors;
+    (SELECT a.id FROM ancestors a WHERE a."type" = 'DIVISION' LIMIT 1),
+    (SELECT a.id FROM ancestors a WHERE a."type" = 'DISTRICT' LIMIT 1),
+    (SELECT a.id FROM ancestors a WHERE a."type" = 'UPAZILA' LIMIT 1)
+  INTO div_id, dist_id, upa_id;
 
   IF NEW."type" = 'DIVISION' THEN div_id := NEW.id; END IF;
   IF NEW."type" = 'DISTRICT' THEN dist_id := NEW.id; END IF;

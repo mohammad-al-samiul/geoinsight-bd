@@ -7,7 +7,6 @@ export class AgroMarketController {
   constructor(private readonly service: AgroMarketService) {}
 
   list = asyncHandler(async (req: Request, res: Response) => {
-    const { unitId } = req.query as unknown as ListAgroMarketsQuery;
-    sendSuccess(res, await this.service.listByUnit(unitId));
+    sendSuccess(res, await this.service.list(req.query as unknown as ListAgroMarketsQuery));
   });
 }

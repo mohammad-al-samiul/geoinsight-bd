@@ -1,12 +1,13 @@
 import { prismaRead } from "../../core/database/prisma.client";
 import { ApiError } from "../../core/errors/api.error";
+import { projectUnitScopeWhere } from "../../shared/scope/admin-unit-filter";
 import { ListProjectsQuery } from "./project.validator";
 
 export class ProjectService {
   async listByUnit(query: ListProjectsQuery) {
     return prismaRead.project.findMany({
       where: {
-        adminUnitId: query.unitId,
+        ...(query.unitId && projectUnitScopeWhere(query.unitId)),
         ...(query.status && { status: query.status }),
       },
       select: {

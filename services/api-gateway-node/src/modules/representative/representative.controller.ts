@@ -7,7 +7,6 @@ export class RepresentativeController {
   constructor(private readonly service: RepresentativeService) {}
 
   list = asyncHandler(async (req: Request, res: Response) => {
-    const { unitId } = req.query as unknown as ListRepresentativesQuery;
-    sendSuccess(res, await this.service.listByUnit(unitId));
+    sendSuccess(res, await this.service.list(req.query as unknown as ListRepresentativesQuery));
   });
 }
