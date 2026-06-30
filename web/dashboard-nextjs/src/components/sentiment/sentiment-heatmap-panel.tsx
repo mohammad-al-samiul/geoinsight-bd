@@ -6,6 +6,7 @@ import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-she
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 import { MessageSquareWarning, Radio, TrendingDown, TrendingUp } from "lucide-react";
 
 function scoreColor(score: number): string {
@@ -16,6 +17,7 @@ function scoreColor(score: number): string {
 }
 
 export function SentimentHeatmapPanel() {
+  const t = useTranslations("modules.sentiment");
   const [level, setLevel] = useState<"district" | "upazila">("district");
   const { data, loading, error, reload } = useSentimentHeatmap(level);
 
@@ -24,45 +26,55 @@ export function SentimentHeatmapPanel() {
     [data],
   );
 
+  const trendLabel = (trend: string) => {
+    if (trend === "rising") return t("trendRising");
+    if (trend === "falling") return t("trendFalling");
+    return t("trendStable");
+  };
+
   return (
     <ModuleShell
-      title="Citizen Sentiment Heatmap"
-      description="333/999 government channel grievances classified by Bangla-BERT — not social media."
+      title={t("title")}
+      description={t("description")}
       loading={loading}
       error={error}
       onRetry={reload}
       stats={
         data && (
           <StatGrid>
-            <StatCard label="Logs analyzed" value={data.total_logs} />
+            <StatCard label={t("logsAnalyzed")} value={data.total_logs} />
             <StatCard
-              label="Grievances"
+              label={t("grievances")}
               value={data.grievance_total}
               accent="danger"
-              hint="Bangla-BERT Grievance class"
+              hint={t("grievanceHint")}
             />
-            <StatCard label="Demands" value={data.demand_total} accent="warning" />
-            <StatCard label="Source" value={data.source} hint={`Level: ${data.level}`} />
+            <StatCard label={t("demands")} value={data.demand_total} accent="warning" />
+            <StatCard
+              label={t("source")}
+              value={data.source}
+              hint={t("levelHint", { level: data.level })}
+            />
           </StatGrid>
         )
       }
     >
       <div className="flex flex-wrap items-center gap-2">
         <Radio className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">Aggregation level</span>
+        <span className="text-sm font-medium">{t("aggregationLevel")}</span>
         <Button
           size="sm"
           variant={level === "district" ? "default" : "outline"}
           onClick={() => setLevel("district")}
         >
-          District
+          {t("district")}
         </Button>
         <Button
           size="sm"
           variant={level === "upazila" ? "default" : "outline"}
           onClick={() => setLevel("upazila")}
         >
-          Upazila
+          {t("upazila")}
         </Button>
       </div>
 
@@ -72,7 +84,7 @@ export function SentimentHeatmapPanel() {
             <div className="border-b border-border/60 px-4 py-3">
               <h3 className="flex items-center gap-2 text-sm font-semibold">
                 <MessageSquareWarning className="h-4 w-4 text-red-400" />
-                Dissatisfaction heatmap
+                {t("dissatisfactionHeatmap")}
               </h3>
             </div>
             <div className="max-h-[480px] overflow-y-auto p-3">
@@ -102,7 +114,7 @@ export function SentimentHeatmapPanel() {
                         ) : cell.trend === "falling" ? (
                           <TrendingDown className="mr-1 inline h-3 w-3" />
                         ) : null}
-                        {cell.trend}
+                        {trendLabel(cell.trend)}
                       </Badge>
                     </div>
                     <div className="mt-2 flex items-center gap-2">
@@ -117,7 +129,11 @@ export function SentimentHeatmapPanel() {
                       </span>
                     </div>
                     <p className="mt-1 text-[10px] text-muted-foreground">
-                      {cell.grievance_count} grievance · {cell.demand_count} demand · {cell.total} total
+                      {t("cellCounts", {
+                        grievance: cell.grievance_count,
+                        demand: cell.demand_count,
+                        total: cell.total,
+                      })}
                     </p>
                   </div>
                 ))}
@@ -126,13 +142,11 @@ export function SentimentHeatmapPanel() {
           </div>
 
           <div className="glass-panel rounded-xl p-4 shadow-panel">
-            <h3 className="text-sm font-semibold text-red-400">Rising dissatisfaction</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Districts/upazilas where grievance ratio is increasing — direct from 333/999.
-            </p>
+            <h3 className="text-sm font-semibold text-red-400">{t("risingDissatisfaction")}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{t("risingDesc")}</p>
             <ul className="mt-4 space-y-3">
               {topRising.length === 0 ? (
-                <li className="text-sm text-muted-foreground">No rising zones in current window.</li>
+                <li className="text-sm text-muted-foreground">{t("noRisingZones")}</li>
               ) : (
                 topRising.map((cell) => (
                   <li
@@ -144,7 +158,7 @@ export function SentimentHeatmapPanel() {
                       <span className="text-muted-foreground"> · {cell.upazila}</span>
                     )}
                     <span className="ml-2 text-xs text-red-400">
-                      {Math.round(cell.grievance_ratio * 100)}% grievance ratio
+                      {t("grievanceRatio", { pct: Math.round(cell.grievance_ratio * 100) })}
                     </span>
                   </li>
                 ))

@@ -9,6 +9,7 @@ import { useAnomalyFeed } from "@/hooks/use-anomaly-feed";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
 import type { AnomalyAlert } from "@/types/alerts";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 import { AlertTriangle, ChevronRight, Radio, RefreshCw } from "lucide-react";
 
 const SEVERITY_STYLES: Record<AnomalyAlert["severity"], string> = {
@@ -24,6 +25,9 @@ interface AnomalyFeedPanelProps {
 }
 
 export function AnomalyFeedPanel({ className, compact = false }: AnomalyFeedPanelProps) {
+  const t = useTranslations("modules.alerts");
+  const tc = useTranslations("common");
+  const ts = useTranslations("status");
   const { filter } = useAdminFilter();
   const { alerts, loading, refresh } = useAnomalyFeed(filter);
   const [selected, setSelected] = useState<AnomalyAlert | null>(null);
@@ -32,6 +36,14 @@ export function AnomalyFeedPanel({ className, compact = false }: AnomalyFeedPane
   const openAlert = (alert: AnomalyAlert) => {
     setSelected(alert);
     setModalOpen(true);
+  };
+
+  const statusLabel = (status: string) => {
+    try {
+      return ts(status as "VERIFIED" | "PENDING" | "UNANCHORED");
+    } catch {
+      return status;
+    }
   };
 
   return (
@@ -46,25 +58,23 @@ export function AnomalyFeedPanel({ className, compact = false }: AnomalyFeedPane
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-destructive" />
             <div>
-              <h3 className="text-sm font-semibold">AI Anomaly & Red Flag Feed</h3>
+              <h3 className="text-sm font-semibold">{t("feedTitle")}</h3>
               {!compact && (
-                <p className="text-[10px] text-muted-foreground">
-                  Real-time infractions · Hyperledger anchored
-                </p>
+                <p className="text-[10px] text-muted-foreground">{t("feedSubtitle")}</p>
               )}
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="gap-1 border-primary/30 text-[10px] text-primary">
               <Radio className="h-3 w-3" />
-              Live
+              {tc("live")}
             </Badge>
             <Button
               variant="ghost"
               size="icon"
               className="h-8 w-8"
               onClick={() => refresh()}
-              aria-label="Refresh alerts"
+              aria-label={t("refreshAlerts")}
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </Button>
@@ -84,9 +94,7 @@ export function AnomalyFeedPanel({ className, compact = false }: AnomalyFeedPane
               ))}
             </div>
           ) : alerts.length === 0 ? (
-            <p className="p-6 text-center text-sm text-muted-foreground">
-              No active anomalies in current scope.
-            </p>
+            <p className="p-6 text-center text-sm text-muted-foreground">{t("empty")}</p>
           ) : (
             <ul className="space-y-2">
               {alerts.map((alert) => (
@@ -110,7 +118,7 @@ export function AnomalyFeedPanel({ className, compact = false }: AnomalyFeedPane
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
                         <span>{new Date(alert.createdAt).toLocaleTimeString("en-BD")}</span>
                         <Badge variant="outline" className="h-5 text-[9px]">
-                          {alert.verificationStatus}
+                          {statusLabel(alert.verificationStatus)}
                         </Badge>
                       </div>
                     </div>

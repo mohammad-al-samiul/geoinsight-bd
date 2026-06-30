@@ -6,6 +6,7 @@ import { useRepresentativesList } from "@/hooks/use-module-data";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/format";
 import { resolveUnitName } from "@/lib/unit-names";
+import { useTranslations } from "next-intl";
 
 const roleColor: Record<string, string> = {
   MINISTER: "bg-purple-500/20 text-purple-300",
@@ -15,6 +16,8 @@ const roleColor: Record<string, string> = {
 };
 
 export default function RepresentativesPage() {
+  const t = useTranslations("modules.representatives");
+  const tc = useTranslations("common");
   const { rows, loading, error, reload } = useRepresentativesList();
 
   const ministers = rows.filter((r) => r.role === "MINISTER").length;
@@ -23,18 +26,18 @@ export default function RepresentativesPage() {
 
   return (
     <ModuleShell
-      title="Representatives"
-      description="MPs, Ministers, DCs, and local government leaders — tenure and party affiliation by unit."
+      title={t("title")}
+      description={t("description")}
       loading={loading}
       error={error}
       onRetry={reload}
       stats={
         !loading && rows.length > 0 ? (
           <StatGrid>
-            <StatCard label="Total" value={rows.length} />
-            <StatCard label="Ministers" value={ministers} />
-            <StatCard label="MPs" value={mps} />
-            <StatCard label="DCs" value={dcs} />
+            <StatCard label={t("total")} value={rows.length} />
+            <StatCard label={t("ministers")} value={ministers} />
+            <StatCard label={t("mps")} value={mps} />
+            <StatCard label={t("dcs")} value={dcs} />
           </StatGrid>
         ) : undefined
       }
@@ -44,31 +47,31 @@ export default function RepresentativesPage() {
         <DataTable
           rows={rows}
           columns={[
-            { key: "name", label: "Name" },
+            { key: "name", label: t("colName") },
             {
               key: "role",
-              label: "Role",
+              label: t("colRole"),
               render: (r) => (
                 <Badge className={roleColor[r.role] ?? ""}>{r.role}</Badge>
               ),
             },
-            { key: "party", label: "Party", render: (r) => r.party ?? "—" },
+            { key: "party", label: t("colParty"), render: (r) => r.party ?? tc("dash") },
             {
               key: "adminUnitId",
-              label: "Constituency / Unit",
+              label: t("colConstituency"),
               render: (r) => resolveUnitName(r.adminUnitId),
             },
-            { key: "nid", label: "NID" },
+            { key: "nid", label: t("colNid") },
             {
               key: "tenureStart",
-              label: "Tenure",
+              label: t("colTenure"),
               render: (r) => {
-                const end = r.tenureEnd ? formatDate(r.tenureEnd) : "Present";
+                const end = r.tenureEnd ? formatDate(r.tenureEnd) : t("present");
                 return `${formatDate(r.tenureStart)} → ${end}`;
               },
             },
           ]}
-          emptyMessage="No representatives in this scope."
+          emptyMessage={t("emptyScope")}
         />
       )}
     </ModuleShell>

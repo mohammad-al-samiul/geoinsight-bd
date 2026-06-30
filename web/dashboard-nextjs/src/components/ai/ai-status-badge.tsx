@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useAiStatus } from "@/hooks/use-ai-status";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -12,12 +13,13 @@ interface AiStatusBadgeProps {
 
 export function AiStatusBadge({ className, compact }: AiStatusBadgeProps) {
   const { status, loading } = useAiStatus();
+  const t = useTranslations("ai");
 
   if (loading && !status) {
     return (
       <Badge variant="outline" className={cn("border-muted text-muted-foreground", className)}>
         <Bot className="mr-1 h-3 w-3" />
-        AI…
+        {t("checking")}
       </Badge>
     );
   }
@@ -35,9 +37,7 @@ export function AiStatusBadge({ className, compact }: AiStatusBadgeProps) {
         className,
       )}
       title={
-        reachable
-          ? `Ollama active — ${model}`
-          : "Ollama offline — using template fallback. Run: ollama run llama3.1:8b"
+        reachable ? t("ollamaTooltip", { model }) : t("fallbackTooltip")
       }
     >
       {reachable ? (
@@ -48,10 +48,10 @@ export function AiStatusBadge({ className, compact }: AiStatusBadgeProps) {
       {compact
         ? reachable
           ? model.split(":")[0]
-          : "Fallback"
+          : t("fallback")
         : reachable
-          ? `Ollama · ${model}`
-          : "Template fallback"}
+          ? t("ollama", { model })
+          : t("fallback")}
     </Badge>
   );
 }

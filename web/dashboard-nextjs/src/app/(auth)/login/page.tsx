@@ -2,7 +2,9 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { authFetch, ApiClientError } from "@/lib/api-client";
 import { Shield } from "lucide-react";
 
@@ -10,6 +12,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? "/";
+  const t = useTranslations("auth");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,9 +31,7 @@ function LoginForm() {
       router.replace(redirect);
       router.refresh();
     } catch (err) {
-      setError(
-        err instanceof ApiClientError ? err.message : "Authentication failed",
-      );
+      setError(err instanceof ApiClientError ? err.message : t("failed"));
     } finally {
       setLoading(false);
     }
@@ -39,20 +40,21 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="glass-panel w-full max-w-md rounded-xl p-8 shadow-panel">
+        <div className="mb-6 flex justify-end">
+          <LocaleSwitcher />
+        </div>
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <Shield className="h-6 w-6 text-primary" />
           </div>
           <h1 className="text-2xl font-bold text-gradient-gov">GeoInsight BD</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            National Intelligence Platform · Secure Sign-In
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{t("subtitle")}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Official Email
+              {t("email")}
             </label>
             <input
               type="email"
@@ -61,12 +63,12 @@ function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-md border border-input bg-secondary/50 px-3 py-2.5 text-sm outline-none ring-primary focus:ring-1"
-              placeholder="analyst@geoinsight.gov.bd"
+              placeholder={t("emailPlaceholder")}
             />
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Password
+              {t("password")}
             </label>
             <input
               type="password"
@@ -85,21 +87,24 @@ function LoginForm() {
           )}
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Authenticating…" : "Enter Command Center"}
+            {loading ? t("submitting") : t("submit")}
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-[10px] text-muted-foreground">
-          Govt. of Bangladesh · RESTRICTED · Session secured via HTTP-only cookies
-        </p>
+        <p className="mt-6 text-center text-[10px] text-muted-foreground">{t("footer")}</p>
       </div>
     </div>
   );
 }
 
 export default function LoginPage() {
+  const t = useTranslations("auth");
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading…</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">{t("loading")}</div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

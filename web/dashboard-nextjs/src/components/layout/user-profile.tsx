@@ -1,17 +1,18 @@
 "use client";
 
 import { useAuth, useAuthActions } from "@/hooks/use-auth";
-import { ROLE_META } from "@/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Shield, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 export function UserProfile({ collapsed }: { collapsed?: boolean }) {
   const user = useAuth();
   const { logout } = useAuthActions();
-  const meta = ROLE_META[user.role];
+  const t = useTranslations("shell");
+  const tr = useTranslations("roles");
   const initials = user.fullName
     .split(" ")
     .map((w) => w[0])
@@ -42,17 +43,16 @@ export function UserProfile({ collapsed }: { collapsed?: boolean }) {
           <p className="truncate text-xs text-muted-foreground">{user.email}</p>
           <Badge
             variant="outline"
-            className={cn("mt-2 border text-[10px] font-bold uppercase tracking-wide", meta.badgeClass)}
+            className={cn("mt-2 border text-[10px] font-bold uppercase tracking-wide")}
           >
             <Shield className="mr-1 h-3 w-3" />
-            {user.role.replace("_", " ")}
+            {tr(user.role)}
           </Badge>
           {user.adminUnitName && (
             <p className="mt-2 truncate text-[11px] leading-tight text-muted-foreground">
-              <span className="text-primary/80">Scope:</span> {user.adminUnitName}
+              <span className="text-primary/80">{t("scope")}:</span> {user.adminUnitName}
             </p>
           )}
-          <p className="mt-0.5 text-[10px] text-muted-foreground/70">{meta.labelBn}</p>
           <Button
             variant="ghost"
             size="sm"
@@ -60,7 +60,7 @@ export function UserProfile({ collapsed }: { collapsed?: boolean }) {
             onClick={() => logout()}
           >
             <LogOut className="h-3.5 w-3.5" />
-            Sign out
+            {t("signOut")}
           </Button>
         </div>
       </div>

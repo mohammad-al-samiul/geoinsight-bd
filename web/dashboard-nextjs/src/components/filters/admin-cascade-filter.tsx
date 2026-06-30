@@ -5,6 +5,7 @@ import { formatUnitInline, formatUnitOptionLabel } from "@/lib/admin-labels";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
 import { useAdminHierarchy } from "@/hooks/use-admin-hierarchy";
 import { useAuth } from "@/hooks/use-auth";
+import { useAppLang } from "@/hooks/use-app-lang";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { ChevronRight, MapPin, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 import type { AdminUnit } from "@/types";
 
 interface CascadeSelectProps {
@@ -27,7 +29,8 @@ interface CascadeSelectProps {
 }
 
 function UnitOptionLabel({ unit }: { unit: Pick<AdminUnit, "name" | "nameBn"> }) {
-  const { primary, secondary } = formatUnitOptionLabel(unit);
+  const locale = useAppLang();
+  const { primary, secondary } = formatUnitOptionLabel(unit, locale);
   if (!secondary) {
     return <span className="truncate">{primary}</span>;
   }
@@ -47,6 +50,7 @@ function CascadeSelect({
   onChange,
   disabled,
 }: CascadeSelectProps) {
+  const tc = useTranslations("common");
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:min-w-[150px] sm:max-w-[200px]">
       <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -62,7 +66,7 @@ function CascadeSelect({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="__all__">
-            <span className="text-muted-foreground">— All —</span>
+            <span className="text-muted-foreground">{tc("all")}</span>
           </SelectItem>
           {options.map((o) => (
             <SelectItem key={o.id} value={o.id}>
@@ -89,6 +93,8 @@ export function AdminCascadeFilter({
     useAdminFilter();
   const { ready } = useAdminHierarchy();
   const user = useAuth();
+  const locale = useAppLang();
+  const t = useTranslations("filters");
 
   const divisions = getChildren(null, "DIVISION");
   const districts = filter.divisionId ? getChildren(filter.divisionId, "DISTRICT") : [];
@@ -120,20 +126,20 @@ export function AdminCascadeFilter({
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
           <MapPin className="h-4 w-4 shrink-0 text-primary" />
-          Administrative Scope
+          {t("title")}
         </div>
         {isFiltered && (
           <Button variant="ghost" size="sm" onClick={clearFilter} className="h-7 shrink-0 text-xs">
             <RotateCcw className="mr-1 h-3 w-3" />
-            Reset
+            {t("reset")}
           </Button>
         )}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <CascadeSelect
-          label="Division"
-          placeholder="All divisions"
+          label={t("division")}
+          placeholder={t("allDivisions")}
           value={filter.divisionId}
           options={divisions}
           onChange={setDivision}
@@ -141,8 +147,8 @@ export function AdminCascadeFilter({
         />
         <ChevronRight className="hidden h-4 w-4 shrink-0 self-end pb-3 text-muted-foreground sm:block" />
         <CascadeSelect
-          label="District"
-          placeholder="All districts"
+          label={t("district")}
+          placeholder={t("allDistricts")}
           value={filter.districtId}
           options={districts}
           onChange={setDistrict}
@@ -150,8 +156,8 @@ export function AdminCascadeFilter({
         />
         <ChevronRight className="hidden h-4 w-4 shrink-0 self-end pb-3 text-muted-foreground sm:block" />
         <CascadeSelect
-          label="Upazila"
-          placeholder="All upazilas"
+          label={t("upazila")}
+          placeholder={t("allUpazilas")}
           value={filter.upazilaId}
           options={upazilas}
           onChange={setUpazila}
@@ -159,8 +165,8 @@ export function AdminCascadeFilter({
         />
         <ChevronRight className="hidden h-4 w-4 shrink-0 self-end pb-3 text-muted-foreground sm:block" />
         <CascadeSelect
-          label="Union"
-          placeholder="All unions"
+          label={t("union")}
+          placeholder={t("allUnions")}
           value={filter.unionId}
           options={unions}
           onChange={setUnion}
@@ -170,11 +176,11 @@ export function AdminCascadeFilter({
 
       {breadcrumb.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-border/50 pt-3 text-xs text-muted-foreground">
-          <span className="font-medium text-primary">Active:</span>
+          <span className="font-medium text-primary">{t("active")}:</span>
           {breadcrumb.map((unit, i) => (
             <span key={unit.id} className="flex items-center gap-1">
               {i > 0 && <ChevronRight className="h-3 w-3" />}
-              <span className="text-foreground">{formatUnitInline(unit)}</span>
+              <span className="text-foreground">{formatUnitInline(unit, locale)}</span>
             </span>
           ))}
         </div>

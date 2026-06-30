@@ -7,6 +7,14 @@ import { validate } from "../../core/middlewares/validate.middleware";
 import { container } from "../../core/di/container";
 import { asyncHandler, sendSuccess } from "../../core/utils/async-handler";
 import { sovereignLlmService } from "./sovereign.service";
+import { buildSovereignContext } from "./sovereign-context.service";
+
+const scopeSchema = z.object({
+  divisionId: z.string().uuid().optional(),
+  districtId: z.string().uuid().optional(),
+  upazilaId: z.string().uuid().optional(),
+  unionId: z.string().uuid().optional(),
+});
 
 const chatSchema = z.object({
   messages: z
@@ -19,7 +27,7 @@ const chatSchema = z.object({
     .min(1),
   lang: z.enum(["bn", "en"]).optional(),
   context: z.string().max(10000).optional(),
-});
+}).merge(scopeSchema);
 
 export class SovereignModule extends BaseModule {
   readonly name = "sovereign";
@@ -31,7 +39,27 @@ export class SovereignModule extends BaseModule {
       container.rbac.requireRoles(UserRole.PMO, UserRole.MINISTER),
       validate(chatSchema, "body"),
       asyncHandler(async (req, res) => {
-        const data = await sovereignLlmService.chat(req.body);
+        const body = req.body as z.infer<typeof chatSchema>;
+        const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
+        const { divisionId, districtId, upazilaId, unionId, messages, lang, context } =
+          body;
+
+        const dbContext = lastUser
+          ? await buildSovereignContext(lastUser.content, {
+              divisionId,
+              districtId,
+              upazilaId,
+              unionId,
+            })
+          : "";
+
+        const mergedContext = [dbContext, context].filter(Boolean).join("\n\n---\n\n");
+
+        const data = await sovereignLlmService.chat({
+          messages,
+          lang,
+          context: mergedContext || undefined,
+        });
         sendSuccess(res, data);
       }),
     );

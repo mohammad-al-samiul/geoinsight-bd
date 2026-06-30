@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { apiClient } from "@/lib/api-client";
+import type { AdminFilterState } from "@/types";
 
 export interface LlmChatResponse {
   reply: string;
@@ -19,7 +20,7 @@ export function useSovereignLlm() {
     async (
       messages: Array<{ role: "user" | "assistant" | "system"; content: string }>,
       lang: "bn" | "en" = "bn",
-      context?: string,
+      scope?: AdminFilterState,
     ) => {
       setLoading(true);
       setError(null);
@@ -28,7 +29,14 @@ export function useSovereignLlm() {
           "sovereign-llm/chat",
           {
             method: "POST",
-            body: JSON.stringify({ messages, lang, context }),
+            body: JSON.stringify({
+              messages,
+              lang,
+              divisionId: scope?.divisionId ?? undefined,
+              districtId: scope?.districtId ?? undefined,
+              upazilaId: scope?.upazilaId ?? undefined,
+              unionId: scope?.unionId ?? undefined,
+            }),
           },
         );
         return json.data;

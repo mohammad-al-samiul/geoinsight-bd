@@ -5,6 +5,8 @@ import { useCitizenChat } from "@/hooks/use-citizen-chat";
 import { ModuleShell } from "@/components/modules/module-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAppLang } from "@/hooks/use-app-lang";
+import { useTranslations } from "next-intl";
 import { MessageCircle, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,8 +17,10 @@ interface Msg {
 }
 
 export function CitizenChatbotPanel() {
+  const lang = useAppLang();
+  const t = useTranslations("modules.citizen");
+  const tc = useTranslations("common");
   const [channel, setChannel] = useState<"333" | "999">("333");
-  const [lang, setLang] = useState<"bn" | "en">("bn");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const { send, loading, error } = useCitizenChat(channel);
@@ -40,20 +44,21 @@ export function CitizenChatbotPanel() {
   };
 
   return (
-    <ModuleShell
-      title="Citizen Chatbot (333/999)"
-      description="নাগরিক বাংলায় লিখে → Bangla-BERT classify → ministry/district route."
-      error={error}
-    >
+    <ModuleShell title={t("title")} description={t("description")} error={error}>
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant={channel === "333" ? "default" : "outline"} onClick={() => setChannel("333")}>
-          333 Upazila
+        <Button
+          size="sm"
+          variant={channel === "333" ? "default" : "outline"}
+          onClick={() => setChannel("333")}
+        >
+          {t("channel333")}
         </Button>
-        <Button size="sm" variant={channel === "999" ? "default" : "outline"} onClick={() => setChannel("999")}>
-          999 Union
-        </Button>
-        <Button size="sm" variant={lang === "bn" ? "default" : "outline"} onClick={() => setLang("bn")}>
-          বাংলা
+        <Button
+          size="sm"
+          variant={channel === "999" ? "default" : "outline"}
+          onClick={() => setChannel("999")}
+        >
+          {t("channel999")}
         </Button>
       </div>
 
@@ -80,18 +85,18 @@ export function CitizenChatbotPanel() {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="আপনার অভিযোগ বা দাবি লিখুন…"
+            placeholder={t("inputPlaceholder")}
             className="flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm font-bengali"
             onKeyDown={(e) => e.key === "Enter" && void handleSend()}
           />
-          <Button onClick={() => void handleSend()} disabled={loading}>
+          <Button onClick={() => void handleSend()} disabled={loading} aria-label={tc("send")}>
             <Send className="h-4 w-4" />
           </Button>
         </div>
       </div>
       <p className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
         <MessageCircle className="h-3 w-3" />
-        Government channel only — not social media. Sovereign Bangla-BERT routing.
+        {t("footerNote")}
       </p>
     </ModuleShell>
   );

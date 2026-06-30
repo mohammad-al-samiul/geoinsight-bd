@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardError({
@@ -10,21 +11,20 @@ export default function DashboardError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useTranslations("error");
+
   useEffect(() => {
     console.error("[dashboard]", error);
   }, [error]);
 
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 p-8 text-center">
-      <h2 className="text-xl font-semibold text-foreground">Something went wrong</h2>
-      <p className="max-w-md text-sm text-muted-foreground">
-        The dashboard hit an unexpected error. This can happen after a long session or when
-        the map reloads. Try refreshing the page or signing in again.
-      </p>
+      <h2 className="text-xl font-semibold text-foreground">{t("title")}</h2>
+      <p className="max-w-md text-sm text-muted-foreground">{t("body")}</p>
       <div className="flex flex-wrap justify-center gap-3">
-        <Button onClick={() => reset()}>Try again</Button>
+        <Button onClick={() => reset()}>{t("retry")}</Button>
         <Button variant="outline" onClick={() => window.location.reload()}>
-          Reload page
+          {t("reload")}
         </Button>
         <Button
           variant="outline"
@@ -32,7 +32,7 @@ export default function DashboardError({
             window.location.href = "/login";
           }}
         >
-          Sign in again
+          {t("signIn")}
         </Button>
       </div>
     </div>

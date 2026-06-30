@@ -14,7 +14,14 @@ from app.modules.arbitrage.worker import ArbitrageBackgroundWorker
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    settings.model_cache_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        settings.model_cache_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Docker non-root user may lack write on bundled ml_models/ — use /tmp
+        from pathlib import Path
+        fallback = Path("/tmp/ml_models/cache")
+        fallback.mkdir(parents=True, exist_ok=True)
+        settings.model_cache_dir = fallback
 
     executor = startup_executor(settings.worker_pool_size)
     app.state.executor = executor

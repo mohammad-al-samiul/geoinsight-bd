@@ -4,17 +4,16 @@ import { useState } from "react";
 import { useProcurementAdvisor } from "@/hooks/use-procurement-advisor";
 import { ModuleShell, DataTable, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Button } from "@/components/ui/button";
+import { useAppLang } from "@/hooks/use-app-lang";
+import { useTranslations } from "next-intl";
 import { Package, Search } from "lucide-react";
 
-const COMMODITIES = [
-  { value: "rice", label: "Rice / চাল" },
-  { value: "onion", label: "Onion / পেঁয়াজ" },
-  { value: "wheat", label: "Wheat / গম" },
-  { value: "lentil", label: "Lentil / ডাল" },
-];
+const COMMODITY_KEYS = ["rice", "onion", "wheat", "lentil"] as const;
+const COMMODITY_VALUES = ["rice", "onion", "wheat", "lentil"] as const;
 
 export function ProcurementAdvisorPanel() {
-  const [lang, setLang] = useState<"bn" | "en">("bn");
+  const lang = useAppLang();
+  const t = useTranslations("modules.procurement");
   const [commodity, setCommodity] = useState("rice");
   const [quantity, setQuantity] = useState(10000);
   const { advice, loading, error, advise } = useProcurementAdvisor();
@@ -23,23 +22,23 @@ export function ProcurementAdvisorPanel() {
 
   return (
     <ModuleShell
-      title="Procurement Arbitrage Advisor"
-      description="চাল ১০,০০০ MT — India vs Vietnam — landed cost + lead time + port congestion."
+      title={t("title")}
+      description={t("description")}
       loading={loading && !advice}
       error={error}
       onRetry={handleAdvise}
       stats={
         advice && (
           <StatGrid>
-            <StatCard label="Commodity" value={advice.commodity} />
-            <StatCard label="Quantity (MT)" value={advice.quantity_mt.toLocaleString()} />
+            <StatCard label={t("commodity")} value={advice.commodity} />
+            <StatCard label={t("quantityMt")} value={advice.quantity_mt.toLocaleString()} />
             <StatCard
-              label="Best landed cost"
+              label={t("bestLandedCost")}
               value={`$${advice.best_option.landed_cost_usd.toLocaleString()}`}
               accent="success"
             />
             <StatCard
-              label="Lead time"
+              label={t("leadTime")}
               value={`${advice.best_option.lead_time_days} days`}
               hint={advice.best_option.port_congestion}
             />
@@ -49,21 +48,21 @@ export function ProcurementAdvisorPanel() {
     >
       <div className="glass-panel flex flex-wrap items-end gap-4 rounded-xl p-4 shadow-panel">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-muted-foreground">Commodity</label>
+          <label className="text-xs text-muted-foreground">{t("commodity")}</label>
           <select
             value={commodity}
             onChange={(e) => setCommodity(e.target.value)}
             className="h-10 rounded-md border border-border bg-card px-3 text-sm"
           >
-            {COMMODITIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
+            {COMMODITY_VALUES.map((value, i) => (
+              <option key={value} value={value}>
+                {t(COMMODITY_KEYS[i])}
               </option>
             ))}
           </select>
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-muted-foreground">Quantity (MT)</label>
+          <label className="text-xs text-muted-foreground">{t("quantityMt")}</label>
           <input
             type="number"
             min={100}
@@ -73,17 +72,9 @@ export function ProcurementAdvisorPanel() {
             className="h-10 w-36 rounded-md border border-border bg-card px-3 text-sm"
           />
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant={lang === "bn" ? "default" : "outline"} onClick={() => setLang("bn")}>
-            বাংলা
-          </Button>
-          <Button size="sm" variant={lang === "en" ? "default" : "outline"} onClick={() => setLang("en")}>
-            EN
-          </Button>
-        </div>
         <Button onClick={handleAdvise} disabled={loading} className="gap-2">
           <Search className="h-4 w-4" />
-          Get advice
+          {t("getAdvice")}
         </Button>
       </div>
 
@@ -99,7 +90,7 @@ export function ProcurementAdvisorPanel() {
           <DataTable
             rows={[advice.best_option, ...advice.alternatives].map((o, i) => ({
               id: o.country_code,
-              rank: i === 0 ? "★ Best" : `#${i + 1}`,
+              rank: i === 0 ? t("bestRank") : `#${i + 1}`,
               country: o.country_name,
               landed: `$${o.landed_cost_usd.toLocaleString()}`,
               lead: `${o.lead_time_days}d`,
@@ -107,14 +98,14 @@ export function ProcurementAdvisorPanel() {
               reliability: `${(o.reliability_score * 100).toFixed(0)}%`,
             }))}
             columns={[
-              { key: "rank", label: "Rank" },
-              { key: "country", label: "Source" },
-              { key: "landed", label: "Landed cost" },
-              { key: "lead", label: "Lead time" },
-              { key: "port", label: "Port" },
-              { key: "reliability", label: "Reliability" },
+              { key: "rank", label: t("rank") },
+              { key: "country", label: t("source") },
+              { key: "landed", label: t("landedCost") },
+              { key: "lead", label: t("leadTime") },
+              { key: "port", label: t("port") },
+              { key: "reliability", label: t("reliability") },
             ]}
-            emptyMessage="No options."
+            emptyMessage={t("noOptions")}
           />
         </div>
       )}

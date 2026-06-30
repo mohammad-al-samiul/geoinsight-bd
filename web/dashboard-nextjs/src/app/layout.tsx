@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, Noto_Sans_Bengali } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages, getTranslations } from "next-intl/server";
+import { cn } from "@/lib/utils";
 import "./globals.css";
 
 const inter = Inter({
@@ -13,16 +16,28 @@ const notoBengali = Noto_Sans_Bengali({
   variable: "--font-bengali",
 });
 
-export const metadata: Metadata = {
-  title: "GeoInsight BD — National Dashboard",
-  description: "Government of Bangladesh · National Intelligence Platform",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("metadata");
+  return {
+    title: t("title"),
+    description: t("description"),
+  };
+}
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.variable} ${notoBengali.variable} font-sans`}>
-        {children}
+    <html lang={locale} className="dark">
+      <body
+        className={cn(
+          inter.variable,
+          notoBengali.variable,
+          locale === "bn" ? "font-bengali" : "font-sans",
+        )}
+      >
+        <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
       </body>
     </html>
   );

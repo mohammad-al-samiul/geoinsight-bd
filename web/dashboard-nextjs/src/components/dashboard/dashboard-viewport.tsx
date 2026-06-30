@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -10,36 +10,13 @@ import { KpiScorecards } from "@/components/dashboard/kpi-scorecards";
 import { Badge } from "@/components/ui/badge";
 import type { GeoFeatureProperties } from "@/types/dashboard";
 import type { SocketConnectionStatus } from "@/hooks/use-socket";
+import { useTranslations } from "next-intl";
 import { Radio, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const SOCKET_STATUS: Record<
-  SocketConnectionStatus,
-  { label: string; className: string; icon: React.ComponentType<{ className?: string }> }
-> = {
-  connected: {
-    label: "Live",
-    className: "border-emerald-500/40 text-emerald-400",
-    icon: Wifi,
-  },
-  connecting: {
-    label: "Connecting",
-    className: "border-amber-500/40 text-amber-400",
-    icon: Radio,
-  },
-  disconnected: {
-    label: "Offline",
-    className: "border-muted-foreground/40 text-muted-foreground",
-    icon: WifiOff,
-  },
-  error: {
-    label: "Reconnecting",
-    className: "border-destructive/40 text-destructive",
-    icon: WifiOff,
-  },
-};
-
 export function DashboardViewport() {
+  const t = useTranslations("modules.dashboard");
+  const tc = useTranslations("common");
   const user = useAuth();
   const { filter, drillToUnit } = useAdminFilter();
 
@@ -49,7 +26,38 @@ export function DashboardViewport() {
   const breadcrumb = getBreadcrumb(filter);
   const scopeLabel = breadcrumb.length
     ? breadcrumb.map((b) => b.name).join(" → ")
-    : user.adminUnitName ?? "National";
+    : (user.adminUnitName ?? t("national"));
+
+  const socketMeta = useMemo(() => {
+    const SOCKET_STATUS: Record<
+      SocketConnectionStatus,
+      { label: string; className: string; icon: React.ComponentType<{ className?: string }> }
+    > = {
+      connected: {
+        label: tc("live"),
+        className: "border-emerald-500/40 text-emerald-400",
+        icon: Wifi,
+      },
+      connecting: {
+        label: t("connecting"),
+        className: "border-amber-500/40 text-amber-400",
+        icon: Radio,
+      },
+      disconnected: {
+        label: t("offline"),
+        className: "border-muted-foreground/40 text-muted-foreground",
+        icon: WifiOff,
+      },
+      error: {
+        label: t("reconnecting"),
+        className: "border-destructive/40 text-destructive",
+        icon: WifiOff,
+      },
+    };
+    return SOCKET_STATUS[socketStatus];
+  }, [socketStatus, t, tc]);
+
+  const SocketIcon = socketMeta.icon;
 
   const handleFeatureClick = useCallback(
     (props: GeoFeatureProperties) => {
@@ -62,18 +70,15 @@ export function DashboardViewport() {
     [drillToUnit],
   );
 
-  const socketMeta = SOCKET_STATUS[socketStatus];
-  const SocketIcon = socketMeta.icon;
-
   return (
     <div className="mx-auto max-w-[1600px] space-y-5 animate-fade-in">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground lg:text-3xl">
-            National Command Viewport
+            {t("viewport")}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Scoped: <span className="text-primary">{scopeLabel}</span>
+            {t("scoped")}: <span className="text-primary">{scopeLabel}</span>
           </p>
         </div>
         <Badge

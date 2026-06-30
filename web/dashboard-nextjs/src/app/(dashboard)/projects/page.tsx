@@ -6,6 +6,7 @@ import { ProjectDetailModal } from "@/components/projects/project-detail-modal";
 import { useProjectsList } from "@/hooks/use-module-data";
 import { Badge } from "@/components/ui/badge";
 import { formatLakh } from "@/lib/format";
+import { useTranslations } from "next-intl";
 import type { ProjectRow } from "@/lib/module-types";
 
 const statusColor: Record<string, string> = {
@@ -17,6 +18,7 @@ const statusColor: Record<string, string> = {
 };
 
 export default function ProjectsPage() {
+  const t = useTranslations("modules.projects");
   const { rows, loading, error, reload } = useProjectsList();
   const [selected, setSelected] = useState<ProjectRow | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -36,23 +38,23 @@ export default function ProjectsPage() {
 
   return (
     <ModuleShell
-      title="Project Tracker"
-      description="National development projects — budget, status, and red-flag counts by administrative scope."
+      title={t("title")}
+      description={t("description")}
       loading={loading}
       error={error}
       onRetry={reload}
       stats={
         !loading && rows.length > 0 ? (
           <StatGrid>
-            <StatCard label="Projects" value={rows.length} />
-            <StatCard label="Ongoing" value={ongoing} accent="default" />
+            <StatCard label={t("total")} value={rows.length} />
+            <StatCard label={t("ongoing")} value={ongoing} accent="default" />
             <StatCard
-              label="Total Budget"
+              label={t("totalBudget")}
               value={formatLakh(totalAllocated)}
-              hint={`Spent: ${formatLakh(totalSpent)}`}
+              hint={t("hintSpent", { amount: formatLakh(totalSpent) })}
             />
             <StatCard
-              label="Red Flags"
+              label={t("redFlags")}
               value={redFlagTotal}
               accent={redFlagTotal > 0 ? "danger" : "success"}
             />
@@ -66,10 +68,10 @@ export default function ProjectsPage() {
             rows={rows}
             onRowClick={openProject}
             columns={[
-              { key: "title", label: "Project" },
+              { key: "title", label: t("colTitle") },
               {
                 key: "status",
-                label: "Status",
+                label: t("colStatus"),
                 render: (r) => (
                   <Badge className={statusColor[String(r.status)] ?? ""}>
                     {String(r.status)}
@@ -78,17 +80,17 @@ export default function ProjectsPage() {
               },
               {
                 key: "budgetAllocated",
-                label: "Allocated",
+                label: t("colAllocated"),
                 render: (r) => formatLakh(r.budgetAllocated),
               },
               {
                 key: "budgetSpent",
-                label: "Spent",
+                label: t("colSpent"),
                 render: (r) => formatLakh(r.budgetSpent),
               },
               {
                 key: "_count",
-                label: "Red Flags",
+                label: t("colAlerts"),
                 render: (r) => {
                   const count = r._count?.redFlagAlerts ?? 0;
                   return count > 0 ? (
@@ -100,15 +102,13 @@ export default function ProjectsPage() {
               },
               {
                 key: "blockchainTx",
-                label: "Blockchain",
-                render: (r) => (r.blockchainTx ? "Anchored" : "Pending"),
+                label: t("colBlockchain"),
+                render: (r) => (r.blockchainTx ? t("anchored") : t("pending")),
               },
             ]}
-            emptyMessage="No projects in this scope. Clear filter for national view."
+            emptyMessage={t("emptyScope")}
           />
-          <p className="text-center text-xs text-muted-foreground">
-            Click a row for full project details and red-flag history.
-          </p>
+          <p className="text-center text-xs text-muted-foreground">{t("clickHint")}</p>
           <ProjectDetailModal
             project={selected}
             open={modalOpen}

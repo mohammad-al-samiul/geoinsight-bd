@@ -2,11 +2,12 @@
 
 import { AdminCascadeFilter } from "@/components/filters/admin-cascade-filter";
 import { CommandSearch } from "@/components/layout/command-search";
+import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { NotificationCenter } from "@/components/layout/notification-center";
 import { useAuth, useAuthActions } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ROLE_META } from "@/types";
+import { useTranslations } from "next-intl";
 import { AlertTriangle, LogOut, Menu, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,8 @@ export function CommandBar({
 }: CommandBarProps) {
   const user = useAuth();
   const { logout } = useAuthActions();
-  const meta = ROLE_META[user.role];
+  const t = useTranslations("shell");
+  const tr = useTranslations("roles");
 
   return (
     <header className="sticky top-0 z-[100] overflow-visible border-b border-command-border bg-command shadow-panel">
@@ -35,7 +37,7 @@ export function CommandBar({
           size="icon"
           className="lg:hidden"
           onClick={onMenuClick}
-          aria-label="Open navigation"
+          aria-label={t("openNav")}
         >
           <Menu className="h-5 w-5" />
         </Button>
@@ -45,8 +47,8 @@ export function CommandBar({
             <Radio className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <p className="text-sm font-semibold leading-none">National Command Center</p>
-            <p className="text-[10px] text-muted-foreground">Real-time governance intelligence</p>
+            <p className="text-sm font-semibold leading-none">{t("commandCenter")}</p>
+            <p className="text-[10px] text-muted-foreground">{t("commandSubtitle")}</p>
           </div>
         </div>
 
@@ -55,11 +57,12 @@ export function CommandBar({
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          <LocaleSwitcher />
           <Badge
             variant="outline"
-            className={cn("hidden border text-[10px] font-bold uppercase sm:inline-flex", meta.badgeClass)}
+            className={cn("hidden border text-[10px] font-bold uppercase sm:inline-flex")}
           >
-            {user.role.replace("_", " ")}
+            {tr(user.role)}
           </Badge>
           {onToggleFeed && (
             <Button
@@ -67,7 +70,7 @@ export function CommandBar({
               size="icon"
               className="hidden xl:inline-flex"
               onClick={onToggleFeed}
-              aria-label="Toggle anomaly feed"
+              aria-label={t("toggleFeed")}
             >
               <AlertTriangle className="h-4 w-4" />
             </Button>
@@ -78,7 +81,7 @@ export function CommandBar({
             size="icon"
             className="text-muted-foreground"
             onClick={() => logout()}
-            aria-label="Sign out"
+            aria-label={t("signOut")}
           >
             <LogOut className="h-4 w-4" />
           </Button>
@@ -86,7 +89,7 @@ export function CommandBar({
       </div>
 
       <div className={cn("border-t border-command-border/50 px-4 py-3 lg:px-6", sidebarCollapsed && "lg:pl-4")}>
-      <AdminCascadeFilter variant="solid" />
+        <AdminCascadeFilter variant="solid" />
       </div>
     </header>
   );

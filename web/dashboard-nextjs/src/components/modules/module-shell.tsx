@@ -6,6 +6,7 @@ import { ScorecardSkeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
 interface ModuleShellProps {
@@ -28,6 +29,7 @@ export function ModuleShell({
   children,
 }: ModuleShellProps) {
   useAdminHierarchy();
+  const t = useTranslations("common");
 
   return (
     <div className="mx-auto max-w-7xl animate-fade-in space-y-6">
@@ -39,7 +41,7 @@ export function ModuleShell({
         {onRetry && (
           <Button variant="outline" size="sm" onClick={onRetry} className="gap-2">
             <RefreshCw className="h-3.5 w-3.5" />
-            Refresh
+            {t("refresh")}
           </Button>
         )}
       </div>
@@ -50,7 +52,7 @@ export function ModuleShell({
         <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
-            <p className="font-medium">Could not load data</p>
+            <p className="font-medium">{t("loadFailed")}</p>
             <p className="mt-1 text-destructive/80">{error}</p>
           </div>
         </div>
@@ -113,13 +115,15 @@ interface DataTableProps<T extends { id?: string }> {
 export function DataTable<T extends { id?: string }>({
   columns,
   rows,
-  emptyMessage = "No records found.",
+  emptyMessage,
   onRowClick,
 }: DataTableProps<T>) {
+  const t = useTranslations("common");
+  const empty = emptyMessage ?? t("noData");
   if (rows.length === 0) {
     return (
       <div className="glass-panel rounded-xl p-8 text-center text-sm text-muted-foreground">
-        {emptyMessage}
+        {empty}
       </div>
     );
   }

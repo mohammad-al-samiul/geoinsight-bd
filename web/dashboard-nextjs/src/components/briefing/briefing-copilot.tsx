@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { useMorningBriefing } from "@/hooks/use-briefing";
 import { VoiceBriefing } from "@/components/briefing/voice-briefing";
 import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { AiStatusBadge } from "@/components/ai/ai-status-badge";
-import { Languages, Sparkles, Sun } from "lucide-react";
+import { useAppLang } from "@/hooks/use-app-lang";
+import { useTranslations } from "next-intl";
+import { Sparkles, Sun } from "lucide-react";
 
 const CATEGORY_STYLE: Record<string, string> = {
   completion: "border-amber-500/40 bg-amber-500/10 text-amber-300",
@@ -19,13 +19,15 @@ const CATEGORY_STYLE: Record<string, string> = {
 };
 
 export function BriefingCopilot() {
-  const [lang, setLang] = useState<"bn" | "en">("bn");
+  const lang = useAppLang();
+  const t = useTranslations("modules.briefing");
+  const tc = useTranslations("common");
   const { briefing, loading, error, reload } = useMorningBriefing(lang);
 
   return (
     <ModuleShell
-      title="PM Briefing Copilot"
-      description="One-click morning briefing from structured national data — Bangla-BERT sentiment, KPIs, arbitrage, and red flags."
+      title={t("title")}
+      description={t("description")}
       loading={loading}
       error={error}
       onRetry={reload}
@@ -33,18 +35,18 @@ export function BriefingCopilot() {
         briefing?.metrics_snapshot && (
           <StatGrid>
             <StatCard
-              label="Completion rate"
+              label={t("completionRate")}
               value={`${briefing.metrics_snapshot.completionRate}%`}
               accent="success"
             />
             <StatCard
-              label="Open red flags"
+              label={t("openRedFlags")}
               value={briefing.metrics_snapshot.openAlerts}
               accent={briefing.metrics_snapshot.openAlerts > 3 ? "danger" : "warning"}
             />
-            <StatCard label="Projects in scope" value={briefing.metrics_snapshot.projects} />
+            <StatCard label={t("projectsInScope")} value={briefing.metrics_snapshot.projects} />
             <StatCard
-              label="Scope"
+              label={t("scope")}
               value={briefing.scope_label}
               hint={new Date(briefing.generated_at).toLocaleString()}
             />
@@ -55,33 +57,12 @@ export function BriefingCopilot() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Sun className="h-5 w-5 text-amber-400" />
-          <h2 className="text-lg font-semibold">
-            {lang === "bn" ? "আজ সকালের ব্রিফিং" : "This Morning's Briefing"}
-          </h2>
+          <h2 className="text-lg font-semibold">{t("morningTitle")}</h2>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={lang === "bn" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setLang("bn")}
-            className="gap-1.5"
-          >
-            <Languages className="h-3.5 w-3.5" />
-            বাংলা
-          </Button>
-          <Button
-            variant={lang === "en" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setLang("en")}
-            className="gap-1.5"
-          >
-            English
-          </Button>
-          <Button size="sm" onClick={reload} className="gap-1.5">
-            <Sparkles className="h-3.5 w-3.5" />
-            {lang === "bn" ? "পুনরায় তৈরি" : "Regenerate"}
-          </Button>
-        </div>
+        <Button size="sm" onClick={reload} className="gap-1.5">
+          <Sparkles className="h-3.5 w-3.5" />
+          {tc("regenerate")}
+        </Button>
       </div>
 
       {briefing && (
@@ -89,7 +70,7 @@ export function BriefingCopilot() {
           <div className="space-y-4 xl:col-span-3">
             <div className="glass-panel rounded-xl p-5 shadow-panel">
               <div className="mb-4 flex items-center gap-2">
-                <span className="text-sm font-semibold">AI Briefing · 5 bullets</span>
+                <span className="text-sm font-semibold">{t("bullets")}</span>
                 <AiStatusBadge className="ml-auto" />
               </div>
               <ul className="space-y-3">

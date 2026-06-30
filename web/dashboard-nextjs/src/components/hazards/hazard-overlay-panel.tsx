@@ -4,25 +4,27 @@ import { useHazardOverlay } from "@/hooks/use-hazard-overlay";
 import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 import { CloudRain, Wind } from "lucide-react";
 
 export function HazardOverlayPanel() {
+  const t = useTranslations("modules.hazards");
   const { overlay, loading, error, reload } = useHazardOverlay();
 
   return (
     <ModuleShell
-      title="Flood & Cyclone Project Risk"
-      description="BMD/FFWC hazard zones overlaid on project locations — এই মৌসুমে ঝুঁকিতে থাকা প্রকল্প।"
+      title={t("title")}
+      description={t("description")}
       loading={loading}
       error={error}
       onRetry={reload}
       stats={
         overlay && (
           <StatGrid>
-            <StatCard label="Projects mapped" value={overlay.projects_mapped} />
-            <StatCard label="At risk" value={overlay.at_risk_count} accent="danger" />
-            <StatCard label="Hazard zones" value={overlay.zones.length} />
-            <StatCard label="Season" value={overlay.season} />
+            <StatCard label={t("projectsMapped")} value={overlay.projects_mapped} />
+            <StatCard label={t("atRisk")} value={overlay.at_risk_count} accent="danger" />
+            <StatCard label={t("hazardZones")} value={overlay.zones.length} />
+            <StatCard label={t("season")} value={overlay.season} />
           </StatGrid>
         )
       }
@@ -30,7 +32,7 @@ export function HazardOverlayPanel() {
       {overlay && (
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="glass-panel rounded-xl p-4 shadow-panel">
-            <h3 className="mb-3 text-sm font-semibold">Active hazard zones</h3>
+            <h3 className="mb-3 text-sm font-semibold">{t("activeHazardZones")}</h3>
             <ul className="space-y-2">
               {overlay.zones.map((z) => (
                 <li
@@ -55,11 +57,11 @@ export function HazardOverlayPanel() {
           </div>
 
           <div className="glass-panel rounded-xl p-4 shadow-panel">
-            <h3 className="mb-1 text-sm font-semibold text-red-400">Projects at risk</h3>
+            <h3 className="mb-1 text-sm font-semibold text-red-400">{t("projectsAtRisk")}</h3>
             <p className="mb-3 text-xs text-muted-foreground">{overlay.narrative_bn}</p>
             <ul className="max-h-[400px] space-y-2 overflow-y-auto">
               {overlay.exposures.length === 0 ? (
-                <li className="text-sm text-muted-foreground">No high-exposure projects in scope.</li>
+                <li className="text-sm text-muted-foreground">{t("noHighExposure")}</li>
               ) : (
                 overlay.exposures.map((e) => (
                   <li
@@ -73,7 +75,11 @@ export function HazardOverlayPanel() {
                   >
                     <p className="text-sm font-medium">{e.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {e.nearest_zone_bn} · {e.distance_km} km · exposure {e.exposure_score}%
+                      {t("exposureDetail", {
+                        zone: e.nearest_zone_bn,
+                        distance: e.distance_km,
+                        score: e.exposure_score,
+                      })}
                     </p>
                   </li>
                 ))

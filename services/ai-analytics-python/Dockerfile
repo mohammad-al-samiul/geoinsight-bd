@@ -28,6 +28,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY app ./app
 COPY ml_models ./ml_models
 
+RUN mkdir -p /app/ml_models/cache \
+    && chown -R app:app /app
+
 USER app
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \

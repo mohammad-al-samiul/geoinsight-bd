@@ -4,6 +4,7 @@ import { ModuleShell, DataTable, StatCard, StatGrid } from "@/components/modules
 import { useAgroMarketsList } from "@/hooks/use-module-data";
 import { Badge } from "@/components/ui/badge";
 import { resolveUnitName } from "@/lib/unit-names";
+import { useTranslations } from "next-intl";
 
 const typeColor: Record<string, string> = {
   WHOLESALE: "bg-emerald-500/20 text-emerald-400",
@@ -12,26 +13,34 @@ const typeColor: Record<string, string> = {
 };
 
 export default function AgroPage() {
+  const t = useTranslations("modules.agro");
   const { rows, loading, error, reload } = useAgroMarketsList();
 
   const wholesale = rows.filter((r) => r.type === "WHOLESALE").length;
   const retail = rows.filter((r) => r.type === "RETAIL").length;
   const haat = rows.filter((r) => r.type === "HAAT").length;
 
+  const typeLabel = (type: string) => {
+    if (type === "WHOLESALE") return t("wholesale");
+    if (type === "RETAIL") return t("retail");
+    if (type === "HAAT") return t("haat");
+    return type;
+  };
+
   return (
     <ModuleShell
-      title="Agri Markets"
-      description="Wholesale mandis, haats, and retail markets — national food security and price monitoring."
+      title={t("title")}
+      description={t("description")}
       loading={loading}
       error={error}
       onRetry={reload}
       stats={
         !loading && rows.length > 0 ? (
           <StatGrid>
-            <StatCard label="Markets" value={rows.length} />
-            <StatCard label="Wholesale" value={wholesale} />
-            <StatCard label="Retail" value={retail} />
-            <StatCard label="Haat" value={haat} />
+            <StatCard label={t("markets")} value={rows.length} />
+            <StatCard label={t("wholesale")} value={wholesale} />
+            <StatCard label={t("retail")} value={retail} />
+            <StatCard label={t("haat")} value={haat} />
           </StatGrid>
         ) : undefined
       }
@@ -40,26 +49,26 @@ export default function AgroPage() {
         <DataTable
           rows={rows}
           columns={[
-            { key: "name", label: "Market" },
+            { key: "name", label: t("colMarket") },
             {
               key: "type",
-              label: "Type",
+              label: t("colType"),
               render: (r) => (
-                <Badge className={typeColor[r.type] ?? ""}>{r.type}</Badge>
+                <Badge className={typeColor[r.type] ?? ""}>{typeLabel(r.type)}</Badge>
               ),
             },
             {
               key: "adminUnitId",
-              label: "District / Unit",
+              label: t("colDistrict"),
               render: (r) => resolveUnitName(r.adminUnitId),
             },
             {
               key: "lat",
-              label: "Coordinates",
+              label: t("colCoordinates"),
               render: (r) => `${Number(r.lat).toFixed(4)}, ${Number(r.lng).toFixed(4)}`,
             },
           ]}
-          emptyMessage="No agro markets in this scope."
+          emptyMessage={t("emptyScope")}
         />
       )}
     </ModuleShell>

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import Enum
 from functools import lru_cache
 from typing import Literal
@@ -104,6 +104,21 @@ def analyze_text(
     )
 
 
+def sentiment_to_dict(result: SentimentResult | object) -> dict[str, object]:
+    if isinstance(result, SentimentResult):
+        return asdict(result)
+    if hasattr(result, "__dict__"):
+        return dict(result.__dict__)
+    return {
+        "text": getattr(result, "text", ""),
+        "category": getattr(result, "category", "Neutral"),
+        "confidence": getattr(result, "confidence", 0.0),
+        "district": getattr(result, "district", ""),
+        "upazila": getattr(result, "upazila", ""),
+        "raw_label": getattr(result, "raw_label", ""),
+    }
+
+
 def _mock_classify(text: str) -> tuple[GrievanceCategory, float]:
     if _GRIEVANCE_KW.search(text):
         return "Grievance", 0.88
@@ -120,6 +135,6 @@ def analyze_batch(
 ) -> list[dict[str, object]]:
     """Entry point for ProcessPoolExecutor (must be top-level picklable)."""
     return [
-        analyze_text(text, district, upazila, model_id, cache_dir, use_mock).__dict__
+        sentiment_to_dict(analyze_text(text, district, upazila, model_id, cache_dir, use_mock))
         for text, district, upazila in items
     ]

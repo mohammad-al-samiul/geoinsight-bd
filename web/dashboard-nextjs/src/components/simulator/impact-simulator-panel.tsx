@@ -6,6 +6,8 @@ import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-she
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useAppLang } from "@/hooks/use-app-lang";
+import { useTranslations } from "next-intl";
 import { Globe2, Play, SlidersHorizontal } from "lucide-react";
 
 const BAND_COLOR: Record<string, string> = {
@@ -16,7 +18,9 @@ const BAND_COLOR: Record<string, string> = {
 };
 
 export function ImpactSimulatorPanel() {
-  const [lang, setLang] = useState<"bn" | "en">("bn");
+  const lang = useAppLang();
+  const t = useTranslations("modules.simulator");
+  const tc = useTranslations("common");
   const [conflict, setConflict] = useState(0.65);
   const [sanctions, setSanctions] = useState(0.4);
   const [trade, setTrade] = useState(0.5);
@@ -40,10 +44,18 @@ export function ImpactSimulatorPanel() {
     });
   };
 
+  const sliders = [
+    { label: t("conflictIntensity"), value: conflict, set: setConflict },
+    { label: t("sanctionsLevel"), value: sanctions, set: setSanctions },
+    { label: t("tradeDisruption"), value: trade, set: setTrade },
+    { label: t("migrationPressure"), value: migration, set: setMigration },
+    { label: t("oilPriceShock"), value: oil, set: setOil },
+  ];
+
   return (
     <ModuleShell
-      title="Cross-Ministry Impact Simulator"
-      description="যদি Middle East conflict বাড়ে — Remittance, RMG, Agriculture, Energy sector impact narrative."
+      title={t("title")}
+      description={t("description")}
       loading={loading && !result}
       error={error}
       onRetry={handleRun}
@@ -51,15 +63,15 @@ export function ImpactSimulatorPanel() {
         result && (
           <StatGrid>
             <StatCard
-              label="Overall risk"
+              label={t("overallRisk")}
               value={`${result.overall_risk_score}/100`}
               accent="danger"
             />
-            <StatCard label="Risk band" value={result.risk_band} />
-            <StatCard label="Ministries" value={result.ministry_impacts.length} />
+            <StatCard label={t("riskBand")} value={result.risk_band} />
+            <StatCard label={t("ministries")} value={result.ministry_impacts.length} />
             <StatCard
-              label="Scenario"
-              value={lang === "bn" ? "মধ্যপ্রাচ্য" : "Middle East"}
+              label={t("scenario")}
+              value={t("middleEast")}
               hint={new Date(result.computed_at).toLocaleString()}
             />
           </StatGrid>
@@ -70,29 +82,15 @@ export function ImpactSimulatorPanel() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <SlidersHorizontal className="h-4 w-4 text-primary" />
-            Scenario sliders
+            {t("scenarioSliders")}
           </h3>
-          <div className="flex gap-2">
-            <Button size="sm" variant={lang === "bn" ? "default" : "outline"} onClick={() => setLang("bn")}>
-              বাংলা
-            </Button>
-            <Button size="sm" variant={lang === "en" ? "default" : "outline"} onClick={() => setLang("en")}>
-              English
-            </Button>
-            <Button size="sm" onClick={handleRun} disabled={loading} className="gap-2">
-              <Play className="h-3.5 w-3.5" />
-              Run simulation
-            </Button>
-          </div>
+          <Button size="sm" onClick={handleRun} disabled={loading} className="gap-2">
+            <Play className="h-3.5 w-3.5" />
+            {tc("run")}
+          </Button>
         </div>
 
-        {[
-          { label: "Conflict intensity", value: conflict, set: setConflict },
-          { label: "Sanctions level", value: sanctions, set: setSanctions },
-          { label: "Trade disruption", value: trade, set: setTrade },
-          { label: "Migration pressure", value: migration, set: setMigration },
-          { label: "Oil price shock", value: oil, set: setOil },
-        ].map((s) => (
+        {sliders.map((s) => (
           <div key={s.label}>
             <div className="mb-1 flex justify-between text-xs">
               <span className="text-muted-foreground">{s.label}</span>
@@ -112,8 +110,11 @@ export function ImpactSimulatorPanel() {
 
         <div>
           <div className="mb-1 flex justify-between text-xs">
-            <span className="text-muted-foreground">Budget reallocation</span>
-            <span className="tabular-nums">{budgetShift > 0 ? "+" : ""}{budgetShift}%</span>
+            <span className="text-muted-foreground">{t("budgetReallocation")}</span>
+            <span className="tabular-nums">
+              {budgetShift > 0 ? "+" : ""}
+              {budgetShift}%
+            </span>
           </div>
           <input
             type="range"

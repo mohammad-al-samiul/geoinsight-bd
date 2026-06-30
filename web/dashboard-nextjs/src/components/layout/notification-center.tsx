@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { AlertDetailModal } from "@/components/alerts/alert-detail-modal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,8 @@ function getLastReadAt(): number {
 export function NotificationCenter() {
   const { filter } = useAdminFilter();
   const { alerts, loading, refresh } = useAnomalyFeed(filter);
+  const t = useTranslations("notifications");
+  const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [lastReadAt, setLastReadAt] = useState(0);
   const [selected, setSelected] = useState<AnomalyAlert | null>(null);
@@ -81,7 +84,9 @@ export function NotificationCenter() {
           size="icon"
           className="relative text-muted-foreground"
           onClick={toggle}
-          aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
+          aria-label={
+            unreadCount > 0 ? t("unread", { count: unreadCount }) : t("title")
+          }
           aria-expanded={open}
         >
           <Bell className="h-4 w-4" />
@@ -97,20 +102,18 @@ export function NotificationCenter() {
             <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-destructive" />
-                <h3 className="text-sm font-semibold">Notifications</h3>
+                <h3 className="text-sm font-semibold">{t("title")}</h3>
               </div>
               <Badge variant="outline" className="text-[10px]">
-                {alerts.length} active
+                {t("active", { count: alerts.length })}
               </Badge>
             </div>
 
             <div className="max-h-80 overflow-y-auto">
               {loading ? (
-                <p className="px-4 py-6 text-center text-sm text-muted-foreground">Loading…</p>
+                <p className="px-4 py-6 text-center text-sm text-muted-foreground">{tc("loading")}</p>
               ) : preview.length === 0 ? (
-                <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                  No active red flags in current scope.
-                </p>
+                <p className="px-4 py-6 text-center text-sm text-muted-foreground">{t("empty")}</p>
               ) : (
                 <ul className="divide-y divide-border/50">
                   {preview.map((alert) => {
@@ -139,7 +142,7 @@ export function NotificationCenter() {
                               {alert.headline}
                             </p>
                             <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
-                              {alert.unitName} · {new Date(alert.createdAt).toLocaleString("en-BD")}
+                              {alert.unitName} · {new Date(alert.createdAt).toLocaleString()}
                             </p>
                           </div>
                           <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -153,11 +156,11 @@ export function NotificationCenter() {
 
             <div className="flex items-center justify-between border-t border-border/60 px-3 py-2">
               <Button variant="ghost" size="sm" className="text-xs" onClick={() => refresh()}>
-                Refresh
+                {tc("refresh")}
               </Button>
               <Button variant="ghost" size="sm" className="gap-1 text-xs" asChild>
                 <Link href="/alerts" onClick={() => setOpen(false)}>
-                  View all
+                  {tc("viewAll")}
                   <ExternalLink className="h-3 w-3" />
                 </Link>
               </Button>

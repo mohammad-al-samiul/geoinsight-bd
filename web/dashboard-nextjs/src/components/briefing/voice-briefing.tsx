@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 import { Pause, Play, Volume2 } from "lucide-react";
 
 interface VoiceBriefingProps {
@@ -12,6 +13,7 @@ interface VoiceBriefingProps {
 }
 
 export function VoiceBriefing({ text, lang, className }: VoiceBriefingProps) {
+  const t = useTranslations("voice");
   const [playing, setPlaying] = useState(false);
   const [supported, setSupported] = useState(true);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -61,21 +63,19 @@ export function VoiceBriefing({ text, lang, className }: VoiceBriefingProps) {
     >
       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
         <Volume2 className="h-4 w-4 text-primary" />
-        Voice Briefing
+        {t("title")}
         <span className="text-xs font-normal text-muted-foreground">
-          ({lang === "bn" ? "বাংলা TTS" : "English TTS"} · ~2 min)
+          ({lang === "bn" ? t("ttsBn") : t("ttsEn")} · {t("duration")})
         </span>
       </div>
 
       {!supported ? (
-        <p className="text-xs text-muted-foreground">
-          Browser speech synthesis is not available. Use the text briefing below.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("unsupported")}</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={playing ? stop : play} className="gap-2">
             {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            {playing ? "Stop" : "Play briefing"}
+            {playing ? t("pause") : t("play")}
           </Button>
         </div>
       )}

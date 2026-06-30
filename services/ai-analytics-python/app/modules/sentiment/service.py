@@ -4,7 +4,7 @@ import asyncio
 from concurrent.futures import ProcessPoolExecutor
 
 from app.core.config import Settings
-from app.ml.bangla_bert.pipeline import analyze_batch, analyze_text
+from app.ml.bangla_bert.pipeline import analyze_batch, analyze_text, sentiment_to_dict
 from app.modules.sentiment.mock_stream import generate_mock_stream
 from app.modules.sentiment.schemas import (
     SentimentAnalyzeRequest,
@@ -30,7 +30,7 @@ class SentimentService:
             str(self._settings.model_cache_dir),
             self._settings.sentiment_use_mock,
         )
-        return SentimentItem(**result.__dict__)
+        return SentimentItem(**sentiment_to_dict(result))
 
     async def analyze_stream(self, limit: int) -> SentimentBatchResponse:
         logs = generate_mock_stream(limit)
