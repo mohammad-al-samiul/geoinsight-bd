@@ -1,0 +1,155 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useGlobalSearch, type SearchResult } from "@/hooks/use-search";
+import { cn } from "@/lib/utils";
+import {
+  AlertTriangle,
+  BarChart3,
+  FolderKanban,
+  LayoutGrid,
+  Search,
+  UserRound,
+} from "lucide-react";
+
+const TYPE_META: Record<
+  SearchResult["type"],
+  { icon: typeof Search; label: string }
+> = {
+  page: { icon: LayoutGrid, label: "Page" },
+  project: { icon: FolderKanban, label: "Project" },
+  representative: { icon: UserRound, label: "Representative" },
+  kpi: { icon: BarChart3, label: "KPI" },
+  alert: { icon: AlertTriangle, label: "Alert" },
+};
+
+export function CommandSearch() {
+  const router = useRouter();
+  const { query, setQuery, results, loading, clear } = useGlobalSearch();
+  const [open, setOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const showDropdown = open && query.trim().length >= 2;
+
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [results]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+        setOpen(true);
+      }
+      if (e.key === "Escape") {
+        setOpen(false);
+        inputRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const navigate = (href: string) => {
+    clear();
+    setOpen(false);
+    router.push(href);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!showDropdown || results.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIdx((i) => (i + 1) % results.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIdx((i) => (i - 1 + results.length) % results.length);
+    } else if (e.key === "Enter" && results[activeIdx]) {
+      e.preventDefault();
+      navigate(results[activeIdx].href);
+    }
+  };
+
+  return (
+    <div ref={rootRef} className="relative w-full">
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <input
+        ref={inputRef}
+        type="search"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={onKeyDown}
+        placeholder="Search KPIs, projects, representatives… (Ctrl+K)"
+        className="h-9 w-full rounded-md border border-input bg-secondary/40 pl-9 pr-3 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+        aria-label="Global search"
+        aria-expanded={showDropdown}
+        aria-autocomplete="list"
+        role="combobox"
+      />
+
+      {showDropdown && (
+        <div
+          className="absolute left-0 right-0 top-full z-[200] mt-1 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
+          role="listbox"
+        >
+          {loading && results.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-muted-foreground">Searching…</p>
+          ) : results.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-muted-foreground">
+              No results for &ldquo;{query}&rdquo;
+            </p>
+          ) : (
+            <ul className="py-1">
+              {results.map((item, idx) => {
+                const meta = TYPE_META[item.type];
+                const Icon = meta.icon;
+                return (
+                  <li key={`${item.type}-${item.id}`}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={idx === activeIdx}
+                      onMouseEnter={() => setActiveIdx(idx)}
+                      onClick={() => navigate(item.href)}
+                      className={cn(
+                        "flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors",
+                        idx === activeIdx ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{item.title}</p>
+                        {item.subtitle && (
+                          <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
+                        )}
+                      </div>
+                      <span className="shrink-0 text-[10px] uppercase text-muted-foreground">
+                        {meta.label}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

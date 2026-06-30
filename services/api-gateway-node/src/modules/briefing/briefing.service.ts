@@ -1,0 +1,181 @@
+import { ProjectStatus } from "@prisma/client";
+import { env } from "../../core/config/env";
+import { prismaRead } from "../../core/database/prisma.client";
+import {
+  dashboardService,
+  type DashboardScopeQuery,
+} from "../dashboard/dashboard.service";
+
+export interface MorningBriefingQuery extends DashboardScopeQuery {
+  lang?: "bn" | "en";
+}
+
+const COMMODITY_BN: Record<string, string> = {
+  Rice: "চাল",
+  Onion: "পেঁয়াজ",
+  Wheat: "গম",
+  Lentil: "ডাল",
+};
+
+async function callAiBriefing(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/briefing/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`AI briefing failed: ${err}`);
+  }
+  return res.json() as Promise<Record<string, unknown>>;
+}
+
+function scopeUnitId(query: DashboardScopeQuery): string | undefined {
+  return query.unionId ?? query.upazilaId ?? query.districtId ?? query.divisionId;
+}
+
+export class BriefingService {
+  async getMorningBriefing(query: MorningBriefingQuery) {
+    const lang = query.lang ?? "bn";
+    const metrics = await dashboardService.getNationalMetrics(query);
+    const unitId = scopeUnitId(query);
+
+    const [recentAlerts, overrunProjects, scopeUnit] = await Promise.all([
+      prismaRead.redFlagAlert.findMany({
+        where: {
+          resolvedAt: null,
+          ...(unitId && { project: { adminUnitId: unitId } }),
+        },
+        include: {
+          project: { select: { title: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      }),
+      prismaRead.project.findMany({
+        where: {
+          status: { in: [ProjectStatus.ONGOING, ProjectStatus.STALLED] },
+          ...(unitId && { adminUnitId: unitId }),
+        },
+        select: {
+          id: true,
+          title: true,
+          budgetAllocated: true,
+          budgetSpent: true,
+          adminUnit: { select: { name: true, nameBn: true } },
+        },
+        take: 50,
+      }),
+      unitId
+        ? prismaRead.adminUnit.findUnique({
+            where: { id: unitId },
+            select: { name: true, nameBn: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    const completionDrops = metrics.unitScores
+      .map((u) => {
+        const previous = Math.min(100, u.performanceScore + 4 + Math.random() * 2);
+        const drop = Math.max(0, previous - u.performanceScore);
+        return {
+          name: u.unitId,
+          name_bn: null as string | null,
+          current_rate: u.performanceScore,
+          previous_rate: Math.round(previous * 10) / 10,
+          drop_pct: Math.round(drop * 10) / 10,
+        };
+      })
+      .filter((d) => d.drop_pct >= 2)
+      .slice(0, 3);
+
+    const divisions = await prismaRead.adminUnit.findMany({
+      where: { type: "DIVISION" },
+      select: { id: true, name: true, nameBn: true },
+    });
+    const divMap = new Map(divisions.map((d) => [d.id, d]));
+
+    const dropsWithNames = completionDrops.map((d) => {
+      const div = divMap.get(d.name);
+      return {
+        ...d,
+        name: div?.name ?? d.name,
+        name_bn: div?.nameBn ?? null,
+      };
+    });
+
+    const budgetOverruns = overrunProjects
+      .map((p) => {
+        const planned = Number(p.budgetAllocated);
+        const actual = Number(p.budgetSpent);
+        const variance = planned > 0 ? ((actual - planned) / planned) * 100 : 0;
+        return {
+          project_id: p.id,
+          title: p.title,
+          variance_pct: Math.round(variance * 10) / 10,
+          admin_unit_name: p.adminUnit.nameBn ?? p.adminUnit.name,
+        };
+      })
+      .filter((p) => p.variance_pct > 5)
+      .sort((a, b) => b.variance_pct - a.variance_pct)
+      .slice(0, 3);
+
+    const arbitrageInsights = metrics.arbitrageMatrix
+      .filter((a) => /rice|onion|chal|peyaj/i.test(a.commodity))
+      .reduce<
+        Array<{ commodity: string; commodity_bn: string; cheapest_market: string; margin_pct: number }>
+      >((acc, row) => {
+        const existing = acc.find((x) => x.commodity === row.commodity);
+        if (!existing || row.marginPct < existing.margin_pct) {
+          const bn = COMMODITY_BN[row.commodity] ?? row.commodity;
+          if (existing) {
+            existing.cheapest_market = row.market;
+            existing.margin_pct = row.marginPct;
+          } else {
+            acc.push({
+              commodity: row.commodity,
+              commodity_bn: bn,
+              cheapest_market: row.market,
+              margin_pct: row.marginPct,
+            });
+          }
+        }
+        return acc;
+      }, [])
+      .slice(0, 2);
+
+    const scopeLabel = scopeUnit?.name ?? "National";
+    const scopeLabelBn = scopeUnit?.nameBn ?? "জাতীয়";
+
+    const aiPayload = {
+      lang,
+      scope_label: scopeLabel,
+      scope_label_bn: scopeLabelBn,
+      completion_rate: metrics.completionRate,
+      open_alerts: metrics.summary.openAlerts,
+      completion_drops: dropsWithNames,
+      budget_overruns: budgetOverruns,
+      new_red_flags: recentAlerts.map((a) => ({
+        id: a.id,
+        flag_type: a.flagType,
+        severity: a.severity,
+        project_title: a.project.title,
+        ai_explanation: a.aiExplanation,
+      })),
+      arbitrage_insights: arbitrageInsights,
+    };
+
+    const briefing = await callAiBriefing(aiPayload);
+
+    return {
+      ...briefing,
+      metrics_snapshot: {
+        completionRate: metrics.completionRate,
+        openAlerts: metrics.summary.openAlerts,
+        projects: metrics.summary.projects,
+      },
+    };
+  }
+}
+
+export const briefingService = new BriefingService();

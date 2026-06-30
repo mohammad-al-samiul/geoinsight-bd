@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import { MapPin } from "lucide-react";
 import { MapSkeleton } from "@/components/ui/skeleton";
-import { getVisibleGeoJson } from "@/lib/geojson-bd";
+import { getVisibleGeoJson, getUnitScoreOverlayVersion } from "@/lib/geojson-bd";
 import { getDrillChildType } from "@/lib/filter-utils";
 import { useAdminHierarchy } from "@/hooks/use-admin-hierarchy";
 import type { AdminFilterState } from "@/types";
@@ -33,9 +33,10 @@ export function BangladeshChoroplethMap({
   onFeatureClick,
 }: BangladeshChoroplethMapProps) {
   const { ready: hierarchyReady } = useAdminHierarchy();
+  const scoreVersion = getUnitScoreOverlayVersion();
   const geoJson = useMemo(
     () => getVisibleGeoJson(filter),
-    [filter, hierarchyReady],
+    [filter, hierarchyReady, scoreVersion],
   );
   const level = getDrillChildType(filter);
 

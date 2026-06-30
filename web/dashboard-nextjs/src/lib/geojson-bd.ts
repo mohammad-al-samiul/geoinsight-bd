@@ -73,6 +73,27 @@ function pseudoScore(id: string, offset: number): number {
   return 42 + (h % 45);
 }
 
+const unitScoreOverlay = new Map<string, { performanceScore: number; riskScore: number }>();
+let unitScoreOverlayVersion = 0;
+
+/** Merge live dashboard unitScores into choropleth (Digital Twin / national KPI). */
+export function applyUnitScoreOverlay(
+  scores: Array<{ unitId: string; performanceScore: number; riskScore: number }>,
+): void {
+  unitScoreOverlay.clear();
+  for (const s of scores) {
+    unitScoreOverlay.set(s.unitId, {
+      performanceScore: s.performanceScore,
+      riskScore: s.riskScore,
+    });
+  }
+  unitScoreOverlayVersion += 1;
+}
+
+export function getUnitScoreOverlayVersion(): number {
+  return unitScoreOverlayVersion;
+}
+
 function ringForUnit(unit: AdminUnit): Ring | null {
   if (unit.lng != null && unit.lat != null) {
     const d = BOX_DELTA[unit.type];
@@ -87,6 +108,7 @@ function toFeature(
   ring: Ring,
 ): Feature<Polygon, GeoFeatureProperties> {
   const nameBn = resolveBnLabel(unit.name, unit.nameBn) ?? unit.name;
+  const overlay = unitScoreOverlay.get(unit.id);
   return {
     type: "Feature",
     properties: {
@@ -95,8 +117,8 @@ function toFeature(
       nameBn,
       type: unit.type,
       parentId: unit.parentId,
-      performanceScore: pseudoScore(unit.id, 1),
-      riskScore: pseudoScore(unit.id, 2),
+      performanceScore: overlay?.performanceScore ?? pseudoScore(unit.id, 1),
+      riskScore: overlay?.riskScore ?? pseudoScore(unit.id, 2),
     },
     geometry: { type: "Polygon", coordinates: [ring] },
   };

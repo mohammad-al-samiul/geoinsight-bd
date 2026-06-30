@@ -9,6 +9,15 @@ import { alertModule } from "./alert/alert.module";
 import { agroMarketModule } from "./agro-market/agro-market.module";
 import { blockchainModule } from "./blockchain/blockchain.module";
 import { dashboardModule } from "./dashboard/dashboard.module";
+import { briefingModule } from "./briefing/briefing.module";
+import { intelligenceModule } from "./intelligence/intelligence.module";
+import { simulatorModule } from "./simulator/simulator.module";
+import { procurementModule } from "./procurement/procurement.module";
+import { sovereignModule } from "./sovereign/sovereign.module";
+import { twinModule } from "./twin/twin.module";
+import { auditTrailModule } from "./audit-trail/audit-trail.module";
+import { citizenModule } from "./citizen/citizen.module";
+import { searchModule } from "./search/search.module";
 import { healthModule } from "./health/health.module";
 import { publicFeedModule } from "./public-feed/public-feed.module";
 
@@ -24,6 +33,15 @@ const modules: AppModule[] = [
   agroMarketModule,
   blockchainModule,
   dashboardModule,
+  briefingModule,
+  intelligenceModule,
+  simulatorModule,
+  procurementModule,
+  sovereignModule,
+  twinModule,
+  auditTrailModule,
+  citizenModule,
+  searchModule,
 ];
 
 export function registerModules(basePath: Router): void {

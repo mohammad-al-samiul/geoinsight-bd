@@ -1,11 +1,13 @@
 "use client";
 
 import { AdminCascadeFilter } from "@/components/filters/admin-cascade-filter";
+import { CommandSearch } from "@/components/layout/command-search";
+import { NotificationCenter } from "@/components/layout/notification-center";
 import { useAuth, useAuthActions } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ROLE_META } from "@/types";
-import { AlertTriangle, Bell, LogOut, Menu, Radio, Search } from "lucide-react";
+import { AlertTriangle, LogOut, Menu, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CommandBarProps {
@@ -48,15 +50,8 @@ export function CommandBar({
           </div>
         </div>
 
-        <div className="mx-auto hidden max-w-md flex-1 lg:flex">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="search"
-              placeholder="Search KPIs, projects, representatives…"
-              className="h-9 w-full rounded-md border border-input bg-secondary/40 pl-9 pr-3 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
-            />
-          </div>
+        <div className="mx-auto hidden max-w-md flex-1 md:flex">
+          <CommandSearch />
         </div>
 
         <div className="ml-auto flex items-center gap-2">
@@ -77,10 +72,7 @@ export function CommandBar({
               <AlertTriangle className="h-4 w-4" />
             </Button>
           )}
-          <Button variant="ghost" size="icon" className="relative text-muted-foreground">
-            <Bell className="h-4 w-4" />
-            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
-          </Button>
+          <NotificationCenter />
           <Button
             variant="ghost"
             size="icon"

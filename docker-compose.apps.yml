@@ -85,6 +85,9 @@ services:
       RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-geoinsight_exchange}
       RABBITMQ_AI_QUEUE: ${RABBITMQ_AI_QUEUE:-ai_analytics_queue}
       SENTIMENT_USE_MOCK: ${SENTIMENT_USE_MOCK:-true}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
       CORS_ORIGINS: ${CORS_ORIGIN:-http://localhost:3000},http://api-gateway:4000
       HF_HUB_DISABLE_TELEMETRY: "1"
     depends_on:
@@ -94,6 +97,8 @@ services:
         condition: service_healthy
     networks:
       - geoinsight_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test:
         [

@@ -10,7 +10,7 @@ import type {
   SocketAlertPayload,
   SocketKpiPayload,
 } from "@/types/dashboard";
-import { getUnitCentroid } from "@/lib/geojson-bd";
+import { applyUnitScoreOverlay, getUnitCentroid } from "@/lib/geojson-bd";
 import { useSocket } from "@/hooks/use-socket";
 
 export function useDashboardData(filter: AdminFilterState) {
@@ -42,6 +42,9 @@ export function useDashboardData(filter: AdminFilterState) {
       ]);
       setMetrics(m);
       setMarkers(mk);
+      if (m?.unitScores?.length) {
+        applyUnitScoreOverlay(m.unitScores);
+      }
     } finally {
       setLoading(false);
     }

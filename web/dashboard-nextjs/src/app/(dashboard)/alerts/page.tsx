@@ -1,6 +1,7 @@
 "use client";
 
 import { AnomalyFeedPanel } from "@/components/alerts/anomaly-feed-panel";
+import { PredictiveAlertsPanel } from "@/components/alerts/predictive-alerts-panel";
 import { AdminCascadeFilter } from "@/components/filters/admin-cascade-filter";
 import { useAdminHierarchy } from "@/hooks/use-admin-hierarchy";
 
@@ -12,10 +13,11 @@ export default function AlertsPage() {
       <div>
         <h1 className="text-2xl font-bold">Red Flag Command Log</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          AI-powered anomaly monitoring with Hyperledger verification
+          AI-powered anomaly monitoring with predictive scoring and Hyperledger verification
         </p>
       </div>
       <AdminCascadeFilter variant="glass" />
+      <PredictiveAlertsPanel />
       <AnomalyFeedPanel />
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountabilityPanel } from "@/components/representatives/accountability-panel";
 import { ModuleShell, DataTable, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { useRepresentativesList } from "@/hooks/use-module-data";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,7 @@ export default function RepresentativesPage() {
         ) : undefined
       }
     >
+      <AccountabilityPanel />
       {!loading && (
         <DataTable
           rows={rows}

@@ -3,6 +3,7 @@ import { env } from "../../core/config/env";
 import { broadcastToHierarchy } from "../socket/socket.server";
 import { mapGovEventType } from "../socket/socket.rooms";
 import { govQueueMessageSchema } from "./gov-queue.schema";
+import { setGovPublisherChannel } from "./gov-queue.publisher";
 
 let connection: ChannelModel | null = null;
 let channel: Channel | null = null;
@@ -19,6 +20,7 @@ async function connectWithRetry(): Promise<void> {
     channel = await connection.createChannel();
     await channel.assertQueue(env.RABBITMQ_GOV_QUEUE, { durable: true });
     await channel.prefetch(10);
+    setGovPublisherChannel(channel);
 
     console.info(`[rabbitmq] Consuming ${env.RABBITMQ_GOV_QUEUE}`);
     await channel.consume(env.RABBITMQ_GOV_QUEUE, onMessage, { noAck: false });
@@ -26,6 +28,7 @@ async function connectWithRetry(): Promise<void> {
     connection.on("close", () => {
       channel = null;
       connection = null;
+      setGovPublisherChannel(null);
       setTimeout(() => void connectWithRetry(), RECONNECT_MS);
     });
   } catch (error) {
@@ -71,6 +74,7 @@ export async function publishToExchange(
 }
 
 export async function closeRabbitMq(): Promise<void> {
+  setGovPublisherChannel(null);
   await channel?.close();
   await connection?.close();
   channel = null;
