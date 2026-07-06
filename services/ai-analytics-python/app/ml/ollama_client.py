@@ -45,7 +45,7 @@ class OllamaClient:
         if not self.enabled:
             return None
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=180.0) as client:
                 res = await client.post(
                     f"{self._url}/api/chat",
                     json={

@@ -41,7 +41,7 @@ export function BangladeshChoroplethMap({
   const level = getDrillChildType(filter);
 
   return (
-    <div className="glass-panel flex h-full min-h-[360px] flex-col overflow-hidden rounded-xl shadow-panel lg:min-h-0">
+    <div className="glass-panel map-panel flex h-full min-h-0 flex-col overflow-hidden rounded-xl shadow-panel">
       <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-primary" />
@@ -54,7 +54,7 @@ export function BangladeshChoroplethMap({
         </Badge>
       </div>
 
-      <div className="relative z-0 min-h-[300px] flex-1 isolate">
+      <div className="relative z-0 min-h-0 flex-1 isolate">
         <ChoroplethMapInner
           filter={filter}
           geoJson={geoJson}

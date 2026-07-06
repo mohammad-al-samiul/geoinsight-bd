@@ -94,13 +94,21 @@ export function getUnitScoreOverlayVersion(): number {
   return unitScoreOverlayVersion;
 }
 
-function ringForUnit(unit: AdminUnit): Ring | null {
+function ringForUnit(unit: AdminUnit): Ring {
   if (unit.lng != null && unit.lat != null) {
     const d = BOX_DELTA[unit.type];
     return box(unit.lng - d, unit.lat - d, unit.lng + d, unit.lat + d);
   }
   const fallback = FALLBACK_GEO.find((f) => f.id === unit.id);
-  return fallback?.ring ?? null;
+  if (fallback) return fallback.ring;
+
+  // Deterministic placement inside Bangladesh when API units lack geo_json.
+  let h = 0;
+  for (let i = 0; i < unit.id.length; i++) h = (h * 31 + unit.id.charCodeAt(i)) >>> 0;
+  const lng = 88.2 + (h % 480) / 100;
+  const lat = 20.6 + ((h >> 8) % 580) / 100;
+  const d = BOX_DELTA[unit.type];
+  return box(lng - d, lat - d, lng + d, lat + d);
 }
 
 function toFeature(
@@ -146,11 +154,7 @@ export function getVisibleGeoJson(
 
   const features = allMapUnits()
     .filter((u) => u.type === childType && u.parentId === parentId)
-    .map((u) => {
-      const ring = ringForUnit(u);
-      return ring ? toFeature(u, ring) : null;
-    })
-    .filter((f): f is Feature<Polygon, GeoFeatureProperties> => f !== null);
+    .map((u) => toFeature(u, ringForUnit(u)));
 
   return { type: "FeatureCollection", features };
 }
@@ -164,8 +168,6 @@ export function getUnitCentroid(unitId: string): [number, number] | null {
   }
 
   const ring = ringForUnit(unit);
-  if (!ring) return null;
-
   const lngs = ring.map((c) => c[0]);
   const lats = ring.map((c) => c[1]);
   return [

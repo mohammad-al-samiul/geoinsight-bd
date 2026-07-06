@@ -35,7 +35,7 @@ export function BudgetVarianceChart({
   return (
     <div
       className={cn(
-        "h-36 w-full transition-all duration-500",
+        "h-52 w-full transition-all duration-500 sm:h-56",
         pulseKey ? "animate-score-pulse" : "",
         className,
       )}
@@ -58,8 +58,8 @@ export function BudgetVarianceChart({
           <YAxis
             type="category"
             dataKey="project"
-            width={72}
-            tick={{ fill: "hsl(215 18% 58%)", fontSize: 9 }}
+            width={140}
+            tick={{ fill: "hsl(215 18% 58%)", fontSize: 11 }}
             axisLine={false}
             tickLine={false}
           />

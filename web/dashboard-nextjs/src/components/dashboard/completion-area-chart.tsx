@@ -29,7 +29,7 @@ export function CompletionAreaChart({
   return (
     <div
       className={cn(
-        "h-36 w-full transition-all duration-500",
+        "h-52 w-full transition-all duration-500 sm:h-56",
         pulseKey ? "animate-score-pulse" : "",
         className,
       )}

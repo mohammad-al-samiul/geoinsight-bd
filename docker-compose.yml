@@ -125,8 +125,7 @@ services:
         echo "\"$${POSTGRES_USER}\" \"$${POSTGRES_PASSWORD}\"" > /tmp/userlist.txt
         chown pgbouncer:pgbouncer /tmp/userlist.txt
         exec su-exec pgbouncer /usr/bin/pgbouncer /etc/pgbouncer/pgbouncer.ini
-    ports:
-      - "${PGBOUNCER_PORT:-6432}:6432"
+    # Internal only (pgbouncer:6432) — avoids Windows reserved port ranges on host
     depends_on:
       postgres:
         condition: service_healthy
@@ -149,8 +148,7 @@ services:
     volumes:
       - ./deploy/init/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
       - redis_data:/data
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    # Internal only (redis:6379) — no host bind avoids Windows Hyper-V port exclusions
     networks:
       - geoinsight_net
     healthcheck:

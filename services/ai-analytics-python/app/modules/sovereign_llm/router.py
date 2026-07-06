@@ -15,9 +15,7 @@ async def sovereign_chat(body: LlmChatRequest, req: Request) -> LlmChatResponse:
     return await service.chat(body)
 
 
-@router.get("/status")
-async def sovereign_status(req: Request) -> dict[str, object]:
-    settings: Settings = req.app.state.settings
+async def _llm_status(settings: Settings) -> dict[str, object]:
     ollama = OllamaClient(settings)
     reachable = await ollama.ping() if ollama.enabled else False
     return {
@@ -28,3 +26,17 @@ async def sovereign_status(req: Request) -> dict[str, object]:
         "sovereign_mode": settings.sovereign_mode,
         "active_provider": "ollama" if reachable else "sovereign_template",
     }
+
+
+@router.get("/status")
+async def sovereign_status(req: Request) -> dict[str, object]:
+    return await _llm_status(req.app.state.settings)
+
+
+# Back-compat alias — some docs/tools use /sovereign/status
+compat_router = APIRouter(prefix="/sovereign", tags=["Sovereign LLM"])
+
+
+@compat_router.get("/status")
+async def sovereign_status_compat(req: Request) -> dict[str, object]:
+    return await _llm_status(req.app.state.settings)

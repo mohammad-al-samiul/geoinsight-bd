@@ -8,17 +8,24 @@ export interface SovereignChatParams {
 
 export class SovereignLlmService {
   async chat(params: SovereignChatParams) {
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/sovereign-llm/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: params.messages,
-        lang: params.lang ?? "bn",
-        context: params.context,
-      }),
-    });
-    if (!res.ok) throw new Error("Sovereign LLM unavailable");
-    return res.json();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 180_000);
+    try {
+      const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/sovereign-llm/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: params.messages,
+          lang: params.lang ?? "bn",
+          context: params.context,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error("Sovereign LLM unavailable");
+      return res.json();
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async status() {

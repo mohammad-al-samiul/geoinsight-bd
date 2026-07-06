@@ -41,6 +41,26 @@ function MapBoundsSync({ filter }: { filter: AdminFilterState }) {
   return null;
 }
 
+/** Leaflet needs invalidateSize after flex layout settles. */
+function MapResizeSync() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer().parentElement;
+    if (!container) return;
+
+    const sync = () => map.invalidateSize({ animate: false });
+    const timer = window.setTimeout(sync, 0);
+    const observer = new ResizeObserver(sync);
+    observer.observe(container);
+
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [map]);
+  return null;
+}
+
 const SEVERITY_COLORS: Record<RedFlagMarker["severity"], string> = {
   LOW: "#34d399",
   MEDIUM: "#fbbf24",
@@ -109,13 +129,17 @@ export function ChoroplethMapInner({
   const geoKey = `${childLabel}-${parentId ?? "root"}-${geoJson.features.length}`;
 
   if (!mounted) {
-    return <MapSkeleton />;
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-muted/20">
+        <MapSkeleton />
+      </div>
+    );
   }
 
   return (
     <div
       className={cn(
-        "relative h-full min-h-[300px] w-full",
+        "absolute inset-0",
         mapPulseKey ? "animate-map-flash" : "",
       )}
     >
@@ -123,6 +147,7 @@ export function ChoroplethMapInner({
         center={BD_MAP_CENTER}
         zoom={BD_MAP_ZOOM}
         className="h-full w-full rounded-b-xl"
+        style={{ height: "100%", width: "100%" }}
         zoomControl={false}
         attributionControl={false}
       >
@@ -130,6 +155,7 @@ export function ChoroplethMapInner({
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
         />
+        <MapResizeSync />
         <MapBoundsSync filter={filter} />
         <GeoJSON
           key={geoKey}

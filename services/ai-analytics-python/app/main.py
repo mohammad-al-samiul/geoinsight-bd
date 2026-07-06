@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from app.api.router import api_router
 from app.core.config import get_settings
@@ -30,5 +31,12 @@ app.add_middleware(
 )
 
 app.add_exception_handler(AppError, app_error_handler)
+
+
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    return RedirectResponse(url="/api/v1/health")
+
+
 app.include_router(api_router)
 setup_metrics(app)

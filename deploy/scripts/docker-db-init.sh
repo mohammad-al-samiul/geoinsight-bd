@@ -16,11 +16,16 @@ done
 echo "[db-init] Applying admin trigger fix..."
 psql -v ON_ERROR_STOP=1 -f /scripts/fix-admin-trigger.sql
 
-echo "[db-init] Seeding national reference data..."
+echo "[db-init] Seeding core national reference (divisions + KPI defs)..."
 psql -v ON_ERROR_STOP=1 -c "SET client_encoding TO 'UTF8';" -f /scripts/seed-national-data.sql
 
-echo "[db-init] Seeding upazilas and unions..."
-psql -v ON_ERROR_STOP=1 -c "SET client_encoding TO 'UTF8';" -f /scripts/seed-admin-upazila-union.sql
+echo "[db-init] Seeding extended real-world datasets..."
+for seed in /scripts/seed/[0-9][0-9]-*.sql; do
+  if [ -f "$seed" ]; then
+    echo "[db-init]   -> $(basename "$seed")"
+    psql -v ON_ERROR_STOP=1 -c "SET client_encoding TO 'UTF8';" -f "$seed"
+  fi
+done
 
 echo "[db-init] Repairing Bengali admin unit labels..."
 psql -v ON_ERROR_STOP=1 -c "SET client_encoding TO 'UTF8';" -f /scripts/fix-admin-unit-bn.sql

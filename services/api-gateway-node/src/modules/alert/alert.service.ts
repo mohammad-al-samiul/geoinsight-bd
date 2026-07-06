@@ -1,6 +1,7 @@
 import { prismaWrite, prismaRead } from "../../core/database/prisma.client";
 import { ApiError } from "../../core/errors/api.error";
 import { IAuditService } from "../../shared/audit/audit.service";
+import { projectUnitScopeWhere } from "../../shared/scope/admin-unit-filter";
 import { ListAlertsQuery } from "./alert.validator";
 
 export class AlertService {
@@ -10,7 +11,7 @@ export class AlertService {
     return prismaRead.redFlagAlert.findMany({
       where: {
         ...(query.unresolvedOnly && { resolvedAt: null }),
-        ...(query.unitId && { project: { adminUnitId: query.unitId } }),
+        ...(query.unitId && { project: projectUnitScopeWhere(query.unitId) }),
       },
       include: {
         project: {

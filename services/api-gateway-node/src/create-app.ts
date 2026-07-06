@@ -29,6 +29,10 @@ export function createApp(): Express {
   registerModules(apiRouter);
   app.use("/api/v1", apiRouter);
 
+  app.get("/", (_req, res) => {
+    res.redirect(302, env.CORS_ORIGIN);
+  });
+
   app.use(notFoundHandler);
   app.use(errorHandler);
 

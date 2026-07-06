@@ -29,7 +29,7 @@ export function AnomalyFeedPanel({ className, compact = false }: AnomalyFeedPane
   const tc = useTranslations("common");
   const ts = useTranslations("status");
   const { filter } = useAdminFilter();
-  const { alerts, loading, refresh } = useAnomalyFeed(filter);
+  const { alerts, loading, error, refresh } = useAnomalyFeed(filter);
   const [selected, setSelected] = useState<AnomalyAlert | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -87,13 +87,18 @@ export function AnomalyFeedPanel({ className, compact = false }: AnomalyFeedPane
             compact ? "max-h-[320px]" : "max-h-[min(70vh,560px)] flex-1",
           )}
         >
+          {error && (
+            <p className="m-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+              {tc("loadFailed")}: {error}
+            </p>
+          )}
           {loading ? (
             <div className="space-y-2 p-2">
               {Array.from({ length: 4 }).map((_, i) => (
                 <Skeleton key={i} className="h-16 w-full rounded-lg" />
               ))}
             </div>
-          ) : alerts.length === 0 ? (
+          ) : alerts.length === 0 && !error ? (
             <p className="p-6 text-center text-sm text-muted-foreground">{t("empty")}</p>
           ) : (
             <ul className="space-y-2">

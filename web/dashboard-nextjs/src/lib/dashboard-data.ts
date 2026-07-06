@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 import { getUnitCoords } from "@/lib/admin-hierarchy";
+import { unitSearchParams } from "@/lib/unit-scope";
 import type { AdminFilterState } from "@/types";
 import type {
   DashboardMetrics,
@@ -61,13 +62,7 @@ export async function fetchRedFlagMarkers(
   filter: AdminFilterState,
 ): Promise<RedFlagMarker[]> {
   try {
-    const params = new URLSearchParams({ unresolvedOnly: "true", limit: "50" });
-    const active =
-      filter.unionId ??
-      filter.upazilaId ??
-      filter.districtId ??
-      filter.divisionId;
-    if (active) params.set("unitId", active);
+    const params = unitSearchParams(filter, { unresolvedOnly: "true", limit: "50" });
 
     const json = await apiClient<{
       success: boolean;

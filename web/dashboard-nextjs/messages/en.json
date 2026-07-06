@@ -231,12 +231,31 @@
     },
     "documents": {
       "title": "Document Intelligence",
-      "description": "Tender and contract analysis — clause extraction, unusual terms, contractor patterns.",
+      "description": "Government-grade tender & contract audit — PPR 2008 compliance, clause extraction, fraud red flags, and PMO executive brief.",
       "documentText": "Document text",
-      "contractorNidPlaceholder": "Contractor NID (optional)",
-      "contractorPatternMatch": "Contractor pattern match — prior flagged contracts",
-      "anomalies": "Anomalies",
-      "extractedClauses": "Extracted clauses"
+      "documentPlaceholder": "Paste tender notice, contract draft, or BOQ terms (min. 50 characters)…",
+      "contractorNidPlaceholder": "Contractor NID (optional — pattern matching)",
+      "contractorPatternMatch": "Contractor risk pattern — prior flagged awards",
+      "anomalies": "Red flags & anomalies",
+      "extractedClauses": "Extracted clauses",
+      "docType": {
+        "tender": "Tender",
+        "contract": "Contract"
+      },
+      "loadSample": "Load sample",
+      "analyzing": "Auditing…",
+      "minChars": "Minimum 50 characters required for analysis.",
+      "riskScore": "Risk",
+      "executiveBrief": "PMO Executive Brief",
+      "complianceChecks": "PPR / CPTU Compliance",
+      "keyEntities": "Key extracted values",
+      "recommendations": "Auditor recommendations",
+      "aiEnhanced": "Ollama AI brief",
+      "status": {
+        "COMPLIANT": "Compliant",
+        "REVIEW_REQUIRED": "Review required",
+        "NON_COMPLIANT": "Non-compliant"
+      }
     },
     "hazards": {
       "title": "Flood & Cyclone Project Risk",

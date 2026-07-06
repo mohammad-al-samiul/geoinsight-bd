@@ -10,6 +10,7 @@ import type { SocketAlertPayload } from "@/types/dashboard";
 export function useAnomalyFeed(filter: AdminFilterState) {
   const [alerts, setAlerts] = useState<AnomalyAlert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [socketToken, setSocketToken] = useState<string | null>(null);
 
   useEffect(() => {
@@ -23,9 +24,13 @@ export function useAnomalyFeed(filter: AdminFilterState) {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await fetchAnomalyAlerts(filter);
       setAlerts(data);
+    } catch (err) {
+      setAlerts([]);
+      setError(err instanceof Error ? err.message : "Failed to load alerts");
     } finally {
       setLoading(false);
     }
@@ -62,5 +67,5 @@ export function useAnomalyFeed(filter: AdminFilterState) {
     onDashboardRefresh: () => load(),
   });
 
-  return { alerts, loading, refresh: load };
+  return { alerts, loading, error, refresh: load };
 }

@@ -231,12 +231,31 @@
     },
     "documents": {
       "title": "নথি বিশ্লেষণ",
-      "description": "টেন্ডার ও চুক্তি বিশ্লেষণ — ধারা বের করা, অস্বাভাবিক শর্ত, ঠিকাদার প্যাটার্ন।",
+      "description": "সরকারি মানের টেন্ডার ও চুক্তি নিরীক্ষা — পিপিআর ২০০৮ যাচাই, ধারা বের করা, জালিয়াতি রেড ফ্ল্যাগ ও পিএমও ব্রিফ।",
       "documentText": "নথির পাঠ্য",
-      "contractorNidPlaceholder": "ঠিকাদার এনআইডি (ঐচ্ছিক)",
-      "contractorPatternMatch": "ঠিকাদার প্যাটার্ন মিল — আগে চিহ্নিত চুক্তি",
-      "anomalies": "অসঙ্গতি",
-      "extractedClauses": "বের করা ধারা"
+      "documentPlaceholder": "টেন্ডার বিজ্ঞপ্তি, চুক্তি খসড়া বা শর্তাবলী এখানে দিন (ন্যূনতম ৫০ অক্ষর)…",
+      "contractorNidPlaceholder": "ঠিকাদার এনআইডি (ঐচ্ছিক — প্যাটার্ন মিল)",
+      "contractorPatternMatch": "ঠিকাদার ঝুঁকি প্যাটার্ন — আগে চিহ্নিত পুরস্কার",
+      "anomalies": "রেড ফ্ল্যাগ ও অনিয়ম",
+      "extractedClauses": "বের করা ধারা",
+      "docType": {
+        "tender": "টেন্ডার",
+        "contract": "চুক্তি"
+      },
+      "loadSample": "নমুনা লোড",
+      "analyzing": "নিরীক্ষা চলছে…",
+      "minChars": "বিশ্লেষণের জন্য ন্যূনতম ৫০ অক্ষর প্রয়োজন।",
+      "riskScore": "ঝুঁকি",
+      "executiveBrief": "পিএমও নির্বাহী ব্রিফ",
+      "complianceChecks": "পিপিআর / সিপিটিইউ যাচাই",
+      "keyEntities": "গুরুত্বপূর্ণ মান",
+      "recommendations": "নিরীক্ষকের সুপারিশ",
+      "aiEnhanced": "ওলামা এআই ব্রিফ",
+      "status": {
+        "COMPLIANT": "সঙ্গতিপূর্ণ",
+        "REVIEW_REQUIRED": "যাচাই প্রয়োজন",
+        "NON_COMPLIANT": "অসঙ্গতি"
+      }
     },
     "hazards": {
       "title": "বন্যা ও ঘূর্ণিঝড় প্রকল্প ঝুঁকি",

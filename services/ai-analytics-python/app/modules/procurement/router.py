@@ -9,5 +9,5 @@ router = APIRouter(prefix="/procurement", tags=["Procurement"])
 @router.post("/advise", response_model=ProcurementAdviceResponse)
 async def procurement_advise(body: ProcurementAdviceRequest, req: Request) -> ProcurementAdviceResponse:
     settings = req.app.state.settings
-    advisor = ProcurementAdvisor(country_count=min(settings.mock_country_count, 50))
+    advisor = ProcurementAdvisor(settings=settings, country_count=min(settings.mock_country_count, 50))
     return await advisor.advise(body)

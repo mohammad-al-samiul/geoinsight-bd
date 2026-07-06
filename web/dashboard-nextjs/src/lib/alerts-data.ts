@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 import { getUnitById } from "@/lib/admin-units";
 import { resolveUnitName } from "@/lib/unit-names";
+import { unitSearchParams } from "@/lib/unit-scope";
 import type { AdminFilterState } from "@/types";
 import type { AnomalyAlert } from "@/types/alerts";
 import {
@@ -67,84 +68,19 @@ function mapApiAlert(row: ApiAlertRow): AnomalyAlert {
   };
 }
 
-const MOCK_ALERTS: AnomalyAlert[] = [
-  {
-    id: "demo-1",
-    headline: "Critical: Budget Variance > 25% detected for Contractor X in Ashulia Union",
-    detail:
-      "AI model flagged a 28.4% spend overrun on rural infrastructure contract. Pattern matches historical fraud cluster #BD-441.",
-    severity: "CRITICAL",
-    flagType: "BUDGET_OVERRUN",
-    adminUnitId: "uni-ashulia",
-    unitName: "Ashulia",
-    projectId: "proj-demo-1",
-    projectTitle: "Union Rural Roads Phase II",
-    contractorName: "Contractor X",
-    createdAt: new Date().toISOString(),
-    resolvedAt: null,
-    blockchainHash: "a3f8c2e91b047d6e5f0a8c3d2e1f9b4a7c6d5e8f0a1b2c3d4e5f6a7b8c9d0e1",
-    blockchainVerified: true,
-    fabricTxId: "fabric-tx-9f2a1b3c4d5e6f70",
-    verificationStatus: "VERIFIED",
-  },
-  {
-    id: "demo-2",
-    headline: "High: Delay risk on Metro Rail P6 in Keraniganj",
-    detail: "Schedule slip probability 73%. Critical path activity behind by 18 days.",
-    severity: "HIGH",
-    flagType: "DELAY",
-    adminUnitId: "upa-keraniganj",
-    unitName: "Keraniganj",
-    projectId: "proj-demo-2",
-    projectTitle: "Metro Rail Package 6",
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    resolvedAt: null,
-    blockchainHash: "b4e9d3f02c158e7f6a1b9d4e3f0a8c5b8d7e6f9a0b1c2d3e4f5a6b7c8d9e0f2",
-    blockchainVerified: false,
-    fabricTxId: null,
-    verificationStatus: "PENDING",
-  },
-  {
-    id: "demo-3",
-    headline: "Medium: Quality deviation at Tongi irrigation scheme",
-    detail: "Sentiment + field imagery correlation suggests sub-standard material usage.",
-    severity: "MEDIUM",
-    flagType: "QUALITY",
-    adminUnitId: "upa-tongi",
-    unitName: "Tongi",
-    projectId: "proj-demo-3",
-    projectTitle: "Tongi Irrigation Rehabilitation",
-    createdAt: new Date(Date.now() - 7200000).toISOString(),
-    resolvedAt: null,
-    blockchainHash: null,
-    blockchainVerified: false,
-    fabricTxId: null,
-    verificationStatus: "UNANCHORED",
-  },
-];
-
 export async function fetchAnomalyAlerts(
   filter: AdminFilterState,
 ): Promise<AnomalyAlert[]> {
-  try {
-    const params = new URLSearchParams({ unresolvedOnly: "true", limit: "50" });
-    const active =
-      filter.unionId ??
-      filter.upazilaId ??
-      filter.districtId ??
-      filter.divisionId;
-    if (active) params.set("unitId", active);
+  const params = unitSearchParams(filter, { unresolvedOnly: "true", limit: "50" });
 
-    const json = await apiClient<{ success: boolean; data: ApiAlertRow[] }>(
-      `alerts?${params}`,
-    );
+  const json = await apiClient<{ success: boolean; data: ApiAlertRow[] }>(
+    `alerts?${params}`,
+  );
 
-    if (!json.success || !Array.isArray(json.data)) throw new Error("No data");
-    return json.data.map(mapApiAlert);
-  } catch {
-    await new Promise((r) => setTimeout(r, 400));
-    return MOCK_ALERTS;
+  if (!json.success || !Array.isArray(json.data)) {
+    throw new Error("Alerts API returned no data");
   }
+  return json.data.map(mapApiAlert);
 }
 
 export function mapSocketPayloadToAlert(

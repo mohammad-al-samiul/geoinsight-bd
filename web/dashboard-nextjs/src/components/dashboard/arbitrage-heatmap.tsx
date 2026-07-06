@@ -46,12 +46,12 @@ export function ArbitrageHeatmap({
       )}
       key={pulseKey}
     >
-      <div className="h-[200px] w-full">
-        <div className="mb-2 flex items-center gap-2 pl-16">
+      <div className="h-[240px] w-full sm:h-[280px]">
+        <div className="mb-2 flex items-center gap-2 pl-20 sm:pl-24">
           {markets.map((m) => (
             <div
               key={m}
-              className="flex-1 truncate text-center text-[10px] font-medium text-muted-foreground"
+              className="flex-1 truncate text-center text-xs font-medium text-muted-foreground"
             >
               {m}
             </div>
@@ -60,7 +60,7 @@ export function ArbitrageHeatmap({
         <div className="flex flex-1 flex-col gap-1">
           {commodities.map((commodity) => (
             <div key={commodity} className="flex flex-1 items-center gap-2">
-              <span className="w-14 truncate text-[10px] text-muted-foreground">
+              <span className="w-20 truncate text-xs text-muted-foreground sm:w-24">
                 {commodity}
               </span>
               <div className="flex flex-1 gap-1">
@@ -73,11 +73,11 @@ export function ArbitrageHeatmap({
                       style={{
                         backgroundColor: marginColor(margin),
                         opacity: marginOpacity(margin),
-                        minHeight: "28px",
+                        minHeight: "36px",
                       }}
                       title={`${commodity} → ${market}: ${margin}%`}
                     >
-                      <span className="text-[9px] font-semibold text-white/90">
+                      <span className="text-[10px] font-semibold text-white/90 sm:text-xs">
                         {margin > 0 ? `${margin}%` : "—"}
                       </span>
                     </div>

@@ -88,6 +88,7 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      SOVEREIGN_MODE: ${SOVEREIGN_MODE:-true}
       AI_MODEL_CACHE_DIR: /tmp/ml_models/cache
       CORS_ORIGINS: ${CORS_ORIGIN:-http://localhost:3000},http://api-gateway:4000
       HF_HUB_DISABLE_TELEMETRY: "1"
@@ -129,6 +130,7 @@ services:
       HOSTNAME: 0.0.0.0
       NEXT_TELEMETRY_DISABLED: "1"
       API_GATEWAY_URL: http://api-gateway:4000
+      COOKIE_SECURE: "false"
     depends_on:
       api-gateway:
         condition: service_healthy

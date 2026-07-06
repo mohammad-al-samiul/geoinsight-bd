@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+
+from app.core.config import Settings
+from app.ml.ollama_client import OllamaClient
 from app.modules.arbitrage.service import CommodityScraper, optimize_arbitrage
 from app.modules.procurement.schemas import (
     ProcurementAdviceRequest,
@@ -34,8 +38,9 @@ def _lead_time(code: str, urgency: int) -> int:
 
 
 class ProcurementAdvisor:
-    def __init__(self, country_count: int = 50) -> None:
+    def __init__(self, settings: Settings | None = None, country_count: int = 50) -> None:
         self._scraper = CommodityScraper(country_count)
+        self._ollama = OllamaClient(settings) if settings else None
 
     async def advise(self, req: ProcurementAdviceRequest) -> ProcurementAdviceResponse:
         quotes = await self._scraper.scrape_commodity(req.commodity.lower())
@@ -89,6 +94,29 @@ class ProcurementAdvisor:
 
         narrative_en = f"{rec_en} Alternatives: {alt_text_en}."
         narrative_bn = f"{rec_bn} বিকল্প: {alt_text_bn}।"
+
+        if self._ollama and self._ollama.enabled:
+            context = json.dumps(
+                {
+                    "commodity": req.commodity,
+                    "quantity_mt": req.quantity_mt,
+                    "best": best.model_dump(),
+                    "alternatives": [a.model_dump() for a in alts],
+                    "lang": req.lang,
+                },
+                ensure_ascii=False,
+            )
+            system = (
+                "তুমি সরকারি ক্রয় উপদেষ্টা। দেওয়া JSON থেকে সংক্ষিপ্ত বাংলা সুপারিশ লেখ।"
+                if req.lang == "bn"
+                else "You are a government procurement advisor. Write a concise recommendation from the JSON."
+            )
+            llm_narrative = await self._ollama.complete(system, context)
+            if llm_narrative:
+                if req.lang == "bn":
+                    narrative_bn = llm_narrative
+                else:
+                    narrative_en = llm_narrative
 
         return ProcurementAdviceResponse(
             commodity=req.commodity.lower(),

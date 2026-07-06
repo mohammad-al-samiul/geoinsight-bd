@@ -8,14 +8,49 @@ export interface DocumentAnomaly {
   description: string;
   description_bn: string;
   severity: number;
+  regulation_ref?: string | null;
+}
+
+export interface ExtractedClause {
+  clause_type: string;
+  label: string;
+  label_bn: string;
+  text: string;
+  risk_level: string;
+}
+
+export interface ComplianceCheck {
+  code: string;
+  label: string;
+  label_bn: string;
+  status: "pass" | "warn" | "fail";
+  detail: string;
+  detail_bn: string;
+  reference?: string | null;
+}
+
+export interface KeyEntity {
+  entity_type: string;
+  value: string;
+  context: string;
 }
 
 export interface DocumentAnalysis {
-  clauses: Array<{ clause_type: string; text: string; risk_level: string }>;
+  doc_type: string;
+  clauses: ExtractedClause[];
   anomalies: DocumentAnomaly[];
   contractor_pattern_match: boolean;
   summary: string;
   summary_bn: string;
+  risk_score: number;
+  compliance_status: "COMPLIANT" | "REVIEW_REQUIRED" | "NON_COMPLIANT";
+  compliance_checks: ComplianceCheck[];
+  key_entities: KeyEntity[];
+  recommendations: string[];
+  recommendations_bn: string[];
+  executive_brief: string;
+  executive_brief_bn: string;
+  engine?: string;
 }
 
 export function useDocumentAnalysis() {
@@ -24,7 +59,12 @@ export function useDocumentAnalysis() {
   const [error, setError] = useState<string | null>(null);
 
   const analyze = useCallback(
-    async (text: string, docType: "tender" | "contract", contractorNid?: string, lang: "bn" | "en" = "bn") => {
+    async (
+      text: string,
+      docType: "tender" | "contract",
+      contractorNid?: string,
+      lang: "bn" | "en" = "bn",
+    ) => {
       setLoading(true);
       setError(null);
       try {

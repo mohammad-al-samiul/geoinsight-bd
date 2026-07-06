@@ -55,8 +55,11 @@ export class SovereignModule extends BaseModule {
 
         const mergedContext = [dbContext, context].filter(Boolean).join("\n\n---\n\n");
 
+        // Keep only recent turns — avoids old "no data" replies confusing Ollama
+        const trimmedMessages = messages.slice(-4);
+
         const data = await sovereignLlmService.chat({
-          messages,
+          messages: trimmedMessages,
           lang,
           context: mergedContext || undefined,
         });

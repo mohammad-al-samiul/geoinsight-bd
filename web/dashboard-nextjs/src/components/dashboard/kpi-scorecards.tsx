@@ -32,7 +32,7 @@ function ScorecardShell({
   return (
     <div
       className={cn(
-        "glass-panel rounded-xl p-5 shadow-panel transition-all duration-300 hover:border-primary/25",
+        "glass-panel rounded-xl p-5 shadow-panel transition-all duration-300 hover:border-primary/25 sm:p-6",
         pulseKey ? "animate-score-pulse ring-1 ring-primary/40" : "",
       )}
     >
@@ -61,7 +61,7 @@ function ScorecardShell({
 export function KpiScorecards({ metrics, loading, pulseKeys }: KpiScorecardsProps) {
   if (loading || !metrics) {
     return (
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5">
         <ScorecardSkeleton />
         <ScorecardSkeleton />
         <ScorecardSkeleton />
@@ -78,7 +78,7 @@ export function KpiScorecards({ metrics, loading, pulseKeys }: KpiScorecardsProp
   )[0];
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-5">
       <ScorecardShell
         label="Project Completion Rate"
         value={`${metrics.completionRate}%`}

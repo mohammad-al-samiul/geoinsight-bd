@@ -78,6 +78,12 @@
 .leaflet-container {
   background: hsl(222 47% 6%) !important;
   font-family: inherit;
+  height: 100%;
+  width: 100%;
+}
+
+.map-panel .leaflet-container {
+  min-height: 240px;
 }
 
 .marker-pulse {

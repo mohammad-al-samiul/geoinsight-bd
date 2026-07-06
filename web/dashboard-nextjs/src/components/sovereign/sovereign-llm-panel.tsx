@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { AiStatusBadge } from "@/components/ai/ai-status-badge";
 import { useAppLang } from "@/hooks/use-app-lang";
 import { useTranslations } from "next-intl";
-import { Bot, Loader2, Send, Shield, User } from "lucide-react";
+import { Bot, Loader2, RotateCcw, Send, Shield, User } from "lucide-react";
 
 interface ChatMsg {
   role: "user" | "assistant";
@@ -38,7 +38,7 @@ export function SovereignLlmPanel() {
     setMessages(nextMessages);
 
     const res = await chat(
-      nextMessages.map((m) => ({
+      nextMessages.slice(-4).map((m) => ({
         role: m.role as "user" | "assistant" | "system",
         content: m.content,
       })),
@@ -58,6 +58,17 @@ export function SovereignLlmPanel() {
         <span className="text-[10px] text-muted-foreground">
           {lang === "bn" ? "ভেরিফাইড DB + Ollama" : "Verified DB + Ollama"}
         </span>
+        {messages.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7 text-xs"
+            onClick={() => setMessages([])}
+          >
+            <RotateCcw className="mr-1 h-3 w-3" />
+            {lang === "bn" ? "নতুন চ্যাট" : "New chat"}
+          </Button>
+        )}
       </div>
 
       <div className="mt-4 flex h-[min(70vh,560px)] flex-col glass-panel rounded-xl shadow-panel">

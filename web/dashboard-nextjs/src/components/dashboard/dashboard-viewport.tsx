@@ -96,8 +96,8 @@ export function DashboardViewport() {
         </Badge>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-5 xl:items-stretch">
-        <div className="xl:col-span-3 xl:min-h-[480px]">
+      <div className="space-y-5">
+        <div className="h-[420px] lg:h-[480px]">
           <BangladeshChoroplethMap
             filter={filter}
             markers={markers}
@@ -105,13 +105,11 @@ export function DashboardViewport() {
             onFeatureClick={handleFeatureClick}
           />
         </div>
-        <div className="xl:col-span-2">
-          <KpiScorecards
-            metrics={metrics}
-            loading={loading}
-            pulseKeys={pulseKeys}
-          />
-        </div>
+        <KpiScorecards
+          metrics={metrics}
+          loading={loading}
+          pulseKeys={pulseKeys}
+        />
       </div>
     </div>
   );
