@@ -28,6 +28,118 @@ function projectWhere(query: DashboardScopeQuery): Prisma.ProjectWhereInput {
   };
 }
 
+const BD_HUB = { lat: 23.685, lng: 90.3563 };
+
+const COUNTRY_COORDS: Record<string, [number, number]> = {
+  IND: [28.6139, 77.209],
+  NPL: [27.7172, 85.324],
+  MMR: [19.7633, 96.0785],
+  PAK: [33.6844, 73.0479],
+  THA: [13.7563, 100.5018],
+  VNM: [21.0285, 105.8542],
+  MYS: [3.139, 101.6869],
+  CHN: [39.9042, 116.4074],
+  TUR: [39.9334, 32.8597],
+  EGY: [30.0444, 31.2357],
+  CAN: [45.4215, -75.6972],
+  AUS: [-35.2809, 149.13],
+  RUS: [55.7558, 37.6176],
+  UKR: [50.4501, 30.5234],
+  BRA: [-15.7942, -47.8822],
+  ARG: [-34.6037, -58.3816],
+  USA: [38.9072, -77.0369],
+  QAT: [25.2854, 51.531],
+  NLD: [52.3676, 4.9041],
+  ARE: [24.4539, 54.3773],
+  BGD: [BD_HUB.lat, BD_HUB.lng],
+};
+
+function formatCommodity(code: string): string {
+  return code.charAt(0) + code.slice(1).toLowerCase().replace(/_/g, " ");
+}
+
+function buildTradeFlows(
+  rows: Array<{
+    commodity_code: string;
+    country_code: string;
+    country_name: string;
+    unit_price_usd: string;
+    landed_cost_usd: string;
+  }>,
+) {
+  const byCommodity = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const list = byCommodity.get(row.commodity_code) ?? [];
+    list.push(row);
+    byCommodity.set(row.commodity_code, list);
+  }
+
+  const flows: Array<{
+    id: string;
+    commodity: string;
+    flowType: "import" | "export";
+    countryCode: string;
+    countryName: string;
+    countryLat: number;
+    countryLng: number;
+    marginPct: number;
+    unitPriceUsd: number;
+    landedCostUsd: number;
+  }> = [];
+
+  for (const [code, entries] of byCommodity) {
+    if (entries.length < 2) continue;
+    const sorted = [...entries].sort(
+      (a, b) => Number(a.landed_cost_usd) - Number(b.landed_cost_usd),
+    );
+    const cheapest = sorted[0];
+    const priciest = sorted[sorted.length - 1];
+    const minCost = Number(cheapest.landed_cost_usd);
+    const maxCost = Number(priciest.landed_cost_usd);
+    const spreadPct =
+      minCost > 0 ? Math.round(((maxCost - minCost) / minCost) * 1000) / 10 : 0;
+    const commodity = formatCommodity(code);
+
+    const importCoords = COUNTRY_COORDS[cheapest.country_code];
+    if (importCoords && cheapest.country_code !== "BGD") {
+      flows.push({
+        id: `import-${code}-${cheapest.country_code}`,
+        commodity,
+        flowType: "import",
+        countryCode: cheapest.country_code,
+        countryName: cheapest.country_name,
+        countryLat: importCoords[0],
+        countryLng: importCoords[1],
+        marginPct: Math.max(3, Math.round(spreadPct * 0.4 * 10) / 10),
+        unitPriceUsd: Number(cheapest.unit_price_usd),
+        landedCostUsd: minCost,
+      });
+    }
+
+    const exportCoords = COUNTRY_COORDS[priciest.country_code];
+    if (
+      exportCoords &&
+      priciest.country_code !== "BGD" &&
+      priciest.country_code !== cheapest.country_code
+    ) {
+      flows.push({
+        id: `export-${code}-${priciest.country_code}`,
+        commodity,
+        flowType: "export",
+        countryCode: priciest.country_code,
+        countryName: priciest.country_name,
+        countryLat: exportCoords[0],
+        countryLng: exportCoords[1],
+        marginPct: spreadPct,
+        unitPriceUsd: Number(priciest.unit_price_usd),
+        landedCostUsd: maxCost,
+      });
+    }
+  }
+
+  return flows.slice(0, 24);
+}
+
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export class DashboardService {
@@ -67,18 +179,22 @@ export class DashboardService {
         prismaRead.$queryRaw<
           Array<{
             commodity_code: string;
+            country_code: string;
             country_name: string;
+            unit_price_usd: string;
             landed_cost_usd: string;
             min_landed: string;
           }>
         >`
-          SELECT DISTINCT ON (commodity_code, country_name)
+          SELECT DISTINCT ON (commodity_code, country_code)
             commodity_code,
+            country_code,
             country_name,
+            unit_price_usd::text,
             landed_cost_usd::text,
             MIN(landed_cost_usd) OVER (PARTITION BY commodity_code)::text AS min_landed
           FROM commodity_price_logs
-          ORDER BY commodity_code, country_name, created_at DESC
+          ORDER BY commodity_code, country_code, created_at DESC
         `,
       ]);
 
@@ -163,12 +279,15 @@ export class DashboardService {
       }),
     );
 
+    const tradeFlows = buildTradeFlows(commodityRows);
+
     return {
       summary: { units, projects, openAlerts, representatives },
       completionRate,
       completionTrend,
       budgetVariance,
       arbitrageMatrix,
+      tradeFlows,
       unitScores,
       timestamp: new Date().toISOString(),
     };

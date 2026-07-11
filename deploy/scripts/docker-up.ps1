@@ -51,8 +51,8 @@ if (-not (Start-DockerDesktopIfNeeded)) {
   exit 1
 }
 
-# Stop local dev servers that block Docker ports (optional)
-foreach ($port in @(3000, 4000, 8000)) {
+# Stop local dev servers that block Docker ports (optional; 8000 often reserved by Windows Hyper-V)
+foreach ($port in @(3000, 4000)) {
   $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
   foreach ($conn in $conns) {
     $proc = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
@@ -76,7 +76,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "Dashboard:  http://localhost:3000  (open this in browser)" -ForegroundColor Green
 Write-Host "API:        http://localhost:4000/api/v1/health" -ForegroundColor Green
-Write-Host "AI:         http://localhost:8000/api/v1/health" -ForegroundColor Green
+Write-Host "AI:         internal ai-analytics:8000 (via API gateway)" -ForegroundColor Green
 Write-Host "Login:      pmo@geoinsight.gov.bd / ChangeMe@123" -ForegroundColor Green
 Write-Host ""
 docker compose -f docker-compose.yml -f docker-compose.apps.yml ps

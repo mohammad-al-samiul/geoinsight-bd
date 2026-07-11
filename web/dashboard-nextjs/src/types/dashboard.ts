@@ -25,11 +25,27 @@ export interface ArbitrageCell {
   marginPct: number;
 }
 
+export type TradeFlowType = "import" | "export";
+
+export interface TradeFlow {
+  id: string;
+  commodity: string;
+  flowType: TradeFlowType;
+  countryCode: string;
+  countryName: string;
+  countryLat: number;
+  countryLng: number;
+  marginPct: number;
+  unitPriceUsd: number;
+  landedCostUsd: number;
+}
+
 export interface DashboardMetrics {
   completionRate: number;
   completionTrend: CompletionTrendPoint[];
   budgetVariance: BudgetVariancePoint[];
   arbitrageMatrix: ArbitrageCell[];
+  tradeFlows: TradeFlow[];
   unitScores: UnitScore[];
   timestamp: string;
 }

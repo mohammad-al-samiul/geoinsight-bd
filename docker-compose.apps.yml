@@ -75,8 +75,7 @@ services:
     image: geoinsight/ai-analytics:local
     container_name: geoinsight-ai-analytics
     restart: unless-stopped
-    ports:
-      - "${AI_ANALYTICS_PORT:-8000}:8000"
+    # Internal only (ai-analytics:8000) — no host bind avoids Windows Hyper-V port exclusions on 8000
     environment:
       NODE_ENV: production
       AI_CORE_PORT: 8000

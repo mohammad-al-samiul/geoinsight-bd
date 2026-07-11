@@ -1,5 +1,6 @@
 import type { AdminFilterState } from "@/types";
 import type { DashboardMetrics } from "@/types/dashboard";
+import { buildDemoTradeFlows } from "@/lib/trade-flows";
 
 const MOCK_COMPLETION_TREND = [
   { month: "Jan", rate: 72 },
@@ -34,6 +35,7 @@ export function buildMockMetrics(filter: AdminFilterState): DashboardMetrics {
     })),
     budgetVariance: [],
     arbitrageMatrix: [],
+    tradeFlows: buildDemoTradeFlows(),
     unitScores: [],
     timestamp: new Date().toISOString(),
   };

@@ -21,6 +21,7 @@ interface NationalDashboardResponse {
     completionTrend: DashboardMetrics["completionTrend"];
     budgetVariance: DashboardMetrics["budgetVariance"];
     arbitrageMatrix: DashboardMetrics["arbitrageMatrix"];
+    tradeFlows: DashboardMetrics["tradeFlows"];
     unitScores: DashboardMetrics["unitScores"];
     timestamp: string;
   };
@@ -50,6 +51,7 @@ export async function fetchDashboardMetrics(
       completionTrend: data.completionTrend,
       budgetVariance: data.budgetVariance,
       arbitrageMatrix: data.arbitrageMatrix,
+      tradeFlows: data.tradeFlows ?? [],
       unitScores: data.unitScores,
       timestamp: data.timestamp,
     };
