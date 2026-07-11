@@ -24,6 +24,9 @@ export interface AnomalyAlert {
   fabricTxId: string | null;
   verificationStatus: BlockchainVerificationStatus;
   isNew?: boolean;
+  live?: boolean;
+  sourceName?: string | null;
+  sourceUrl?: string | null;
 }
 
 export function severityFromInt(level: number): AlertSeverity {

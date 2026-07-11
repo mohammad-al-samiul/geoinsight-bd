@@ -1,10 +1,18 @@
 import { prismaRead } from "../../core/database/prisma.client";
 import { ApiError } from "../../core/errors/api.error";
+import { env } from "../../core/config/env";
+import { liveDataService } from "../live-data/live-data.service";
 import { projectUnitScopeWhere } from "../../shared/scope/admin-unit-filter";
 import { ListProjectsQuery } from "./project.validator";
 
 export class ProjectService {
   async listByUnit(query: ListProjectsQuery) {
+    if (env.LIVE_DATA_ONLY) {
+      return liveDataService.listProjects({
+        ...(query.unitId && { districtId: query.unitId }),
+      });
+    }
+
     return prismaRead.project.findMany({
       where: {
         ...(query.unitId && projectUnitScopeWhere(query.unitId)),
@@ -27,6 +35,12 @@ export class ProjectService {
   }
 
   async getById(projectId: string) {
+    if (env.LIVE_DATA_ONLY) {
+      const live = await liveDataService.getProjectById(projectId);
+      if (!live) throw ApiError.notFound("Project not found");
+      return live;
+    }
+
     const project = await prismaRead.project.findUnique({
       where: { id: projectId },
       include: {

@@ -34,6 +34,23 @@ const envSchema = z.object({
   PUBLIC_FEED_999_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   AI_SERVICE_URL: z.string().url().default("http://localhost:8000"),
   SOVEREIGN_MODE: z.string().default("false").transform((v) => v === "true"),
+  INGESTION_ENABLED: z.string().default("true").transform((v) => v === "true"),
+  INGESTION_INTERVAL_MS: z.coerce.number().int().positive().default(900_000),
+  INGESTION_RUN_ON_START: z.string().default("true").transform((v) => v === "true"),
+  INGESTION_STARTUP_DELAY_MS: z.coerce.number().int().positive().default(45_000),
+
+  PIPELINE_ENABLED: z.string().default("true").transform((v) => v === "true"),
+  PIPELINE_RUN_ON_START: z.string().default("true").transform((v) => v === "true"),
+  PIPELINE_STARTUP_DELAY_MS: z.coerce.number().int().positive().default(60_000),
+  PIPELINE_NEWS_INTERVAL_MS: z.coerce.number().int().positive().default(900_000),
+  PIPELINE_COMMODITY_INTERVAL_MS: z.coerce.number().int().positive().default(1_800_000),
+  PIPELINE_KPI_INTERVAL_MS: z.coerce.number().int().positive().default(1_800_000),
+  PIPELINE_ALERT_INTERVAL_MS: z.coerce.number().int().positive().default(1_200_000),
+  PIPELINE_AGRO_INTERVAL_MS: z.coerce.number().int().positive().default(1_800_000),
+  PIPELINE_HAZARD_INTERVAL_MS: z.coerce.number().int().positive().default(1_800_000),
+  PIPELINE_WEATHER_INTERVAL_MS: z.coerce.number().int().positive().default(600_000),
+
+  LIVE_DATA_ONLY: z.string().default("true").transform((v) => v === "true"),
 
   FABRIC_ENABLED: z.string().default("false").transform((v) => v === "true"),
   FABRIC_CONNECTION_PROFILE_PATH: z

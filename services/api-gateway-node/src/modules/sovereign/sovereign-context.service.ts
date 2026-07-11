@@ -1,4 +1,5 @@
 import { prismaRead } from "../../core/database/prisma.client";
+import { ingestionService } from "../ingestion/ingestion.service";
 import type { DashboardScopeQuery } from "../dashboard/dashboard.service";
 
 const EXTRA_TERMS: Record<string, string[]> = {
@@ -88,6 +89,7 @@ async function buildPlatformSnapshot(scope: DashboardScopeQuery = {}): Promise<s
     commodities,
     agroMarkets,
     kpiDefs,
+    newsArticles,
   ] = await Promise.all([
     Promise.all([
       prismaRead.adminUnit.count(),
@@ -98,6 +100,9 @@ async function buildPlatformSnapshot(scope: DashboardScopeQuery = {}): Promise<s
       prismaRead.commodityPriceLog.count(),
       prismaRead.agroMarket.count(),
       prismaRead.kpiDefinition.count(),
+      prismaRead.externalArticle.count({
+        where: { fetchedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+      }),
     ]),
     prismaRead.adminUnit.findMany({
       where: { type: "DIVISION" },
@@ -167,6 +172,7 @@ async function buildPlatformSnapshot(scope: DashboardScopeQuery = {}): Promise<s
       select: { code: true, name: true, nameBn: true, unit: true },
       orderBy: { code: "asc" },
     }),
+    ingestionService.listArticles(8, 7),
   ]);
 
   const [
@@ -178,6 +184,7 @@ async function buildPlatformSnapshot(scope: DashboardScopeQuery = {}): Promise<s
     commodityCount,
     agroCount,
     kpiDefCount,
+    newsCount,
   ] = counts;
 
   const lines: string[] = [
@@ -192,6 +199,7 @@ async function buildPlatformSnapshot(scope: DashboardScopeQuery = {}): Promise<s
     `- open_red_flag_alerts: ${alertCount}`,
     `- commodity_price_observations: ${commodityCount}`,
     `- agro_markets: ${agroCount}`,
+    `- online_news_articles_7d: ${newsCount} (RSS + Google News ingestion)`,
     "",
     "8 DIVISIONS:",
     ...divisions.map((d) => `- ${d.name} / ${d.nameBn ?? d.name} (code ${d.code})`),
@@ -247,6 +255,15 @@ async function buildPlatformSnapshot(scope: DashboardScopeQuery = {}): Promise<s
     lines.push("", "AGRO MARKETS:");
     for (const m of agroMarkets) {
       lines.push(`- ${m.name} (${m.type}) | ${m.adminUnit.nameBn ?? m.adminUnit.name}`);
+    }
+  }
+
+  if (newsArticles.length > 0) {
+    lines.push("", "ONLINE NEWS HEADLINES (last 7 days, RSS/Google):");
+    for (const n of newsArticles) {
+      lines.push(
+        `- [${n.sentimentCategory ?? "—"}] ${n.sourceName} | ${n.district ?? "National"} | ${n.title.slice(0, 140)}`,
+      );
     }
   }
 
@@ -442,6 +459,18 @@ export async function buildSovereignContext(
       lines.push(
         `- ${k.kpiDef.name} (${k.kpiDef.code}): ${k.value}${k.kpiDef.unit ? ` ${k.kpiDef.unit}` : ""} | ${k.representative.adminUnit.nameBn ?? k.representative.adminUnit.name}`,
       );
+    }
+  }
+
+  if (searchTerms.length > 0) {
+    const newsHits = await ingestionService.searchArticles(q, 6);
+    if (newsHits.length > 0) {
+      lines.push("\nONLINE NEWS (RSS/Google ingestion):");
+      for (const n of newsHits) {
+        lines.push(
+          `- [${n.sentimentCategory ?? "—"}] ${n.sourceName} | ${n.district ?? "National"} | ${n.title.slice(0, 160)}`,
+        );
+      }
     }
   }
 

@@ -9,8 +9,20 @@ export class AgroMarketService {
       where: {
         ...(query.unitId && agroMarketUnitScopeWhere(query.unitId)),
       },
-      select: { id: true, name: true, lat: true, lng: true, type: true, adminUnitId: true },
+      select: {
+        id: true,
+        name: true,
+        lat: true,
+        lng: true,
+        type: true,
+        adminUnitId: true,
+        commodityCode: true,
+        priceBdtPerKg: true,
+        priceUpdatedAt: true,
+      },
       orderBy: { name: "asc" },
     });
   }
 }
+
+export const agroMarketService = new AgroMarketService();

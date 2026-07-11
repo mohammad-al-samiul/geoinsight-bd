@@ -77,8 +77,15 @@ export function KpiScorecards({ metrics, loading, pulseKeys }: KpiScorecardsProp
   }
 
   const avgVariance =
-    metrics.budgetVariance.reduce((s, b) => s + b.variance, 0) /
-    metrics.budgetVariance.length;
+    metrics.budgetVariance.length > 0
+      ? metrics.budgetVariance.reduce((s, b) => s + b.variance, 0) /
+        metrics.budgetVariance.length
+      : 0;
+
+  const varianceDisplay =
+    metrics.budgetVariance.length > 0
+      ? `${avgVariance > 0 ? "+" : ""}${avgVariance.toFixed(1)}%`
+      : "—";
 
   const topArbitrage = [...metrics.arbitrageMatrix].sort(
     (a, b) => b.marginPct - a.marginPct,
@@ -101,8 +108,12 @@ export function KpiScorecards({ metrics, loading, pulseKeys }: KpiScorecardsProp
 
       <ScorecardShell
         label="Budget Variance"
-        value={`${avgVariance > 0 ? "+" : ""}${avgVariance.toFixed(1)}%`}
-        sub="Planned vs. actual spend"
+        value={varianceDisplay}
+        sub={
+          metrics.budgetVariance.length > 0
+            ? "Planned vs. actual spend"
+            : "Live budget signals syncing…"
+        }
         icon={Wallet}
         pulseKey={pulseKeys.budget}
       >

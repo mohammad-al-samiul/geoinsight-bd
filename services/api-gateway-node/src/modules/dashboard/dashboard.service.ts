@@ -1,5 +1,7 @@
 import { Prisma, ProjectStatus } from "@prisma/client";
+import { env } from "../../core/config/env";
 import { prismaRead } from "../../core/database/prisma.client";
+import { liveDataService } from "../live-data/live-data.service";
 
 export interface DashboardScopeQuery {
   divisionId?: string;
@@ -144,6 +146,9 @@ const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "S
 
 export class DashboardService {
   async getNationalMetrics(query: DashboardScopeQuery = {}) {
+    if (env.LIVE_DATA_ONLY) {
+      return liveDataService.getNationalMetrics(query);
+    }
     const where = projectWhere(query);
 
     const [units, projects, openAlerts, representatives, projectRows, divisions, commodityRows] =

@@ -18,6 +18,10 @@ interface ApiAlertRow {
   createdAt: string;
   blockchainHash: string | null;
   blockchainVerified: boolean;
+  live?: boolean;
+  sourceName?: string | null;
+  sourceUrl?: string | null;
+  district?: string;
   project: {
     id: string;
     title: string;
@@ -41,7 +45,8 @@ function buildHeadline(row: ApiAlertRow, unitName: string): string {
 }
 
 function mapApiAlert(row: ApiAlertRow): AnomalyAlert {
-  const unitName = getUnitById(row.project.adminUnitId)?.name
+  const unitName = row.district
+    ?? getUnitById(row.project.adminUnitId)?.name
     ?? resolveUnitName(row.project.adminUnitId);
 
   return {
@@ -60,6 +65,9 @@ function mapApiAlert(row: ApiAlertRow): AnomalyAlert {
     blockchainHash: row.blockchainHash,
     blockchainVerified: row.blockchainVerified,
     fabricTxId: row.project.blockchainTx,
+    live: row.live,
+    sourceName: row.sourceName,
+    sourceUrl: row.sourceUrl,
     verificationStatus: deriveVerificationStatus({
       blockchainHash: row.blockchainHash,
       blockchainVerified: row.blockchainVerified,

@@ -12,6 +12,27 @@ const typeColor: Record<string, string> = {
   HAAT: "bg-amber-500/20 text-amber-400",
 };
 
+function formatPrice(value: string | number | null | undefined): string {
+  if (value == null || value === "") return "—";
+  const n = Number(value);
+  if (Number.isNaN(n)) return "—";
+  return `৳${n.toFixed(2)}/kg`;
+}
+
+function formatUpdated(at: string | null | undefined): string {
+  if (!at) return "";
+  try {
+    return new Date(at).toLocaleString("bn-BD", {
+      hour: "2-digit",
+      minute: "2-digit",
+      day: "numeric",
+      month: "short",
+    });
+  } catch {
+    return "";
+  }
+}
+
 export default function AgroPage() {
   const t = useTranslations("modules.agro");
   const { rows, loading, error, reload } = useAgroMarketsList();
@@ -19,6 +40,7 @@ export default function AgroPage() {
   const wholesale = rows.filter((r) => r.type === "WHOLESALE").length;
   const retail = rows.filter((r) => r.type === "RETAIL").length;
   const haat = rows.filter((r) => r.type === "HAAT").length;
+  const withLivePrice = rows.filter((r) => r.priceBdtPerKg != null).length;
 
   const typeLabel = (type: string) => {
     if (type === "WHOLESALE") return t("wholesale");
@@ -41,6 +63,7 @@ export default function AgroPage() {
             <StatCard label={t("wholesale")} value={wholesale} />
             <StatCard label={t("retail")} value={retail} />
             <StatCard label={t("haat")} value={haat} />
+            <StatCard label={t("livePrices")} value={withLivePrice} />
           </StatGrid>
         ) : undefined
       }
@@ -55,6 +78,29 @@ export default function AgroPage() {
               label: t("colType"),
               render: (r) => (
                 <Badge className={typeColor[r.type] ?? ""}>{typeLabel(r.type)}</Badge>
+              ),
+            },
+            {
+              key: "priceBdtPerKg",
+              label: t("colPrice"),
+              render: (r) => (
+                <span className="font-mono text-emerald-300">
+                  {formatPrice(r.priceBdtPerKg)}
+                  {r.commodityCode ? (
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      ({r.commodityCode.toLowerCase()})
+                    </span>
+                  ) : null}
+                </span>
+              ),
+            },
+            {
+              key: "priceUpdatedAt",
+              label: t("colUpdated"),
+              render: (r) => (
+                <span className="text-xs text-muted-foreground">
+                  {formatUpdated(r.priceUpdatedAt)}
+                </span>
               ),
             },
             {

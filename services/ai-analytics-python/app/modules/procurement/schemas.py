@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 
+from app.modules.arbitrage.schemas import CommodityQuote
+
 
 class ProcurementOption(BaseModel):
     country_code: str
@@ -18,6 +20,10 @@ class ProcurementAdviceRequest(BaseModel):
     quantity_mt: float = Field(gt=0)
     urgency_days: int = Field(default=30, ge=7, le=180)
     lang: str = Field(default="bn", pattern="^(bn|en)$")
+    market_quotes: list[CommodityQuote] | None = Field(
+        default=None,
+        description="Live quotes from gateway commodity pipeline; falls back to scraper when absent",
+    )
 
 
 class ProcurementAdviceResponse(BaseModel):

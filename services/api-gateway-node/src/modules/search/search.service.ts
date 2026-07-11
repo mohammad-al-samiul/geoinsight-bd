@@ -1,7 +1,8 @@
 import { prismaRead } from "../../core/database/prisma.client";
+import { ingestionService } from "../ingestion/ingestion.service";
 
 export interface SearchResult {
-  type: "page" | "project" | "representative" | "kpi" | "alert";
+  type: "page" | "project" | "representative" | "kpi" | "alert" | "news";
   id: string;
   title: string;
   subtitle?: string;
@@ -41,7 +42,7 @@ export class SearchService {
       }
     }
 
-    const [projects, reps, kpis, alerts] = await Promise.all([
+    const [projects, reps, kpis, alerts, news] = await Promise.all([
       prismaRead.project.findMany({
         where: { title: { contains: q, mode: "insensitive" } },
         select: { id: true, title: true, status: true },
@@ -78,6 +79,7 @@ export class SearchService {
         include: { project: { select: { title: true } } },
         take: 6,
       }),
+      ingestionService.searchArticles(q, 6),
     ]);
 
     for (const p of projects) {
@@ -114,6 +116,15 @@ export class SearchService {
         title: a.project.title,
         subtitle: a.flagType.replace(/_/g, " "),
         href: "/alerts",
+      });
+    }
+    for (const n of news) {
+      results.push({
+        type: "news",
+        id: n.id,
+        title: n.title,
+        subtitle: `${n.sourceName}${n.district ? ` · ${n.district}` : ""}`,
+        href: n.url,
       });
     }
 

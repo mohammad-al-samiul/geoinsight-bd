@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { AdminFilterState } from "@/types";
-import { fetchDashboardMetrics, fetchRedFlagMarkers } from "@/lib/dashboard-data";
-import { buildMockMetrics } from "@/lib/dashboard-mock";
+import { fetchDashboardMetricsSafe, fetchRedFlagMarkers } from "@/lib/dashboard-data";
 import type {
   DashboardMetrics,
   RedFlagMarker,
@@ -37,7 +36,7 @@ export function useDashboardData(filter: AdminFilterState) {
     setLoading(true);
     try {
       const [m, mk] = await Promise.all([
-        fetchDashboardMetrics(filter),
+        fetchDashboardMetricsSafe(filter),
         fetchRedFlagMarkers(filter),
       ]);
       setMetrics(m);
@@ -63,8 +62,8 @@ export function useDashboardData(filter: AdminFilterState) {
   const handleKpiUpdate = useCallback(
     (payload: SocketKpiPayload) => {
       setMetrics((prev) => {
-        const base = prev ?? buildMockMetrics(filter);
-        const next = { ...base, timestamp: new Date().toISOString() };
+        if (!prev) return prev;
+        const next = { ...prev, timestamp: new Date().toISOString() };
 
         if (payload.metric === "completion_rate" && payload.value != null) {
           next.completionRate = payload.value;
@@ -88,7 +87,7 @@ export function useDashboardData(filter: AdminFilterState) {
         return next;
       });
     },
-    [filter, pulse],
+    [pulse],
   );
 
   const handleRedFlag = useCallback(

@@ -6,7 +6,6 @@ import type {
   DashboardMetrics,
   RedFlagMarker,
 } from "@/types/dashboard";
-import { buildMockMetrics } from "@/lib/dashboard-mock";
 
 interface NationalDashboardResponse {
   success: boolean;
@@ -16,6 +15,7 @@ interface NationalDashboardResponse {
       projects: number;
       openAlerts: number;
       representatives: number;
+      newsArticles?: number;
     };
     completionRate: number;
     completionTrend: DashboardMetrics["completionTrend"];
@@ -23,6 +23,7 @@ interface NationalDashboardResponse {
     arbitrageMatrix: DashboardMetrics["arbitrageMatrix"];
     tradeFlows: DashboardMetrics["tradeFlows"];
     unitScores: DashboardMetrics["unitScores"];
+    dataSource?: string;
     timestamp: string;
   };
 }
@@ -37,26 +38,42 @@ function filterQuery(filter: AdminFilterState): string {
   return qs ? `?${qs}` : "";
 }
 
+const EMPTY_METRICS: DashboardMetrics = {
+  completionRate: 0,
+  completionTrend: [],
+  budgetVariance: [],
+  arbitrageMatrix: [],
+  tradeFlows: [],
+  unitScores: [],
+  timestamp: new Date().toISOString(),
+};
+
 export async function fetchDashboardMetrics(
   filter: AdminFilterState,
 ): Promise<DashboardMetrics> {
+  const json = await apiClient<NationalDashboardResponse>(
+    `dashboard/national${filterQuery(filter)}`,
+  );
+  if (!json.success || !json.data) throw new Error("Live dashboard unavailable");
+  const { data } = json;
+  return {
+    completionRate: data.completionRate,
+    completionTrend: data.completionTrend,
+    budgetVariance: data.budgetVariance,
+    arbitrageMatrix: data.arbitrageMatrix,
+    tradeFlows: data.tradeFlows ?? [],
+    unitScores: data.unitScores,
+    timestamp: data.timestamp,
+  };
+}
+
+export async function fetchDashboardMetricsSafe(
+  filter: AdminFilterState,
+): Promise<DashboardMetrics> {
   try {
-    const json = await apiClient<NationalDashboardResponse>(
-      `dashboard/national${filterQuery(filter)}`,
-    );
-    if (!json.success || !json.data) throw new Error("API error");
-    const { data } = json;
-    return {
-      completionRate: data.completionRate,
-      completionTrend: data.completionTrend,
-      budgetVariance: data.budgetVariance,
-      arbitrageMatrix: data.arbitrageMatrix,
-      tradeFlows: data.tradeFlows ?? [],
-      unitScores: data.unitScores,
-      timestamp: data.timestamp,
-    };
+    return await fetchDashboardMetrics(filter);
   } catch {
-    return buildMockMetrics(filter);
+    return { ...EMPTY_METRICS, timestamp: new Date().toISOString() };
   }
 }
 
@@ -78,7 +95,7 @@ export async function fetchRedFlagMarkers(
       }>;
     }>(`alerts?${params}`);
 
-    if (!json.success || !Array.isArray(json.data)) throw new Error("No data");
+    if (!json.success || !Array.isArray(json.data)) return [];
 
     const markers: RedFlagMarker[] = [];
     for (const a of json.data) {

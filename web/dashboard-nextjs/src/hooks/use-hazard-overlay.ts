@@ -21,7 +21,16 @@ export interface HazardOverlay {
   exposures: HazardExposure[];
   narrative: string;
   narrative_bn: string;
-  zones: Array<{ zone_id: string; name: string; name_bn: string; hazard_type: string; risk_level: number }>;
+  zones: Array<{
+    zone_id: string;
+    name: string;
+    name_bn: string;
+    hazard_type: string;
+    risk_level: number;
+    lat?: number;
+    lng?: number;
+    radius_km?: number;
+  }>;
   projects_mapped: number;
 }
 

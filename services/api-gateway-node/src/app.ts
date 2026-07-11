@@ -12,6 +12,7 @@ import {
 import { initSocketServer } from "./infrastructure/socket/socket.server";
 import { container } from "./core/di/container";
 import { createApp } from "./create-app";
+import { pipelineOrchestrator } from "./modules/pipeline/pipeline.orchestrator";
 
 const app = createApp();
 const httpServer = createServer(app);
@@ -25,6 +26,21 @@ async function bootstrap(): Promise<void> {
   await startGovQueueConsumer();
   container.blockchainRetryWorker.start();
 
+  if (env.PIPELINE_ENABLED && env.NODE_ENV !== "test") {
+    pipelineOrchestrator.start();
+  } else if (env.INGESTION_ENABLED && env.NODE_ENV !== "test") {
+    // Legacy fallback when pipeline disabled but ingestion alone is enabled
+    const { ingestionService } = await import("./modules/ingestion/ingestion.service");
+    const { IngestionBackgroundWorker } = await import("./modules/ingestion/ingestion.worker");
+    const worker = new IngestionBackgroundWorker(
+      () => ingestionService.syncFromAi(15),
+      env.INGESTION_INTERVAL_MS,
+      env.INGESTION_RUN_ON_START,
+      env.INGESTION_STARTUP_DELAY_MS,
+    );
+    worker.start();
+  }
+
   httpServer.listen(env.API_GATEWAY_PORT, () => {
     console.info(`[gateway] Port ${env.API_GATEWAY_PORT} (${env.NODE_ENV})`);
   });
@@ -32,6 +48,7 @@ async function bootstrap(): Promise<void> {
 
 async function shutdown(signal: string): Promise<void> {
   console.info(`[gateway] ${signal} — shutting down`);
+  pipelineOrchestrator.stop();
   container.blockchainRetryWorker.stop();
   await container.fabricClient.disconnect();
   httpServer.close();

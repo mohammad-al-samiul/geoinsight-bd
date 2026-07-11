@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     )
     worker_pool_size: int = Field(default=4, alias="AI_WORKER_POOL_SIZE")
     scrape_interval_sec: int = Field(default=300, alias="AI_SCRAPE_INTERVAL_SEC")
+    ingestion_interval_sec: int = Field(default=900, alias="AI_INGESTION_INTERVAL_SEC")
+    ingestion_enabled: bool = Field(default=True, alias="INGESTION_ENABLED")
     mock_country_count: int = Field(default=195, alias="AI_MOCK_COUNTRY_COUNT")
 
     rabbitmq_url: str = Field(

@@ -32,7 +32,7 @@ services:
     container_name: geoinsight-api-gateway
     restart: unless-stopped
     ports:
-      - "${API_GATEWAY_PORT:-4000}:4000"
+      - "${API_GATEWAY_PORT:-4800}:4000"
     environment:
       NODE_ENV: production
       API_GATEWAY_PORT: 4000
@@ -48,11 +48,27 @@ services:
       RABBITMQ_GOV_QUEUE: ${RABBITMQ_GOV_QUEUE:-gov_core_queue}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       AI_SERVICE_URL: http://ai-analytics:8000
+      INGESTION_ENABLED: ${INGESTION_ENABLED:-true}
+      INGESTION_INTERVAL_MS: ${INGESTION_INTERVAL_MS:-900000}
+      INGESTION_RUN_ON_START: ${INGESTION_RUN_ON_START:-true}
+      INGESTION_STARTUP_DELAY_MS: ${INGESTION_STARTUP_DELAY_MS:-45000}
+      PIPELINE_ENABLED: ${PIPELINE_ENABLED:-true}
+      PIPELINE_RUN_ON_START: ${PIPELINE_RUN_ON_START:-true}
+      PIPELINE_STARTUP_DELAY_MS: ${PIPELINE_STARTUP_DELAY_MS:-60000}
+      PIPELINE_NEWS_INTERVAL_MS: ${PIPELINE_NEWS_INTERVAL_MS:-900000}
+      PIPELINE_COMMODITY_INTERVAL_MS: ${PIPELINE_COMMODITY_INTERVAL_MS:-1800000}
+      PIPELINE_KPI_INTERVAL_MS: ${PIPELINE_KPI_INTERVAL_MS:-1800000}
+      PIPELINE_ALERT_INTERVAL_MS: ${PIPELINE_ALERT_INTERVAL_MS:-1200000}
+      PIPELINE_AGRO_INTERVAL_MS: ${PIPELINE_AGRO_INTERVAL_MS:-1800000}
+      PIPELINE_HAZARD_INTERVAL_MS: ${PIPELINE_HAZARD_INTERVAL_MS:-1800000}
+      LIVE_DATA_ONLY: ${LIVE_DATA_ONLY:-true}
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
     depends_on:
       db-init:
         condition: service_completed_successfully
+      ai-analytics:
+        condition: service_healthy
       pgbouncer:
         condition: service_started
       redis:
@@ -83,7 +99,7 @@ services:
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
       RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-geoinsight_exchange}
       RABBITMQ_AI_QUEUE: ${RABBITMQ_AI_QUEUE:-ai_analytics_queue}
-      SENTIMENT_USE_MOCK: ${SENTIMENT_USE_MOCK:-true}
+      SENTIMENT_USE_MOCK: ${SENTIMENT_USE_MOCK:-false}
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
@@ -116,8 +132,8 @@ services:
       context: ./web/dashboard-nextjs
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:${API_GATEWAY_PORT:-4000}/api/v1
-        NEXT_PUBLIC_SOCKET_URL: http://localhost:${API_GATEWAY_PORT:-4000}
+        NEXT_PUBLIC_API_URL: http://localhost:${API_GATEWAY_PORT:-4800}/api/v1
+        NEXT_PUBLIC_SOCKET_URL: http://localhost:${API_GATEWAY_PORT:-4800}
     image: geoinsight/dashboard:local
     container_name: geoinsight-dashboard
     restart: unless-stopped

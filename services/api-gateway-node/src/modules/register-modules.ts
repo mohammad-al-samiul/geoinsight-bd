@@ -20,6 +20,9 @@ import { citizenModule } from "./citizen/citizen.module";
 import { searchModule } from "./search/search.module";
 import { healthModule } from "./health/health.module";
 import { publicFeedModule } from "./public-feed/public-feed.module";
+import { ingestionModule } from "./ingestion/ingestion.module";
+import { pipelineModule } from "./pipeline/pipeline.module";
+import { weatherModule } from "./weather/weather.module";
 
 const modules: AppModule[] = [
   healthModule,
@@ -35,6 +38,9 @@ const modules: AppModule[] = [
   dashboardModule,
   briefingModule,
   intelligenceModule,
+  ingestionModule,
+  pipelineModule,
+  weatherModule,
   simulatorModule,
   procurementModule,
   sovereignModule,

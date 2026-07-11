@@ -14,10 +14,13 @@ from app.modules.predictive.router import router as predictive_router
 from app.modules.procurement.router import router as procurement_router
 from app.modules.risk.router import router as risk_router
 from app.modules.sentiment.router import router as sentiment_router
+from app.modules.ingestion.router import router as ingestion_router
+from app.modules.weather.router import router as weather_router
 from app.modules.simulator.router import router as simulator_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
+api_router.include_router(ingestion_router)
 api_router.include_router(arbitrage_router)
 api_router.include_router(sentiment_router)
 api_router.include_router(risk_router)
@@ -28,6 +31,7 @@ api_router.include_router(procurement_router)
 api_router.include_router(accountability_router)
 api_router.include_router(documents_router)
 api_router.include_router(hazards_router)
+api_router.include_router(weather_router)
 api_router.include_router(sovereign_llm_router)
 api_router.include_router(sovereign_compat_router)
 api_router.include_router(twin_router)

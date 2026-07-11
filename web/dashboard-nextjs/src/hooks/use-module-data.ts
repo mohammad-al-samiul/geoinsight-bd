@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
 import { useAuthActions } from "@/hooks/use-auth";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { activeUnitId, unitQuery } from "@/lib/unit-scope";
 import type {
   AgroMarketRow,
@@ -71,6 +72,8 @@ export function useProjectsList() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useRealtimeRefresh(load, ready);
 
   return { rows, loading: loading || !ready, error, reload: load };
 }
@@ -141,6 +144,8 @@ export function useRepresentativesList() {
     void load();
   }, [load]);
 
+  useRealtimeRefresh(load, ready);
+
   return { rows, loading: loading || !ready, error, reload: load };
 }
 
@@ -173,6 +178,8 @@ export function useAgroMarketsList() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useRealtimeRefresh(load, ready);
 
   return { rows, loading: loading || !ready, error, reload: load };
 }
@@ -227,6 +234,8 @@ export function useKpiData() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useRealtimeRefresh(load, ready);
 
   return { definitions, records, loading: loading || !ready, error, reload: load };
 }

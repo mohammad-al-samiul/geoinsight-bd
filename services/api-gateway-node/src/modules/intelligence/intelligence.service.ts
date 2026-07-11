@@ -4,7 +4,13 @@ import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
 import { publishToGovQueue } from "../../infrastructure/messaging/gov-queue.publisher";
 import { hashAiExplanation } from "../twin/twin.service";
 import { auditService } from "../../shared/audit/audit.service";
+import { liveDataService } from "../live-data/live-data.service";
 import type { DashboardScopeQuery } from "../dashboard/dashboard.service";
+import {
+  matchesScopeDistrict,
+  normalizeDivisionName,
+  resolveScopeContext,
+} from "../../shared/scope/scope-context";
 
 export interface PredictiveScore {
   project_id: string;
@@ -21,8 +27,29 @@ function scopeUnitId(query: DashboardScopeQuery): string | undefined {
   return query.unionId ?? query.upazilaId ?? query.districtId ?? query.divisionId;
 }
 
+interface HazardZoneRecord {
+  zone_id: string;
+  name: string;
+  name_bn: string;
+  hazard_type: string;
+  risk_level: number;
+  division: string;
+  lat: number;
+  lng: number;
+  radius_km: number;
+  district?: string;
+  source?: string;
+  [key: string]: unknown;
+}
+
 export class IntelligenceService {
   async getSentimentHeatmap(level: "district" | "upazila" = "district", limit = 100) {
+    const { ingestionService } = await import("../ingestion/ingestion.service");
+    const hasNews = await ingestionService.hasRecentArticles(7, 5);
+    if (hasNews) {
+      return ingestionService.buildHeatmap(level, limit);
+    }
+
     const res = await fetch(
       `${env.AI_SERVICE_URL}/api/v1/sentiment/heatmap?level=${level}&limit=${limit}`,
     );
@@ -37,27 +64,41 @@ export class IntelligenceService {
   ) {
     const unitId = scopeUnitId(query);
 
-    const projects = await prismaRead.project.findMany({
-      where: {
-        status: { in: [ProjectStatus.ONGOING, ProjectStatus.STALLED] },
-        ...(unitId && { adminUnitId: unitId }),
-      },
-      select: {
-        id: true,
-        title: true,
-        budgetAllocated: true,
-        budgetSpent: true,
-        status: true,
-        contractorNid: true,
-        startDate: true,
-        adminUnitId: true,
-        redFlagAlerts: {
-          where: { resolvedAt: null },
-          select: { id: true, flagType: true },
-        },
-      },
-      take: 100,
-    });
+    const projects = env.LIVE_DATA_ONLY
+      ? (await liveDataService.listProjects({
+          ...(unitId && { districtId: unitId }),
+        })).map((p) => ({
+          id: p.id,
+          title: p.title,
+          budgetAllocated: 0,
+          budgetSpent: 0,
+          status: ProjectStatus.ONGOING,
+          contractorNid: null as string | null,
+          startDate: new Date(p.startDate),
+          adminUnitId: p.adminUnitId,
+          redFlagAlerts: [] as Array<{ id: string; flagType: RedFlagType }>,
+        }))
+      : await prismaRead.project.findMany({
+          where: {
+            status: { in: [ProjectStatus.ONGOING, ProjectStatus.STALLED] },
+            ...(unitId && { adminUnitId: unitId }),
+          },
+          select: {
+            id: true,
+            title: true,
+            budgetAllocated: true,
+            budgetSpent: true,
+            status: true,
+            contractorNid: true,
+            startDate: true,
+            adminUnitId: true,
+            redFlagAlerts: {
+              where: { resolvedAt: null },
+              select: { id: true, flagType: true },
+            },
+          },
+          take: 100,
+        });
 
     const contractorNids = [
       ...new Set(projects.map((p) => p.contractorNid).filter(Boolean) as string[]),
@@ -108,6 +149,16 @@ export class IntelligenceService {
     });
     if (!res.ok) throw new Error("Predictive scoring unavailable");
     const aiResult = (await res.json()) as { scores: PredictiveScore[]; scanned_at: string };
+
+    if (env.LIVE_DATA_ONLY) {
+      return {
+        scanned_at: aiResult.scanned_at,
+        scores: aiResult.scores,
+        alerts_created: 0,
+        created: [],
+        dataSource: "live_pipeline",
+      };
+    }
 
     const created: Array<{ alertId: string; projectId: string; confidence: number }> = [];
 
@@ -286,7 +337,7 @@ export class IntelligenceService {
   async getHazardOverlay(query: DashboardScopeQuery = {}, season = "monsoon") {
     const unitId = scopeUnitId(query);
 
-    const STATIC_ZONES = [
+    const STATIC_ZONES: HazardZoneRecord[] = [
       {
         zone_id: "flood-barishal",
         name: "Barishal Coastal Flood Plain",
@@ -308,6 +359,17 @@ export class IntelligenceService {
         lat: 22.35,
         lng: 91.78,
         radius_km: 100,
+      },
+      {
+        zone_id: "flood-chattogram",
+        name: "Chattogram Coastal & Low-Lying Flood Zone",
+        name_bn: "চট্টগ্রাম উপকূলীয় ও নিম্নাঞ্চল বন্যা অঞ্চল",
+        hazard_type: "flood",
+        risk_level: 4,
+        division: "Chattogram",
+        lat: 22.335,
+        lng: 91.834,
+        radius_km: 65,
       },
       {
         zone_id: "flood-sylhet",
@@ -375,10 +437,144 @@ export class IntelligenceService {
     if (!res.ok) throw new Error("Hazard overlay unavailable");
     const overlay = (await res.json()) as Record<string, unknown>;
 
+    const { pipelineService } = await import("../pipeline/pipeline.service");
+    const liveSignals = await pipelineService.getHazardSignals();
+    const dynamicZones =
+      liveSignals && Array.isArray(liveSignals.signals)
+        ? (liveSignals.signals as Array<{
+            zone_id: string;
+            hazard_type: string;
+            risk_level: number;
+            division: string;
+            article_count: number;
+          }>).map((s) => ({
+            zone_id: s.zone_id,
+            name: `Live ${s.hazard_type} — ${s.division}`,
+            name_bn: `লাইভ ${s.hazard_type === "flood" ? "বন্যা" : "ঘূর্ণিঝড়"} — ${s.division}`,
+            hazard_type: s.hazard_type,
+            risk_level: s.risk_level,
+            division: s.division,
+            lat: STATIC_ZONES.find((z) => normalizeDivisionName(z.division) === normalizeDivisionName(s.division))?.lat ?? 23.68,
+            lng: STATIC_ZONES.find((z) => normalizeDivisionName(z.division) === normalizeDivisionName(s.division))?.lng ?? 90.35,
+            radius_km: 60 + s.article_count * 10,
+            source: "news_pipeline",
+          }))
+        : [];
+
+    const mergedZones = [...dynamicZones, ...STATIC_ZONES];
+
+    let weatherLive: Record<string, unknown> | null = null;
+    const scopeCtx = await resolveScopeContext(query);
+    try {
+      const { weatherService } = await import("../weather/weather.service");
+      weatherLive = (await weatherService.getLive(query)) as unknown as Record<string, unknown>;
+    } catch {
+      weatherLive = null;
+    }
+
+    const weatherObs = (weatherLive?.observations ?? []) as Array<{
+      division: string;
+      district?: string | null;
+      name_bn: string;
+      lat: number;
+      lng: number;
+      flood_risk: number;
+      cyclone_risk: number;
+      heat_stress: number;
+      precipitation_mm: number;
+      rain_24h_mm?: number;
+      wind_speed_kmh: number;
+      temp_c: number;
+      population_at_risk: number;
+      weather_label: string;
+      weather_label_bn: string;
+    }>;
+
+    const weatherZones = weatherObs
+      .filter((o) => {
+        const floodThreshold = o.district ? 2 : 3;
+        return (
+          o.flood_risk >= floodThreshold ||
+          o.cyclone_risk >= 3 ||
+          o.heat_stress >= 4
+        );
+      })
+      .flatMap((o) => {
+        const zones: HazardZoneRecord[] = [];
+        if (o.flood_risk >= (o.district ? 2 : 3)) {
+          zones.push({
+            zone_id: `weather-flood-${(o.district ?? o.division).toLowerCase().replace(/\s+/g, "-")}`,
+            name: `Live Flood Risk — ${o.district ?? o.division}`,
+            name_bn: `লাইভ বন্যা ঝুঁকি — ${o.name_bn}`,
+            hazard_type: "flood",
+            risk_level: o.flood_risk,
+            division: o.division,
+            lat: o.lat,
+            lng: o.lng,
+            radius_km: 40 + o.flood_risk * 15,
+            source: "open-meteo",
+            precipitation_mm: o.precipitation_mm,
+            population_at_risk: o.population_at_risk,
+          });
+        }
+        if (o.cyclone_risk >= 3) {
+          zones.push({
+            zone_id: `weather-cyclone-${o.division.toLowerCase()}`,
+            name: `Live Cyclone Risk — ${o.division}`,
+            name_bn: `লাইভ ঘূর্ণিঝড় ঝুঁকি — ${o.name_bn}`,
+            hazard_type: "cyclone",
+            risk_level: o.cyclone_risk,
+            division: o.division,
+            lat: o.lat,
+            lng: o.lng,
+            radius_km: 50 + o.cyclone_risk * 20,
+            source: "open-meteo",
+            wind_speed_kmh: o.wind_speed_kmh,
+            population_at_risk: o.population_at_risk,
+          });
+        }
+        if (o.heat_stress >= 4) {
+          zones.push({
+            zone_id: `weather-heat-${o.division.toLowerCase()}`,
+            name: `Heat Stress — ${o.division}`,
+            name_bn: `তাপপ্রবাহ ঝুঁকি — ${o.name_bn}`,
+            hazard_type: "heat",
+            risk_level: o.heat_stress,
+            division: o.division,
+            lat: o.lat,
+            lng: o.lng,
+            radius_km: 35,
+            source: "open-meteo",
+            temp_c: o.temp_c,
+            population_at_risk: o.population_at_risk,
+          });
+        }
+        return zones;
+      });
+
+    const allZones = [...weatherZones, ...mergedZones].filter((z) =>
+      matchesScopeDistrict(
+        "district" in z && typeof (z as HazardZoneRecord).district === "string"
+          ? (z as HazardZoneRecord).district!
+          : null,
+        z.division,
+        scopeCtx,
+      ),
+    );
+
     return {
       ...overlay,
-      zones: STATIC_ZONES,
+      zones: allZones,
+      live_signals: liveSignals?.signals ?? [],
+      weather: weatherLive,
+      scope: scopeCtx,
       projects_mapped: projectInputs.length,
+      data_source:
+        weatherZones.length > 0
+          ? "open-meteo+gdacs"
+          : dynamicZones.length > 0
+            ? "news_rss_google"
+            : "static_baseline",
     };
   }
 }

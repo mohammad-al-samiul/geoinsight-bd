@@ -33,6 +33,7 @@ class BriefingService:
                     "completion_rate": data.completion_rate,
                     "open_alerts": data.open_alerts,
                     "bullets": [b.text for b in bullets],
+                    "news_headlines": [h.model_dump() for h in data.news_headlines[:5]],
                 },
                 ensure_ascii=False,
             )
@@ -112,6 +113,18 @@ class BriefingService:
                     f"(margin {arb.margin_pct:.1f}%)."
                 )
             out.append(BriefingBullet(text=text, category="arbitrage", priority=3))
+
+        for headline in data.news_headlines[:2]:
+            district = headline.district or ("জাতীয়" if bn else "National")
+            if bn:
+                text = f"সংবাদ ({headline.source}): {headline.title[:120]}"
+                if headline.district:
+                    text += f" — {district}"
+            else:
+                text = f"News ({headline.source}): {headline.title[:120]}"
+                if headline.district:
+                    text += f" — {district}"
+            out.append(BriefingBullet(text=text, category="news", priority=2))
 
         if not out:
             if bn:

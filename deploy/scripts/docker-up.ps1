@@ -11,6 +11,19 @@ if (-not (Test-Path "$Root\.env")) {
 
 Set-Location $Root
 
+function Get-EnvValue {
+  param([string]$Name, [string]$Default)
+  $match = Select-String -Path "$Root\.env" -Pattern "^\s*$([regex]::Escape($Name))\s*=" |
+    Select-Object -Last 1
+  if ($match) {
+    return ($match.Line -split "=", 2)[1].Trim().Trim('"').Trim("'")
+  }
+  return $Default
+}
+
+$DashboardPort = [int](Get-EnvValue "DASHBOARD_PORT" "3000")
+$ApiPort = [int](Get-EnvValue "API_GATEWAY_PORT" "4800")
+
 function Test-DockerDaemon {
   docker info *> $null
   return $LASTEXITCODE -eq 0
@@ -43,6 +56,24 @@ function Start-DockerDesktopIfNeeded {
   return $false
 }
 
+function Invoke-DockerCompose {
+  param([string[]]$Arguments)
+  # Docker Compose writes progress to stderr; do not treat that as a PowerShell error.
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  & docker compose -f docker-compose.yml -f docker-compose.apps.yml @Arguments 2>&1 |
+    ForEach-Object {
+      if ($_ -is [System.Management.Automation.ErrorRecord]) {
+        Write-Host $_.ToString()
+      } else {
+        Write-Host $_
+      }
+    }
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $prevEap
+  return $code
+}
+
 if (-not (Start-DockerDesktopIfNeeded)) {
   Write-Host ""
   Write-Host "ERROR: Docker Desktop is not running." -ForegroundColor Red
@@ -51,8 +82,8 @@ if (-not (Start-DockerDesktopIfNeeded)) {
   exit 1
 }
 
-# Stop local dev servers that block Docker ports (optional; 8000 often reserved by Windows Hyper-V)
-foreach ($port in @(3000, 4000)) {
+# Stop local dev servers that block Docker ports
+foreach ($port in @($DashboardPort, $ApiPort)) {
   $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
   foreach ($conn in $conns) {
     $proc = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
@@ -65,18 +96,48 @@ foreach ($port in @(3000, 4000)) {
 Start-Sleep -Seconds 2
 
 Write-Host "Starting GeoInsight BD (Docker full stack)..." -ForegroundColor Cyan
-docker compose -f docker-compose.yml -f docker-compose.apps.yml up -d --build
-if ($LASTEXITCODE -ne 0) {
+Write-Host "  Dashboard port: $DashboardPort | API port: $ApiPort" -ForegroundColor DarkGray
+
+$composeExit = Invoke-DockerCompose -Arguments @("up", "-d", "--build")
+if ($composeExit -ne 0) {
   Write-Host ""
-  Write-Host "ERROR: docker compose failed. Check logs:" -ForegroundColor Red
+  Write-Host "ERROR: docker compose failed (exit $composeExit). Check logs:" -ForegroundColor Red
   Write-Host "  docker compose -f docker-compose.yml -f docker-compose.apps.yml logs --tail 50" -ForegroundColor White
-  exit $LASTEXITCODE
+  Write-Host ""
+  Write-Host "Windows Hyper-V often reserves ports 4000, 8000, 6379, 6432." -ForegroundColor Yellow
+  Write-Host "  Keep API_GATEWAY_PORT=4800 in .env (already set)." -ForegroundColor Yellow
+  exit $composeExit
 }
 
 Write-Host ""
-Write-Host "Dashboard:  http://localhost:3000  (open this in browser)" -ForegroundColor Green
-Write-Host "API:        http://localhost:4000/api/v1/health" -ForegroundColor Green
+Write-Host "Waiting for services to become healthy..." -ForegroundColor DarkGray
+$deadline = (Get-Date).AddMinutes(3)
+$ready = $false
+while ((Get-Date) -lt $deadline) {
+  try {
+    $health = Invoke-RestMethod -Uri "http://localhost:$ApiPort/api/v1/health" -TimeoutSec 5
+    if ($health.status -eq "healthy") {
+      $ready = $true
+      break
+    }
+  } catch {
+    # still starting
+  }
+  Start-Sleep -Seconds 3
+}
+
+Write-Host ""
+if ($ready) {
+  Write-Host "All core services are up." -ForegroundColor Green
+} else {
+  Write-Host "WARNING: API health check timed out - containers may still be starting." -ForegroundColor Yellow
+  Write-Host "  docker compose -f docker-compose.yml -f docker-compose.apps.yml logs api-gateway --tail 30" -ForegroundColor White
+}
+
+Write-Host ""
+Write-Host "Dashboard:  http://localhost:$DashboardPort  (open this in browser)" -ForegroundColor Green
+Write-Host "API:        http://localhost:$ApiPort/api/v1/health" -ForegroundColor Green
 Write-Host "AI:         internal ai-analytics:8000 (via API gateway)" -ForegroundColor Green
-Write-Host "Login:      pmo@geoinsight.gov.bd / ChangeMe@123" -ForegroundColor Green
+Write-Host 'Login:      pmo@geoinsight.gov.bd / ChangeMe@123' -ForegroundColor Green
 Write-Host ""
 docker compose -f docker-compose.yml -f docker-compose.apps.yml ps

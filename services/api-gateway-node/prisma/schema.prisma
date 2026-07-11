@@ -100,6 +100,24 @@ enum RbacAction {
   APPROVE
 }
 
+enum ExternalArticleSource {
+  RSS_NEWSPAPER
+  GOOGLE_NEWS
+}
+
+enum IngestionSentiment {
+  Grievance
+  Demand
+  Neutral
+}
+
+enum LiveSignalType {
+  PROJECT
+  REPRESENTATIVE
+  ALERT
+  POLICY
+}
+
 // ── Hierarchical Administrative Structure (Bangladesh) ───────────────────────
 
 model AdminUnit {
@@ -377,6 +395,11 @@ model AgroMarket {
   lng  Float
   type AgroMarketType
 
+  /// Live price from commodity pipeline (BDT per kg)
+  commodityCode  String?   @map("commodity_code") @db.VarChar(50)
+  priceBdtPerKg  Decimal?  @map("price_bdt_per_kg") @db.Decimal(18, 4)
+  priceUpdatedAt DateTime? @map("price_updated_at") @db.Timestamptz
+
   adminUnitId String    @map("admin_unit_id") @db.Uuid
   adminUnit   AdminUnit @relation(fields: [adminUnitId], references: [id], onDelete: Restrict)
 
@@ -411,4 +434,107 @@ model BlockchainMilestoneQueue {
   @@index([representativeId, status])
   @@index([projectId, status])
   @@map("blockchain_milestone_queue")
+}
+
+/// Online news / Google News articles ingested for sentiment intelligence
+model ExternalArticle {
+  id                String                @id @default(uuid()) @db.Uuid
+  sourceType        ExternalArticleSource @map("source_type")
+  sourceName        String                @map("source_name") @db.VarChar(128)
+  title             String                @db.Text
+  summary           String?               @db.Text
+  url               String                @unique @db.VarChar(2048)
+  publishedAt       DateTime?             @map("published_at") @db.Timestamptz
+  district          String?               @db.VarChar(64)
+  division          String?               @db.VarChar(64)
+  sentimentCategory IngestionSentiment?   @map("sentiment_category")
+  sentimentScore    Decimal?              @map("sentiment_score") @db.Decimal(6, 4)
+  language          String                @default("bn") @db.VarChar(8)
+  fetchedAt         DateTime              @default(now()) @map("fetched_at") @db.Timestamptz
+
+  @@index([fetchedAt(sort: Desc)])
+  @@index([district, sentimentCategory])
+  @@index([sourceType, publishedAt(sort: Desc)])
+  @@map("external_articles")
+}
+
+/// Entities extracted from live news — replaces seed/demo data when LIVE_DATA_ONLY=true
+model LiveSignal {
+  id                String           @id @default(uuid()) @db.Uuid
+  signalType        LiveSignalType   @map("signal_type")
+  title             String           @db.Text
+  body              String?          @db.Text
+  url               String           @unique @db.VarChar(2048)
+  sourceName        String           @map("source_name") @db.VarChar(128)
+  district          String?          @db.VarChar(64)
+  division          String?          @db.VarChar(64)
+  adminUnitId       String?          @map("admin_unit_id") @db.Uuid
+  severity          Int?
+  flagType          String?          @map("flag_type") @db.VarChar(32)
+  sentimentCategory IngestionSentiment? @map("sentiment_category")
+  articleId         String?          @map("article_id") @db.Uuid
+  publishedAt       DateTime?        @map("published_at") @db.Timestamptz
+  resolvedAt        DateTime?        @map("resolved_at") @db.Timestamptz
+  resolvedById      String?          @map("resolved_by") @db.Uuid
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([signalType, createdAt(sort: Desc)])
+  @@index([signalType, resolvedAt])
+  @@index([district, signalType])
+  @@index([adminUnitId])
+  @@map("live_signals")
+}
+
+/// Live weather observations per division (Open-Meteo pipeline)
+model WeatherObservation {
+  id              String   @id @default(uuid()) @db.Uuid
+  division        String   @db.VarChar(64)
+  district        String?  @db.VarChar(64)
+  nameBn          String   @map("name_bn") @db.VarChar(64)
+  lat             Float
+  lng             Float
+  tempC           Decimal  @map("temp_c") @db.Decimal(5, 2)
+  humidityPct     Int      @map("humidity_pct")
+  precipitationMm Decimal  @map("precipitation_mm") @db.Decimal(8, 2)
+  windSpeedKmh    Decimal  @map("wind_speed_kmh") @db.Decimal(6, 2)
+  weatherCode     Int      @map("weather_code")
+  weatherLabel    String   @map("weather_label") @db.VarChar(64)
+  weatherLabelBn  String   @map("weather_label_bn") @db.VarChar(64)
+  floodRisk       Int      @map("flood_risk")
+  cycloneRisk     Int      @map("cyclone_risk")
+  heatStress      Int      @map("heat_stress")
+  populationAtRisk Int     @map("population_at_risk")
+  source          String   @default("open-meteo") @db.VarChar(32)
+  recordedAt      DateTime @map("recorded_at") @db.Timestamptz
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([division, recordedAt(sort: Desc)])
+  @@index([district, recordedAt(sort: Desc)])
+  @@index([recordedAt(sort: Desc)])
+  @@map("weather_observations")
+}
+
+/// Active disaster alerts (GDACS + news pipeline)
+model DisasterAlert {
+  id               String    @id @default(uuid()) @db.Uuid
+  externalId       String    @unique @map("external_id") @db.VarChar(512)
+  alertType        String    @map("alert_type") @db.VarChar(32)
+  severity         Int
+  title            String    @db.Text
+  titleBn          String?   @map("title_bn") @db.Text
+  description      String?   @db.Text
+  division         String?   @db.VarChar(64)
+  lat              Float?
+  lng              Float?
+  populationAtRisk Int?      @map("population_at_risk")
+  validFrom        DateTime  @map("valid_from") @db.Timestamptz
+  validTo          DateTime? @map("valid_to") @db.Timestamptz
+  source           String    @default("gdacs") @db.VarChar(32)
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([alertType, isActive])
+  @@index([division, isActive])
+  @@map("disaster_alerts")
 }

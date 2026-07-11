@@ -43,7 +43,10 @@ class ProcurementAdvisor:
         self._ollama = OllamaClient(settings) if settings else None
 
     async def advise(self, req: ProcurementAdviceRequest) -> ProcurementAdviceResponse:
-        quotes = await self._scraper.scrape_commodity(req.commodity.lower())
+        if req.market_quotes and len(req.market_quotes) > 0:
+            quotes = req.market_quotes
+        else:
+            quotes = await self._scraper.scrape_commodity(req.commodity.lower())
         arb = optimize_arbitrage(quotes, req.quantity_mt)
 
         def to_option(row: object) -> ProcurementOption:

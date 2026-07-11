@@ -7,7 +7,7 @@ class CommodityQuote(BaseModel):
     commodity: str
     unit_price_usd: float = Field(ge=0)
     shipping_cost_usd: float = Field(ge=0)
-    tariff_rate: float = Field(ge=0, le=1, description="0–1 fraction")
+    tariff_rate: float = Field(ge=0, le=1, default=0.05, description="0–1 fraction")
     reliability_score: float = Field(ge=0, le=1, default=0.9)
 
 

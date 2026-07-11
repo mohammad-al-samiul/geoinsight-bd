@@ -76,4 +76,7 @@ export interface AgroMarketRow {
   lng: number;
   type: string;
   adminUnitId: string;
+  commodityCode?: string | null;
+  priceBdtPerKg?: string | number | null;
+  priceUpdatedAt?: string | null;
 }

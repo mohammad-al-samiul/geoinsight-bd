@@ -33,6 +33,14 @@ class ArbitrageInsight(BaseModel):
     margin_pct: float
 
 
+class NewsHeadline(BaseModel):
+    title: str
+    source: str
+    district: str | None = None
+    sentiment: str | None = None
+    url: str | None = None
+
+
 class BriefingInput(BaseModel):
     lang: str = Field(default="bn", pattern="^(bn|en)$")
     scope_label: str = "National"
@@ -43,6 +51,7 @@ class BriefingInput(BaseModel):
     budget_overruns: list[BudgetOverrunProject] = Field(default_factory=list)
     new_red_flags: list[RedFlagSummary] = Field(default_factory=list)
     arbitrage_insights: list[ArbitrageInsight] = Field(default_factory=list)
+    news_headlines: list[NewsHeadline] = Field(default_factory=list)
 
 
 class BriefingBullet(BaseModel):

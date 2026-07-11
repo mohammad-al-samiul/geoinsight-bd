@@ -133,60 +133,89 @@ export function AlertDetailModal({
           </div>
 
           <div className="rounded-lg border border-border/60 p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h4 className="text-sm font-semibold">Immutable Ledger Verification</h4>
-              <Badge variant="outline" className={cn("gap-1", status.className)}>
-                <StatusIcon className="h-3 w-3" />
-                {status.label}
-              </Badge>
-            </div>
-
-            {alert.blockchainHash ? (
-              <div className="space-y-3">
-                <div>
-                  <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
-                    SHA-256 Block Hash
-                  </p>
-                  <div className="flex items-start gap-2">
-                    <code className="flex-1 break-all rounded-md bg-background/80 p-2 text-[11px] text-primary">
-                      {alert.blockchainHash}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0"
-                      onClick={copyHash}
-                      aria-label="Copy hash"
-                    >
-                      {copied ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
+            {alert.live ? (
+              <>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-semibold">Live News Source</h4>
+                  <Badge variant="outline" className="gap-1 border-sky-500/40 bg-sky-500/10 text-sky-400">
+                    <Link2 className="h-3 w-3" />
+                    Pipeline
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  This alert was extracted in real time from Bangladeshi news feeds
+                  {alert.sourceName ? ` (${alert.sourceName})` : ""}.
+                </p>
+                {alert.sourceUrl && (
+                  <a
+                    href={alert.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
+                    View original article
+                  </a>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-semibold">Immutable Ledger Verification</h4>
+                  <Badge variant="outline" className={cn("gap-1", status.className)}>
+                    <StatusIcon className="h-3 w-3" />
+                    {status.label}
+                  </Badge>
                 </div>
 
-                {alert.fabricTxId && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Link2 className="h-3.5 w-3.5" />
-                    Fabric TX:{" "}
-                    <span className="font-mono text-foreground">{alert.fabricTxId}</span>
-                  </div>
-                )}
+                {alert.blockchainHash ? (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
+                        SHA-256 Block Hash
+                      </p>
+                      <div className="flex items-start gap-2">
+                        <code className="flex-1 break-all rounded-md bg-background/80 p-2 text-[11px] text-primary">
+                          {alert.blockchainHash}
+                        </code>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0"
+                          onClick={copyHash}
+                          aria-label="Copy hash"
+                        >
+                          {copied ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
 
-                {alert.verificationStatus === "VERIFIED" && (
-                  <p className="flex items-center gap-2 text-xs text-emerald-400">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    Hash matches Hyperledger Fabric anchor — record is tamper-evident.
+                    {alert.fabricTxId && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Link2 className="h-3.5 w-3.5" />
+                        Fabric TX:{" "}
+                        <span className="font-mono text-foreground">{alert.fabricTxId}</span>
+                      </div>
+                    )}
+
+                    {alert.verificationStatus === "VERIFIED" && (
+                      <p className="flex items-center gap-2 text-xs text-emerald-400">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Hash matches Hyperledger Fabric anchor — record is tamper-evident.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    This alert has not been anchored to the permissioned ledger yet. Anchoring
+                    is queued by the blockchain milestone worker.
                   </p>
                 )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                This alert has not been anchored to the permissioned ledger yet. Anchoring
-                is queued by the blockchain milestone worker.
-              </p>
+              </>
             )}
           </div>
 

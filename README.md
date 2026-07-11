@@ -1652,6 +1652,45 @@ VALUES (
 
 ---
 
+## Online News Ingestion (RSS + Google News)
+
+Automatically collects headlines from **Prothom Alo, Daily Star, BDNews24, Jugantor, Samakal** and **Google News** (government, development, agriculture, corruption, economy).
+
+| Step | Detail |
+|------|--------|
+| **Fetch** | AI service `POST /api/v1/ingestion/fetch` |
+| **Store** | Gateway upserts to `external_articles` table |
+| **Analyze** | Bangla-BERT sentiment (Grievance / Demand / Neutral) |
+| **Auto sync** | Gateway worker every 15 min (`INGESTION_INTERVAL_MS=900000`) |
+| **Manual sync** | Dashboard → Sentiment → **Fetch news now** |
+
+**Env vars** (root `.env`):
+
+```env
+INGESTION_ENABLED=true
+INGESTION_INTERVAL_MS=900000
+INGESTION_RUN_ON_START=true
+INGESTION_STARTUP_DELAY_MS=45000
+```
+
+**API (authenticated):**
+
+| Endpoint | Role |
+|----------|------|
+| `POST /api/v1/ingestion/sync` | PMO, Minister |
+| `GET /api/v1/ingestion/articles` | PMO, Minister, DC |
+| `GET /api/v1/ingestion/stats` | PMO, Minister |
+
+**Used by:** Sentiment heatmap, PM Briefing, Sovereign LLM context, global search.
+
+Docker rebuild after code changes:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.apps.yml up -d --build api-gateway ai-analytics
+```
+
+---
+
 ## Running Tests
 
 ### API Gateway (Jest + Supertest)
