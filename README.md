@@ -1,4 +1,4 @@
-# GeoInsight BD
+﻿# GeoInsight BD
 
 **National governance intelligence platform** for Bangladesh — hierarchical admin dashboards, real-time KPI feeds, Bangla sentiment analytics, sovereign on-prem LLM, and Hyperledger-backed project milestones.
 
@@ -15,7 +15,6 @@
 - [Overview](#overview)
 - [Features](#features)
 - [System Design](#system-design)
-  - [Architecture Diagrams (Shared)](#architecture-diagrams-shared)
   - [সিস্টেম ডিজাইন (বাংলা)](#সিস্টেম-ডিজাইন-বাংলা)
   - [System Design (English)](#system-design-english)
 - [Quick Start](#quick-start)
@@ -140,13 +139,35 @@ cp .env.example .env          # প্রথমবার
 | **বাংলা** | [সিস্টেম ডিজাইন (বাংলা)](#সিস্টেম-ডিজাইন-বাংলা) |
 | **English** | [System Design (English)](#system-design-english) |
 
-Architecture **diagrams** are shared below. **Explanations** are provided in both Bengali and English.
+নিচে **বাংলা** ও **English** — দুই ভাষায় আর্কিটেকচার ডায়াগ্রাম ও ব্যাখ্যা আছে। প্রতিটি সেকশনে চিত্রের আগে/পরে সংক্ষিপ্ত বর্ণনা দেওয়া হয়েছে।
 
 ---
 
-### Architecture Diagrams (Shared)
+### সিস্টেম ডিজাইন (বাংলা)
 
-#### High-Level Architecture
+#### ১. উচ্চ-স্তরের আর্কিটেকচার
+
+GeoInsight BD একটি **মডুলার মনোরেপো** — চারটি স্তরে ভাগ: Presentation (Dashboard), Application (Gateway), Intelligence (AI), Data (DB/Cache/Storage)। ব্রাউজার সরাসরি Gateway-এ যায় না; Next.js BFF cookie দিয়ে auth করে। Gateway PgBouncer দিয়ে read/write split DB ব্যবহার করে, RabbitMQ দিয়ে async job চালায়, Socket.io দিয়ে live update পাঠায়।
+
+| স্তর | সেবা | দায়িত্ব |
+|------|------|----------|
+| **Presentation** | Next.js Dashboard (:3000) | UI, BFF auth proxy, Socket.io client |
+| **Application** | API Gateway (:4000) | REST API, JWT/RBAC, RabbitMQ consumer |
+| **Intelligence** | AI Analytics (:8000) | Bangla-BERT, Ollama, arbitrage worker |
+| **Data** | TimescaleDB + PgBouncer + Redis + MinIO | ডেটা সংরক্ষণ, ক্যাশ, ফাইল |
+| **Messaging** | RabbitMQ | অ্যাসিঙ্ক ইভেন্ট ও AI job queue |
+| **Ledger** | Hyperledger Fabric (ঐচ্ছিক) | প্রকল্প milestone anchoring |
+
+**নকশার মূলনীতি:**
+
+1. **টোকেন `localStorage`-এ নয়** — HTTP-only cookie (Next.js BFF)
+2. **Tenant isolation** — প্রতিটি query `admin_unit_id` + role দিয়ে সীমিত
+3. **Read/Write split** — `prismaRead` → replica; `prismaWrite` → primary
+4. **AI সার্বভৌমতা** — Ollama on-prem; production-এ বাইরের LLM API নয়
+5. **Event-driven** — RabbitMQ → Socket.io hierarchy broadcast
+6. **Idempotent seed** — `deploy/scripts/*.sql` বারবার চালানো safe
+
+নিচের চিত্রে দেখুন কীভাবে User → Dashboard → Gateway → DB/AI/MQ সংযুক্ত:
 
 ```mermaid
 flowchart TB
@@ -218,7 +239,22 @@ flowchart TB
   REST --> Fabric
 ```
 
-#### Component Diagram
+**চিত্র ব্যাখ্যা:** বামে `Browser` — PMO/Minister/DC লগইন করে। `BFF_PROXY` cookie থেকে JWT নিয়ে Gateway-এ পাঠায়। `GovConsumer` RabbitMQ থেকে alert/KPI message নিয়ে `WS` (Socket.io) দিয়ে room-এ broadcast করে। `AI` layer আলাদা FastAPI সার্ভিস — Gateway orchestration করে।
+
+---
+
+#### ২. কম্পোনেন্ট ডায়াগ্রাম
+
+তিনটি মূল সার্ভিস: **Dashboard** (UI + BFF), **Gateway** (business logic + DB), **AI Analytics** (ML/LLM)। Dashboard-এর hooks BFF route দিয়ে Gateway module-এ hit করে; real-time-এর জন্য আলাদা Socket.io connection।
+
+| কম্পোনেন্ট | ফোল্ডার | কাজ |
+|-----------|---------|-----|
+| **Dashboard** | `web/dashboard-nextjs` | ১৭+ পেজ, hooks, i18n (bn/en) |
+| **BFF** | `src/app/api/auth`, `api/proxy` | Cookie-based auth, gateway proxy |
+| **Gateway** | `services/api-gateway-node` | ২০+ domain module, Prisma, Socket.io |
+| **AI Service** | `services/ai-analytics-python` | briefing, sentiment, sovereign LLM, predictive |
+
+Gateway **orchestrator** — DB থেকে ডেটা নিয়ে AI-কে পাঠায়, ফল Dashboard-এ ফেরত দেয়।
 
 ```mermaid
 flowchart LR
@@ -260,7 +296,28 @@ flowchart LR
   FastAPI --> SovereignSvc
 ```
 
-#### Request & Auth Flow
+**চিত্র ব্যাখ্যা:** `Pages` → `Hooks` → `BFF` — REST call path। `useSocket` সরাসরি Gateway-এ WebSocket খোলে (BFF দিয়ে proxy নয়)। `Modules` (যেমন `briefing`, `dashboard`, `kpi`) Prisma দিয়ে DB পড়ে, প্রয়োজনে FastAPI call করে।
+
+---
+
+#### ৩. অনুরোধ ও Authentication Flow
+
+Login-এ password Gateway-এ verify হয়; token browser-এ JSON হিসেবে রাখা হয় না — **HTTP-only cookie**-তে set হয়। প্রতিটি API call BFF দিয়ে যায়, যেখানে cookie থেকে Bearer header বানানো হয়।
+
+| ধাপ | বিবরণ |
+|-----|--------|
+| ১. Login | Browser → `/api/auth/login` → Gateway → bcrypt verify |
+| ২. Cookie | `gi_access_token`, `gi_refresh_token` HTTP-only cookie-তে set |
+| ৩. API call | `/api/proxy/*` → cookie থেকে Bearer token → Gateway |
+| ৪. RBAC | JWT verify + role + admin unit scope check |
+| ৫. Response | JSON Dashboard-এ ফেরত |
+
+| প্যারামিটার | মান |
+|------------|-----|
+| Access token TTL | ১৫ মিনিট |
+| Refresh token | ৭ দিন, rotation on use |
+| 401 | BFF auto refresh → retry |
+| 403 | `/forbidden` redirect |
 
 ```mermaid
 sequenceDiagram
@@ -296,7 +353,33 @@ sequenceDiagram
   N-->>B: briefing payload
 ```
 
-#### Real-Time Event Flow
+**চিত্র ব্যাখ্যা:** তিনটি flow — (১) Login ও cookie set, (২) সাধারণ DB read, (৩) AI feature যেখানে Gateway প্রথম DB aggregate করে তারপর AI-কে generate করতে দেয়। XSS থেকে রক্ষা পেতে token JavaScript-এ exposed হয় না।
+
+---
+
+#### ৪. রিয়েল-টাইম ইভেন্ট Flow
+
+Red flag বা KPI update হলে Gateway/AI RabbitMQ-তে message publish করে। **Gov Queue Consumer** consume করে admin unit অনুযায়ী Socket room resolve করে — PMO জাতীয় room-এ, Minister নিজ division room-এ পায়।
+
+AI বা Gateway যখন red flag / KPI update তৈরি করে:
+
+1. Message **RabbitMQ** `gov_core_queue`-তে publish
+2. **Gov Queue Consumer** consume করে
+3. `resolveBroadcastRooms(adminUnitId)` — division, district, national room
+4. **Socket.io** emit → Dashboard update (map marker, anomaly feed)
+
+**Socket rooms:**
+
+| Room | Pattern | সদস্য |
+|------|---------|-------|
+| জাতীয় | `room:national` | PMO |
+| বিভাগ | `room:division:{id}` | Minister + PMO |
+| জেলা | `room:district:{id}` | DC + upstream |
+| উপজেলা/ইউনিয়ন | `room:upazila:{id}` | Scoped users |
+
+**ইভেন্ট:** `kpi:update`, `alert:created`, `dashboard:refresh`, `connected`
+
+**Scaling:** Redis adapter — একাধিক Gateway instance-এ broadcast।
 
 ```mermaid
 sequenceDiagram
@@ -314,7 +397,26 @@ sequenceDiagram
   B->>B: Update map markers + anomaly feed
 ```
 
-#### AI Pipeline
+**চিত্র ব্যাখ্যা:** HTTP polling নয় — push model। Chattogram-এ alert হলে শুধু Chattogram division room + national room (PMO) update পায়; অন্য division-এর user দেখে না — **tenant-scoped broadcast**।
+
+---
+
+#### ৫. AI Pipeline
+
+Gateway module DB context তৈরি করে; AI Analytics FastAPI endpoint-এ পাঠায়। Generative কাজ (Briefing, Sovereign LLM) **Ollama**-তে; sentiment **Bangla-BERT**; arbitrage/predictive **heuristic ML**।
+
+| ফিচার | ইনপুট | মডেল | আউটপুট |
+|-------|-------|------|--------|
+| PM Briefing | DB metrics + alerts | Ollama | bullets, narrative, voice |
+| Sovereign LLM | DB context + প্রশ্ন | Ollama | Markdown উত্তর |
+| Sentiment heatmap | ৩৩৩/৯৯৯ stream | Bangla-BERT | Grievance/Demand/Neutral |
+| Predictive red flag | Project budget/history | ML heuristic | confidence % |
+| Procurement | commodity_price_logs | Arbitrage engine | দেশ ranking |
+| Document intel | টেন্ডার text | Ollama + rules | clauses, anomalies |
+| Digital twin | division budgets | simulation | projected completion |
+| Impact simulator | geopolitical sliders | risk engine | ministry impacts |
+
+**লোকাল dev:** `SENTIMENT_USE_MOCK=true`, `ollama run llama3.1:8b`
 
 ```mermaid
 flowchart TB
@@ -373,7 +475,17 @@ flowchart TB
   Citizen --> BERT
 ```
 
-#### Database ER (Core Domain)
+**চিত্র ব্যাখ্যা:** `gateway_ai` layer business context বানায় (কোন division, কোন alert) — raw DB AI-তে যায় না। Sovereign mode-এ সব generative call **on-prem Ollama**-তে; বাইরের OpenAI/Claude API production-এ disabled।
+
+---
+
+#### ৬. ডাটাবেস ডিজাইন
+
+**Engine:** PostgreSQL 16 + TimescaleDB  
+**ORM:** Prisma  
+**Pooling:** PgBouncer — `geoinsight_write` (লেখা), `geoinsight_read` (পড়া)
+
+সব entity `admin_units` hierarchy-র সাথে যুক্ত — project, user, representative, agro market সব `admin_unit_id` দিয়ে scope হয়। নিচের ER চিত্র core relationship দেখায়:
 
 ```mermaid
 erDiagram
@@ -438,7 +550,52 @@ erDiagram
   }
 ```
 
-#### RBAC Flow
+**প্রশাসনিক hierarchy:**
+
+```
+DIVISION (৮)
+  └── DISTRICT (৬৪)
+        └── UPAZILA (~৪৯৫)
+              └── UNION (~৪,৫০০+)
+```
+
+- **Materialized path** (`path`) — hierarchy walk
+- **Denormalized IDs** (`division_id`, `district_id`, `upazila_id`) — দ্রুত scope filter
+- **DB trigger** — insert/update-এ ancestor IDs auto-fill
+
+**মূল টেবিল:**
+
+| টেবিল | উদ্দেশ্য |
+|-------|----------|
+| `admin_units` | বিভাগ → ইউনিয়ন hierarchy |
+| `users` | PMO, Minister, DC, Union Chairman |
+| `representatives` | MP, Minister, DC |
+| `projects` | উন্নয়ন প্রকল্প, বাজেট, status |
+| `red_flag_alerts` | AI anomaly alerts |
+| `kpi_definitions` / `kpi_records` | প্রতিনিধি KPI |
+| `commodity_price_logs` | TimescaleDB — global commodity দাম |
+| `agro_markets` | মান্ডি, হাট, retail |
+| `audit_logs` | user action audit |
+| `blockchain_milestone_queue` | Fabric tx queue |
+
+**চিত্র ব্যাখ্যা:** `AdminUnit` self-referencing tree — সব data এই tree-তে bind। `Project` → `RedFlagAlert` AI anomaly chain। `CommodityPriceLog` time-series — procurement/arbitrage-এ ব্যবহৃত।
+
+---
+
+#### ৭. RBAC ও Multi-Tenancy
+
+প্রতিটি HTTP request JWT verify → RBAC → **unit scope check** পasses করতে হয়। PMO সব division দেখে; Minister শুধু নিজ division subtree; DC district; Union Chairman শুধু নিজ union।
+
+| Role | Tier | Scope | উদাহরণ পেজ |
+|------|------|-------|-----------|
+| `PMO` | ১ | জাতীয় — সব বিভাগ | Briefing, Sovereign AI |
+| `MINISTER` | ২ | এক বিভাগ | KPIs, Projects, Alerts |
+| `DC` | ৩ | এক জেলা | Agro, Map |
+| `UNION_CHAIRMAN` | ৪ | এক ইউনিয়ন | Representatives |
+
+**URL scope:** `?division=&district=&upazila=&union=`
+
+**নিবন্ধন:** `POST /auth/register` — PMO token লাগে। প্রথম PMO: `docker-db-init.sh`
 
 ```mermaid
 flowchart TB
@@ -455,7 +612,19 @@ flowchart TB
   Union --> Handler
 ```
 
-#### Message Queue Topology
+**চিত্র ব্যাখ্যা:** Auth fail → 401; RBAC fail → 403; scope fail → forbidden বা filtered empty result। Sidebar menu-ও role অনুযায়ী hide — কিন্তু security backend middleware-এ enforce হয়।
+
+---
+
+#### ৮. Message Queue Topology
+
+দুই ধরনের queue: **gov_core_queue** (real-time Socket.io broadcast) এবং **geoinsight_exchange** (async AI jobs — arbitrage, sentiment, risk)।
+
+| Queue / Exchange | Routing keys | উদ্দেশ্য |
+|------------------|--------------|----------|
+| `gov_core_queue` | — | Real-time gov events → Socket.io |
+| `geoinsight_exchange` | `gov.arbitrage`, `ai.sentiment`, `ai.risk` | Async AI jobs |
+| `ai_analytics_queue` | exchange-bound | AI worker dispatch |
 
 ```mermaid
 flowchart LR
@@ -491,7 +660,24 @@ flowchart LR
   AICons --> Ex
 ```
 
-#### Deployment — Docker Full Stack
+**চিত্র ব্যাখ্যা:** Gateway alert create করলে `GovQ` → Socket.io। Arbitrage worker commodity price scrape করে `Ex` → Gateway DB persist। Decouple — AI slow হলেও API response block হয় না।
+
+---
+
+#### ৯. Deployment Topology
+
+| পরিবেশ | ফাইল | বর্ণনা |
+|--------|------|--------|
+| **Infrastructure only** | `docker-compose.yml` | Postgres, Redis, RabbitMQ, MinIO |
+| **Full stack (local)** | `+ docker-compose.apps.yml` | + Gateway, AI, Dashboard, db-init |
+| **Production** | `docker-compose.prod.yml` | + nginx TLS, GHCR images |
+| **Observability** | `+ docker-compose.observability.yml` | Prometheus, Grafana |
+
+**Windows one-command:** `.\deploy\scripts\docker-up.ps1`
+
+**Production:** GitHub Actions → GHCR build → VPS SSH deploy
+
+Docker full stack-এ সব service এক `geoinsight_net` network-এ; `db-init` one-shot container seed SQL চালায়:
 
 ```mermaid
 flowchart TB
@@ -523,7 +709,23 @@ flowchart TB
   GW --> MinIO
 ```
 
-#### Security Architecture
+**চিত্র ব্যাখ্যা:** User শুধু `:3000` (Dashboard) দেখে। Gateway `:4000` internal। PgBouncer read/write pool split — replica read load কমায়। Production-এ nginx সামনে TLS terminate করে।
+
+---
+
+#### ১০. Security Architecture
+
+Defense in depth — edge (nginx TLS) → application (BFF cookie, JWT, RBAC) → data (PgBouncer, audit) → sovereign AI (local Ollama, no external API)।
+
+| স্তর | নিয়ন্ত্রণ |
+|------|-----------|
+| Transport | TLS (prod), HSTS |
+| Auth | JWT + refresh rotation, HTTP-only cookies |
+| Authorization | Role + admin-unit tenant isolation |
+| AI | Sovereign mode — local Ollama, verified DB only |
+| Audit | `audit_logs` + blockchain hash on red flags |
+| Rate limit | nginx → gateway → AI (333/999 feeds) |
+| Secrets | `.env` gitignored; browser-এ শুধু `NEXT_PUBLIC_*` |
 
 ```mermaid
 flowchart TB
@@ -559,218 +761,15 @@ flowchart TB
   RBAC2 --> Audit
 ```
 
----
-
-### সিস্টেম ডিজাইন (বাংলা)
-
-> উপরের **Architecture Diagrams** সেকশনের সব Mermaid চিত্র এই ব্যাখ্যার সাথে প্রযোজ্য।
-
-#### ১. উচ্চ-স্তরের আর্কিটেকচার
-
-GeoInsight BD একটি **মডুলার মনোরেপো**। মূল নকশা:
-
-| স্তর | সেবা | দায়িত্ব |
-|------|------|----------|
-| **Presentation** | Next.js Dashboard (:3000) | UI, BFF auth proxy, Socket.io client |
-| **Application** | API Gateway (:4000) | REST API, JWT/RBAC, RabbitMQ consumer |
-| **Intelligence** | AI Analytics (:8000) | Bangla-BERT, Ollama, arbitrage worker |
-| **Data** | TimescaleDB + PgBouncer + Redis + MinIO | ডেটা সংরক্ষণ, ক্যাশ, ফাইল |
-| **Messaging** | RabbitMQ | অ্যাসিঙ্ক ইভেন্ট ও AI job queue |
-| **Ledger** | Hyperledger Fabric (ঐচ্ছিক) | প্রকল্প milestone anchoring |
-
-**নকশার মূলনীতি:**
-
-1. **টোকেন `localStorage`-এ নয়** — HTTP-only cookie (Next.js BFF)
-2. **Tenant isolation** — প্রতিটি query `admin_unit_id` + role দিয়ে সীমিত
-3. **Read/Write split** — `prismaRead` → replica; `prismaWrite` → primary
-4. **AI সার্বভৌমতা** — Ollama on-prem; production-এ বাইরের LLM API নয়
-5. **Event-driven** — RabbitMQ → Socket.io hierarchy broadcast
-6. **Idempotent seed** — `deploy/scripts/*.sql` বারবার চালানো safe
-
-**ডেটা প্রবাহ (সংক্ষেপ):**
-
-```
-ব্রাউজার → Next.js BFF → API Gateway → PostgreSQL
-                              ↓
-                         AI Analytics (FastAPI)
-                              ↓
-                         RabbitMQ → Socket.io → Dashboard (Live)
-```
-
----
-
-#### ২. কম্পোনেন্ট ডায়াগ্রাম
-
-| কম্পোনেন্ট | ফোল্ডার | কাজ |
-|-----------|---------|-----|
-| **Dashboard** | `web/dashboard-nextjs` | ১৭+ পেজ, hooks, i18n (bn/en) |
-| **BFF** | `src/app/api/auth`, `api/proxy` | Cookie-based auth, gateway proxy |
-| **Gateway** | `services/api-gateway-node` | ২০+ domain module, Prisma, Socket.io |
-| **AI Service** | `services/ai-analytics-python` | briefing, sentiment, sovereign LLM, predictive |
-
-Gateway **orchestrator** — DB থেকে ডেটা নিয়ে AI-কে পাঠায়, ফল Dashboard-এ ফেরত দেয়।
-
----
-
-#### ৩. অনুরোধ ও Authentication Flow
-
-| ধাপ | বিবরণ |
-|-----|--------|
-| ১. Login | Browser → `/api/auth/login` → Gateway → bcrypt verify |
-| ২. Cookie | `gi_access_token`, `gi_refresh_token` HTTP-only cookie-তে set |
-| ৩. API call | `/api/proxy/*` → cookie থেকে Bearer token → Gateway |
-| ৪. RBAC | JWT verify + role + admin unit scope check |
-| ৫. Response | JSON Dashboard-এ ফেরত |
-
-| প্যারামিটার | মান |
-|------------|-----|
-| Access token TTL | ১৫ মিনিট |
-| Refresh token | ৭ দিন, rotation on use |
-| 401 | BFF auto refresh → retry |
-| 403 | `/forbidden` redirect |
-
----
-
-#### ৪. রিয়েল-টাইম ইভেন্ট Flow
-
-AI বা Gateway যখন red flag / KPI update তৈরি করে:
-
-1. Message **RabbitMQ** `gov_core_queue`-তে publish
-2. **Gov Queue Consumer** consume করে
-3. `resolveBroadcastRooms(adminUnitId)` — division, district, national room
-4. **Socket.io** emit → Dashboard update (map marker, anomaly feed)
-
-**Socket rooms:**
-
-| Room | Pattern | সদস্য |
-|------|---------|-------|
-| জাতীয় | `room:national` | PMO |
-| বিভাগ | `room:division:{id}` | Minister + PMO |
-| জেলা | `room:district:{id}` | DC + upstream |
-| উপজেলা/ইউনিয়ন | `room:upazila:{id}` | Scoped users |
-
-**ইভেন্ট:** `kpi:update`, `alert:created`, `dashboard:refresh`, `connected`
-
-**Scaling:** Redis adapter — একাধিক Gateway instance-এ broadcast।
-
----
-
-#### ৫. AI Pipeline
-
-| ফিচার | ইনপুট | মডেল | আউটপুট |
-|-------|-------|------|--------|
-| PM Briefing | DB metrics + alerts | Ollama | bullets, narrative, voice |
-| Sovereign LLM | DB context + প্রশ্ন | Ollama | Markdown উত্তর |
-| Sentiment heatmap | ৩৩৩/৯৯৯ stream | Bangla-BERT | Grievance/Demand/Neutral |
-| Predictive red flag | Project budget/history | ML heuristic | confidence % |
-| Procurement | commodity_price_logs | Arbitrage engine | দেশ ranking |
-| Document intel | টেন্ডার text | Ollama + rules | clauses, anomalies |
-| Digital twin | division budgets | simulation | projected completion |
-| Impact simulator | geopolitical sliders | risk engine | ministry impacts |
-
-**লোকাল dev:** `SENTIMENT_USE_MOCK=true`, `ollama run llama3.1:8b`
-
----
-
-#### ৬. ডাটাবেস ডিজাইন
-
-**Engine:** PostgreSQL 16 + TimescaleDB  
-**ORM:** Prisma  
-**Pooling:** PgBouncer — `geoinsight_write` (লেখা), `geoinsight_read` (পড়া)
-
-**প্রশাসনিক hierarchy:**
-
-```
-DIVISION (৮)
-  └── DISTRICT (৬৪)
-        └── UPAZILA (~৪৯৫)
-              └── UNION (~৪,৫০০+)
-```
-
-- **Materialized path** (`path`) — hierarchy walk
-- **Denormalized IDs** (`division_id`, `district_id`, `upazila_id`) — দ্রুত scope filter
-- **DB trigger** — insert/update-এ ancestor IDs auto-fill
-
-**মূল টেবিল:**
-
-| টেবিল | উদ্দেশ্য |
-|-------|----------|
-| `admin_units` | বিভাগ → ইউনিয়ন hierarchy |
-| `users` | PMO, Minister, DC, Union Chairman |
-| `representatives` | MP, Minister, DC |
-| `projects` | উন্নয়ন প্রকল্প, বাজেট, status |
-| `red_flag_alerts` | AI anomaly alerts |
-| `kpi_definitions` / `kpi_records` | প্রতিনিধি KPI |
-| `commodity_price_logs` | TimescaleDB — global commodity দাম |
-| `agro_markets` | মান্ডি, হাট, retail |
-| `audit_logs` | user action audit |
-| `blockchain_milestone_queue` | Fabric tx queue |
-
-**TimescaleDB hypertable:** `commodity_price_logs` — arbitrage matrix, procurement advisor
-
----
-
-#### ৭. RBAC ও Multi-Tenancy
-
-| Role | Tier | Scope | উদাহরণ পেজ |
-|------|------|-------|-----------|
-| `PMO` | ১ | জাতীয় — সব বিভাগ | Briefing, Sovereign AI |
-| `MINISTER` | ২ | এক বিভাগ | KPIs, Projects, Alerts |
-| `DC` | ৩ | এক জেলা | Agro, Map |
-| `UNION_CHAIRMAN` | ৪ | এক ইউনিয়ন | Representatives |
-
-**URL scope:** `?division=&district=&upazila=&union=`
-
-**নিবন্ধন:** `POST /auth/register` — PMO token লাগে। প্রথম PMO: `docker-db-init.sh`
-
----
-
-#### ৮. Message Queue Topology
-
-| Queue / Exchange | Routing keys | উদ্দেশ্য |
-|------------------|--------------|----------|
-| `gov_core_queue` | — | Real-time gov events → Socket.io |
-| `geoinsight_exchange` | `gov.arbitrage`, `ai.sentiment`, `ai.risk` | Async AI jobs |
-| `ai_analytics_queue` | exchange-bound | AI worker dispatch |
-
----
-
-#### ৯. Deployment Topology
-
-| পরিবেশ | ফাইল | বর্ণনা |
-|--------|------|--------|
-| **Infrastructure only** | `docker-compose.yml` | Postgres, Redis, RabbitMQ, MinIO |
-| **Full stack (local)** | `+ docker-compose.apps.yml` | + Gateway, AI, Dashboard, db-init |
-| **Production** | `docker-compose.prod.yml` | + nginx TLS, GHCR images |
-| **Observability** | `+ docker-compose.observability.yml` | Prometheus, Grafana |
-
-**Windows one-command:** `.\deploy\scripts\docker-up.ps1`
-
-**Production:** GitHub Actions → GHCR build → VPS SSH deploy
-
----
-
-#### ১০. Security Architecture
-
-| স্তর | নিয়ন্ত্রণ |
-|------|-----------|
-| Transport | TLS (prod), HSTS |
-| Auth | JWT + refresh rotation, HTTP-only cookies |
-| Authorization | Role + admin-unit tenant isolation |
-| AI | Sovereign mode — local Ollama, verified DB only |
-| Audit | `audit_logs` + blockchain hash on red flags |
-| Rate limit | nginx → gateway → AI (333/999 feeds) |
-| Secrets | `.env` gitignored; browser-এ শুধু `NEXT_PUBLIC_*` |
+**চিত্র ব্যাখ্যা:** Sensitive data (JWT secret, DB password) কখনো browser-এ যায় না। Red flag alert-এ optional **blockchain hash** — tamper-evident audit trail। Sovereign block নিশ্চিত করে citizen data বাইরের cloud LLM-এ upload হয় না।
 
 ---
 
 ### System Design (English)
 
-> All **Architecture Diagrams** in the shared section above apply to this explanation.
-
 #### 1. High-Level Architecture
 
-GeoInsight BD is a **modular monorepo**. Core design:
+GeoInsight BD is a **modular monorepo** split into four layers: Presentation (Dashboard), Application (Gateway), Intelligence (AI), and Data (DB/cache/storage). The browser never talks to the Gateway directly — the Next.js BFF handles auth via cookies. The Gateway uses PgBouncer for read/write DB split, RabbitMQ for async jobs, and Socket.io for live updates.
 
 | Layer | Service | Responsibility |
 |-------|---------|----------------|
@@ -790,19 +789,85 @@ GeoInsight BD is a **modular monorepo**. Core design:
 5. **Event-driven updates** — RabbitMQ → Socket.io hierarchy broadcast
 6. **Idempotent seeds** — `deploy/scripts/*.sql` safe to re-run
 
-**Data flow (summary):**
+The diagram below shows how User → Dashboard → Gateway → DB/AI/MQ connect:
 
+```mermaid
+flowchart TB
+  subgraph clients [Clients]
+    Browser[Browser / Tablet]
+  end
+
+  subgraph presentation [Presentation Layer]
+    NextJS[Next.js Dashboard :3000]
+    BFF_AUTH["/api/auth/*"]
+    BFF_PROXY["/api/proxy/*"]
+  end
+
+  subgraph application [Application Layer]
+    Gateway[API Gateway :4000]
+    REST["/api/v1/* REST"]
+    WS[Socket.io]
+    RBAC[JWT + RBAC Middleware]
+    GovConsumer[Gov Queue Consumer]
+  end
+
+  subgraph intelligence [Intelligence Layer]
+    AI[AI Analytics :8000]
+    BERT[Bangla-BERT]
+    Ollama[Ollama llama3.1]
+    ArbWorker[Arbitrage Worker]
+    AIConsumer[AI Queue Consumer]
+  end
+
+  subgraph data [Data Layer]
+    PgBouncer[(PgBouncer :6432)]
+    PGWrite[(TimescaleDB Primary)]
+    PGRead[(TimescaleDB Replica)]
+    Redis[(Redis)]
+    MinIO[(MinIO S3)]
+  end
+
+  subgraph messaging [Messaging]
+    RMQ[RabbitMQ]
+    Exchange[geoinsight_exchange]
+  end
+
+  subgraph ledger [Optional Ledger]
+    Fabric[Hyperledger Fabric]
+  end
+
+  Browser --> NextJS
+  NextJS --> BFF_AUTH
+  NextJS --> BFF_PROXY
+  Browser -->|WebSocket| WS
+  BFF_AUTH --> REST
+  BFF_PROXY -->|Bearer JWT| REST
+  REST --> RBAC
+  RBAC --> PgBouncer
+  PgBouncer --> PGWrite
+  PgBouncer --> PGRead
+  REST --> Redis
+  REST --> AI
+  REST --> RMQ
+  GovConsumer --> RMQ
+  GovConsumer --> WS
+  AI --> BERT
+  AI --> Ollama
+  AI --> Redis
+  AI --> RMQ
+  AIConsumer --> RMQ
+  ArbWorker --> RMQ
+  REST --> MinIO
+  REST --> Fabric
 ```
-Browser → Next.js BFF → API Gateway → PostgreSQL
-                              ↓
-                         AI Analytics (FastAPI)
-                              ↓
-                         RabbitMQ → Socket.io → Dashboard (Live)
-```
+
+**Diagram notes:** On the left, `Browser` — PMO/Minister/DC users log in. `BFF_PROXY` reads the JWT from cookies and forwards to the Gateway. `GovConsumer` pulls alert/KPI messages from RabbitMQ and broadcasts via `WS` (Socket.io) to rooms. The `AI` layer is a separate FastAPI service — the Gateway orchestrates calls to it.
 
 ---
 
 #### 2. Component Diagram
+
+Three main services: **Dashboard** (UI + BFF), **Gateway** (business logic + DB), **AI Analytics** (ML/LLM). Dashboard hooks hit Gateway modules through BFF routes; real-time uses a separate Socket.io connection.
 
 | Component | Folder | Role |
 |-----------|--------|------|
@@ -813,9 +878,53 @@ Browser → Next.js BFF → API Gateway → PostgreSQL
 
 The Gateway acts as an **orchestrator** — it reads from the database, calls AI services, and returns results to the Dashboard.
 
+```mermaid
+flowchart LR
+  subgraph web [web/dashboard-nextjs]
+    Pages[App Router Pages]
+    Hooks[React Hooks]
+    BFF[Routes /api/auth + /api/proxy]
+    Middleware[Auth Middleware]
+    SocketClient[useSocket]
+  end
+
+  subgraph gateway [services/api-gateway-node]
+    Modules[20+ Domain Modules]
+    Prisma[Prisma Client R/W]
+    SocketServer[Socket.io Server]
+    FabricClient[Fabric Gateway Client]
+    Metrics[Prometheus Middleware]
+  end
+
+  subgraph ai [services/ai-analytics-python]
+    FastAPI[FastAPI Routers]
+    Sentiment[Sentiment Service]
+    BriefingSvc[Briefing Service]
+    SovereignSvc[Sovereign LLM]
+    Predictive[Predictive Engine]
+    Procurement[Procurement Advisor]
+  end
+
+  Pages --> Hooks
+  Hooks --> BFF
+  BFF --> Modules
+  Hooks --> SocketClient
+  SocketClient --> SocketServer
+  Modules --> Prisma
+  Modules --> FastAPI
+  Modules --> FabricClient
+  FastAPI --> Sentiment
+  FastAPI --> BriefingSvc
+  FastAPI --> SovereignSvc
+```
+
+**Diagram notes:** `Pages` → `Hooks` → `BFF` is the REST call path. `useSocket` opens a WebSocket directly to the Gateway (not proxied through BFF). `Modules` (e.g. `briefing`, `dashboard`, `kpi`) read DB via Prisma and call FastAPI when needed.
+
 ---
 
 #### 3. Request & Authentication Flow
+
+On login, the password is verified at the Gateway; tokens are **not** stored in the browser as JSON — they are set in **HTTP-only cookies**. Every API call goes through the BFF, which builds the Bearer header from cookies.
 
 | Step | Detail |
 |------|--------|
@@ -832,9 +941,47 @@ The Gateway acts as an **orchestrator** — it reads from the database, calls AI
 | 401 | BFF auto refresh → retry |
 | 403 | Redirect to `/forbidden` |
 
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant N as Next.js BFF
+  participant G as API Gateway
+  participant DB as PostgreSQL
+  participant AI as AI Service
+
+  Note over B,N: Login
+  B->>N: POST /api/auth/login {email, password}
+  N->>G: POST /api/v1/auth/login
+  G->>DB: Verify user + bcrypt
+  G-->>N: {accessToken, refreshToken}
+  N-->>B: Set HTTP-only cookies gi_access_token, gi_refresh_token
+
+  Note over B,G: Authenticated API call
+  B->>N: GET /api/proxy/dashboard/national
+  N->>N: Read gi_access_token from cookie
+  N->>G: GET /api/v1/dashboard/national Authorization Bearer
+  G->>G: JWT verify + RBAC + unit scope
+  G->>DB: prismaRead.project.findMany(...)
+  G-->>N: JSON response
+  N-->>B: JSON response
+
+  Note over B,AI: AI-backed feature
+  B->>N: GET /api/proxy/briefing/morning?lang=bn
+  N->>G: GET /api/v1/briefing/morning
+  G->>DB: Aggregate metrics + alerts
+  G->>AI: POST /api/v1/briefing/generate
+  AI-->>G: bullets + narrative + voice_text
+  G-->>N: briefing payload
+  N-->>B: briefing payload
+```
+
+**Diagram notes:** Three flows — (1) login and cookie set, (2) standard DB read, (3) AI feature where the Gateway first aggregates DB data then asks AI to generate. Tokens are not exposed to JavaScript, protecting against XSS.
+
 ---
 
 #### 4. Real-Time Event Flow
+
+When a red flag or KPI update occurs, the Gateway/AI publishes a message to RabbitMQ. The **Gov Queue Consumer** consumes it and resolves Socket rooms by admin unit — PMO gets the national room, Ministers get their division room.
 
 When AI or the Gateway creates a red flag or KPI update:
 
@@ -856,9 +1003,29 @@ When AI or the Gateway creates a red flag or KPI update:
 
 **Scaling:** Redis adapter — broadcast across multiple Gateway instances.
 
+```mermaid
+sequenceDiagram
+  participant AI as AI / Gateway
+  participant RMQ as RabbitMQ
+  participant G as Gov Queue Consumer
+  participant SIO as Socket.io
+  participant B as Dashboard Browser
+
+  AI->>RMQ: Publish gov_core_queue {type: alert_created, adminUnitId, payload}
+  RMQ->>G: Consume message
+  G->>G: resolveBroadcastRooms(unitId)
+  G->>SIO: emit to room:division:*, room:national
+  SIO->>B: event alert:created
+  B->>B: Update map markers + anomaly feed
+```
+
+**Diagram notes:** Push model, not HTTP polling. An alert in Chattogram updates only the Chattogram division room + national room (PMO) — other divisions do not see it. This is **tenant-scoped broadcast**.
+
 ---
 
 #### 5. AI Pipeline
+
+Gateway modules build DB context and send it to AI Analytics FastAPI endpoints. Generative tasks (Briefing, Sovereign LLM) use **Ollama**; sentiment uses **Bangla-BERT**; arbitrage/predictive use **heuristic ML**.
 
 | Feature | Input | Model | Output |
 |---------|-------|-------|--------|
@@ -873,6 +1040,65 @@ When AI or the Gateway creates a red flag or KPI update:
 
 **Local dev:** `SENTIMENT_USE_MOCK=true`, `ollama run llama3.1:8b`
 
+```mermaid
+flowchart TB
+  subgraph inputs [Inputs]
+    DB[(PostgreSQL)]
+    Mock333[Mock 333/999 Stream]
+    UserText[User Document / Chat]
+    Sliders[Simulator Sliders]
+  end
+
+  subgraph gateway_ai [Gateway Orchestration]
+    BriefingMod[briefing.service]
+    IntelMod[intelligence.service]
+    SovereignMod[sovereign-context.service]
+    TwinMod[twin.service]
+  end
+
+  subgraph ai_svc [AI Analytics FastAPI]
+    BriefingGen["/briefing/generate"]
+    SovereignChat["/sovereign-llm/chat"]
+    SentimentHM["/sentiment/heatmap"]
+    Predictive["/predictive/score"]
+    Arbitrage["/arbitrage/*"]
+    Documents["/documents/analyze"]
+    TwinSim["/twin/simulate"]
+    RiskSim["/simulator/*"]
+    Citizen["/citizen/chat"]
+  end
+
+  subgraph models [Models]
+    BERT[l3cube Bangla-BERT]
+    Ollama[Ollama llama3.1:8b]
+    Heuristics[Rule + ML Heuristics]
+  end
+
+  DB --> BriefingMod
+  DB --> IntelMod
+  DB --> SovereignMod
+  BriefingMod --> BriefingGen
+  IntelMod --> Predictive
+  IntelMod --> SentimentHM
+  SovereignMod --> SovereignChat
+  Mock333 --> SentimentHM
+  UserText --> Documents
+  UserText --> Citizen
+  Sliders --> RiskSim
+
+  BriefingGen --> Ollama
+  SovereignChat --> Ollama
+  SentimentHM --> BERT
+  Predictive --> Heuristics
+  Arbitrage --> Heuristics
+  Documents --> Ollama
+  TwinSim --> Heuristics
+  RiskSim --> Heuristics
+  Citizen --> BERT
+```
+
+**Diagram notes:** The `gateway_ai` layer builds business context (which division, which alerts) — raw DB is not sent blindly to AI. In sovereign mode, all generative calls go to **on-prem Ollama**; external OpenAI/Claude APIs are disabled in production.
+
 ---
 
 #### 6. Database Design
@@ -880,6 +1106,71 @@ When AI or the Gateway creates a red flag or KPI update:
 **Engine:** PostgreSQL 16 + TimescaleDB  
 **ORM:** Prisma  
 **Pooling:** PgBouncer — `geoinsight_write` (writes), `geoinsight_read` (reads)
+
+All entities tie to the `admin_units` hierarchy — projects, users, representatives, and agro markets are scoped by `admin_unit_id`. The ER diagram below shows core relationships:
+
+```mermaid
+erDiagram
+  AdminUnit ||--o{ AdminUnit : parent
+  AdminUnit ||--o{ User : scopes
+  AdminUnit ||--o{ Representative : represents
+  AdminUnit ||--o{ Project : hosts
+  AdminUnit ||--o{ AgroMarket : contains
+  AdminUnit ||--o{ CommodityPriceLog : contextualizes
+
+  Representative ||--o{ KpiRecord : has
+  KpiDefinition ||--o{ KpiRecord : defines
+
+  Project ||--o{ RedFlagAlert : triggers
+  Project ||--o{ BlockchainMilestoneQueue : anchors
+
+  User ||--o{ AuditLog : performs
+  User ||--o{ RefreshToken : owns
+  User ||--o{ RedFlagAlert : resolves
+
+  AdminUnit {
+    uuid id PK
+    string code
+    string name
+    enum type
+    uuid parent_id FK
+    uuid division_id
+    uuid district_id
+    uuid upazila_id
+    json geo_json
+  }
+
+  Project {
+    uuid id PK
+    string title
+    decimal budget_allocated
+    decimal budget_spent
+    enum status
+    uuid admin_unit_id FK
+  }
+
+  RedFlagAlert {
+    uuid id PK
+    enum flag_type
+    int severity
+    text ai_explanation
+    string blockchain_hash
+  }
+
+  KpiRecord {
+    uuid id PK
+    decimal value
+    enum status
+    bool verified
+  }
+
+  CommodityPriceLog {
+    uuid id PK
+    timestamptz created_at PK
+    string commodity_code
+    decimal landed_cost_usd
+  }
+```
 
 **Admin hierarchy:**
 
@@ -909,11 +1200,13 @@ DIVISION (8)
 | `audit_logs` | User action audit |
 | `blockchain_milestone_queue` | Fabric tx queue |
 
-**TimescaleDB hypertable:** `commodity_price_logs` — arbitrage matrix, procurement advisor
+**Diagram notes:** `AdminUnit` is a self-referencing tree — all data binds to this tree. `Project` → `RedFlagAlert` is the AI anomaly chain. `CommodityPriceLog` is time-series data used for procurement/arbitrage.
 
 ---
 
 #### 7. RBAC & Multi-Tenancy
+
+Every HTTP request must pass JWT verify → RBAC → **unit scope check**. PMO sees all divisions; Minister sees only their division subtree; DC sees district; Union Chairman sees only their union.
 
 | Role | Tier | Scope | Example pages |
 |------|------|-------|---------------|
@@ -926,15 +1219,70 @@ DIVISION (8)
 
 **Registration:** `POST /auth/register` requires PMO token. First PMO: `docker-db-init.sh`
 
+```mermaid
+flowchart TB
+  Request[HTTP Request] --> Auth[JWT Auth Middleware]
+  Auth --> RBAC[RBAC Middleware]
+  RBAC --> Scope{Unit scope check}
+  Scope -->|PMO| National[All divisions]
+  Scope -->|MINISTER| Division[Own division subtree]
+  Scope -->|DC| District[Own district subtree]
+  Scope -->|UNION_CHAIRMAN| Union[Own union only]
+  National --> Handler[Route Handler]
+  Division --> Handler
+  District --> Handler
+  Union --> Handler
+```
+
+**Diagram notes:** Auth fail → 401; RBAC fail → 403; scope fail → forbidden or filtered empty result. The sidebar hides menus by role — but security is enforced in backend middleware.
+
 ---
 
 #### 8. Message Queue Topology
+
+Two queue types: **gov_core_queue** (real-time Socket.io broadcast) and **geoinsight_exchange** (async AI jobs — arbitrage, sentiment, risk).
 
 | Queue / Exchange | Routing keys | Purpose |
 |------------------|--------------|---------|
 | `gov_core_queue` | — | Real-time gov events → Socket.io |
 | `geoinsight_exchange` | `gov.arbitrage`, `ai.sentiment`, `ai.risk` | Async AI jobs |
 | `ai_analytics_queue` | exchange-bound | AI worker dispatch |
+
+```mermaid
+flowchart LR
+  subgraph producers [Producers]
+    GW[API Gateway]
+    AIW[AI Arbitrage Worker]
+    AIC[AI Queue Consumer]
+  end
+
+  subgraph rabbit [RabbitMQ]
+    Ex[geoinsight_exchange]
+    GovQ[gov_core_queue]
+    AIQ[ai_analytics_queue]
+  end
+
+  subgraph consumers [Consumers]
+    GovCons[Gov Queue Consumer]
+    AICons[AI Queue Consumer]
+  end
+
+  subgraph sinks [Sinks]
+    SIO[Socket.io broadcast]
+    DB2[(PostgreSQL)]
+  end
+
+  GW -->|alert_created, kpi_update| GovQ
+  GW -->|arbitrage_request| Ex
+  AIW -->|arbitrage_update| Ex
+  Ex --> AIQ
+  AIQ --> AICons
+  GovQ --> GovCons
+  GovCons --> SIO
+  AICons --> Ex
+```
+
+**Diagram notes:** When the Gateway creates an alert → `GovQ` → Socket.io. The arbitrage worker scrapes commodity prices → `Ex` → Gateway persists to DB. Decoupled — slow AI does not block API responses.
 
 ---
 
@@ -951,9 +1299,45 @@ DIVISION (8)
 
 **Production:** GitHub Actions → GHCR build → VPS SSH deploy
 
+In the Docker full stack, all services share one `geoinsight_net` network; `db-init` is a one-shot container that runs seed SQL:
+
+```mermaid
+flowchart TB
+  subgraph docker [Docker Network geoinsight_net]
+    DBInit[db-init one-shot]
+    PG[(postgres)]
+    Replica[(postgres-replica)]
+    PGB[(pgbouncer)]
+    Redis[(redis)]
+    RMQ[rabbitmq]
+    MinIO[minio]
+    GW[api-gateway]
+    AI[ai-analytics]
+    Dash[dashboard-nextjs]
+  end
+
+  User[User :3000] --> Dash
+  Dash --> GW
+  User -->|WebSocket| GW
+  GW --> PGB
+  PGB --> PG
+  PGB --> Replica
+  GW --> Redis
+  GW --> AI
+  GW --> RMQ
+  AI --> RMQ
+  AI --> Redis
+  DBInit --> PG
+  GW --> MinIO
+```
+
+**Diagram notes:** Users only see `:3000` (Dashboard). Gateway `:4000` is internal. PgBouncer splits read/write pools — replica handles read load. In production, nginx terminates TLS at the edge.
+
 ---
 
 #### 10. Security Architecture
+
+Defense in depth — edge (nginx TLS) → application (BFF cookie, JWT, RBAC) → data (PgBouncer, audit) → sovereign AI (local Ollama, no external API).
 
 | Layer | Control |
 |-------|---------|
@@ -964,6 +1348,42 @@ DIVISION (8)
 | Audit | `audit_logs` + blockchain hash on red flags |
 | Rate limit | nginx → gateway → AI (333/999 feeds) |
 | Secrets | `.env` gitignored; only `NEXT_PUBLIC_*` in browser |
+
+```mermaid
+flowchart TB
+  subgraph edge [Edge]
+    Nginx[nginx TLS + rate limit]
+  end
+
+  subgraph app_sec [Application Security]
+    BFF[Next.js BFF — cookie only]
+    JWT[JWT 15m access]
+    Refresh[Refresh rotation]
+    RBAC2[RBAC + unit scope]
+    RateLimit[express-rate-limit]
+  end
+
+  subgraph data_sec [Data Security]
+    PGBouncer[PgBouncer pooled connections]
+    Audit[audit_logs table]
+    Hash[bcrypt password]
+    BlockHash[SHA-256 alert anchors]
+  end
+
+  subgraph sovereign [Sovereign Mode]
+    OllamaLocal[Ollama on-prem]
+    NoTelemetry[HF_TELEMETRY disabled]
+    NoExternal[No external LLM API]
+  end
+
+  Nginx --> BFF
+  BFF --> JWT
+  JWT --> RBAC2
+  RBAC2 --> PGBouncer
+  RBAC2 --> Audit
+```
+
+**Diagram notes:** Sensitive data (JWT secret, DB password) never reaches the browser. Red flag alerts optionally include a **blockchain hash** for tamper-evident audit trails. The sovereign block ensures citizen data is not uploaded to external cloud LLMs.
 
 ---
 
