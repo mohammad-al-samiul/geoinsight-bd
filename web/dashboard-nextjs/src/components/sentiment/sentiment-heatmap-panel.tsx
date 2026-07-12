@@ -101,27 +101,29 @@ export function SentimentHeatmapPanel() {
         )
       }
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <Radio className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">{t("aggregationLevel")}</span>
-        <Button
-          size="sm"
-          variant={level === "district" ? "default" : "outline"}
-          onClick={() => setLevel("district")}
-        >
-          {t("district")}
-        </Button>
-        <Button
-          size="sm"
-          variant={level === "upazila" ? "default" : "outline"}
-          onClick={() => setLevel("upazila")}
-        >
-          {t("upazila")}
-        </Button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex flex-wrap items-center gap-2">
+          <Radio className="h-4 w-4 shrink-0 text-primary" />
+          <span className="text-sm font-medium">{t("aggregationLevel")}</span>
+          <Button
+            size="sm"
+            variant={level === "district" ? "default" : "outline"}
+            onClick={() => setLevel("district")}
+          >
+            {t("district")}
+          </Button>
+          <Button
+            size="sm"
+            variant={level === "upazila" ? "default" : "outline"}
+            onClick={() => setLevel("upazila")}
+          >
+            {t("upazila")}
+          </Button>
+        </div>
         <Button
           size="sm"
           variant="outline"
-          className="ml-auto gap-2"
+          className="w-full gap-2 sm:ml-auto sm:w-auto"
           disabled={syncing}
           onClick={() => void handleSync()}
         >
@@ -159,25 +161,27 @@ export function SentimentHeatmapPanel() {
       )}
 
       {data && (
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <div className="glass-panel overflow-hidden rounded-xl shadow-panel">
-            <div className="border-b border-border/60 px-4 py-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2">
+          <div className="glass-panel min-w-0 overflow-hidden rounded-xl shadow-panel">
+            <div className="border-b border-border/60 px-3 py-3 sm:px-4">
               <h3 className="flex items-center gap-2 text-sm font-semibold">
-                <MessageSquareWarning className="h-4 w-4 text-red-400" />
+                <MessageSquareWarning className="h-4 w-4 shrink-0 text-red-400" />
                 {t("dissatisfactionHeatmap")}
               </h3>
-              <p className="mt-1 text-[11px] text-muted-foreground">{t("heatmapHint")}</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                {t("heatmapHint")}
+              </p>
             </div>
-            <div className="max-h-[520px] overflow-y-auto p-3">
+            <div className="max-h-none overflow-visible p-2.5 sm:max-h-[560px] sm:overflow-y-auto sm:p-3">
               {distressed.length === 0 ? (
                 <p className="p-2 text-sm text-muted-foreground">{t("noDistressed")}</p>
               ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-2">
                   {distressed.map((cell) => (
                     <div
                       key={`${cell.district}-${cell.upazila ?? "all"}`}
                       className={cn(
-                        "rounded-lg border p-3",
+                        "min-w-0 rounded-lg border p-2.5 sm:p-3",
                         cell.sentiment_score >= 50
                           ? "border-red-500/40 bg-red-500/5"
                           : cell.sentiment_score >= 25
@@ -186,40 +190,48 @@ export function SentimentHeatmapPanel() {
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-medium">{cell.district}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{cell.district}</p>
                           {cell.hardship_hint && (
-                            <p className="text-[11px] text-red-300/90">{cell.hardship_hint}</p>
+                            <p className="truncate text-[11px] text-red-300/90">
+                              {cell.hardship_hint}
+                            </p>
                           )}
                         </div>
                         <Badge
                           variant="outline"
                           className={cn(
-                            "text-[10px]",
+                            "shrink-0 text-[10px]",
                             cell.trend === "rising" && "border-red-500/40 text-red-400",
                             cell.trend === "falling" && "border-emerald-500/40 text-emerald-400",
                           )}
                         >
                           {cell.trend === "rising" ? (
-                            <TrendingUp className="mr-1 inline h-3 w-3" />
+                            <TrendingUp className="mr-0.5 inline h-3 w-3" />
                           ) : cell.trend === "falling" ? (
-                            <TrendingDown className="mr-1 inline h-3 w-3" />
+                            <TrendingDown className="mr-0.5 inline h-3 w-3" />
                           ) : null}
-                          {trendLabel(cell.trend)}
+                          <span className="hidden min-[380px]:inline">{trendLabel(cell.trend)}</span>
+                          <span className="min-[380px]:hidden">
+                            {cell.trend === "rising" ? "↑" : cell.trend === "falling" ? "↓" : "→"}
+                          </span>
                         </Badge>
                       </div>
                       <div className="mt-2 flex items-center gap-2">
-                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                        <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-secondary">
                           <div
-                            className={cn("h-full rounded-full transition-all", scoreColor(cell.sentiment_score))}
+                            className={cn(
+                              "h-full rounded-full transition-all",
+                              scoreColor(cell.sentiment_score),
+                            )}
                             style={{ width: `${Math.max(cell.sentiment_score, 4)}%` }}
                           />
                         </div>
-                        <span className="text-xs tabular-nums font-medium text-foreground">
+                        <span className="shrink-0 text-xs font-medium tabular-nums text-foreground">
                           {cell.sentiment_score}
                         </span>
                       </div>
-                      <p className="mt-1 text-[10px] text-muted-foreground">
+                      <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
                         {t("cellCounts", {
                           grievance: cell.grievance_count,
                           demand: cell.demand_count,
@@ -233,11 +245,11 @@ export function SentimentHeatmapPanel() {
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="glass-panel rounded-xl p-4 shadow-panel">
+          <div className="min-w-0 space-y-4 sm:space-y-6">
+            <div className="glass-panel rounded-xl p-3 shadow-panel sm:p-4">
               <h3 className="text-sm font-semibold text-red-400">{t("risingDissatisfaction")}</h3>
               <p className="mt-1 text-xs text-muted-foreground">{t("risingDesc")}</p>
-              <ul className="mt-4 space-y-3">
+              <ul className="mt-3 max-h-none space-y-2 overflow-visible sm:mt-4 sm:max-h-[280px] sm:space-y-3 sm:overflow-y-auto">
                 {topRising.length === 0 ? (
                   <li className="text-sm text-muted-foreground">{t("noRisingZones")}</li>
                 ) : (
@@ -247,10 +259,12 @@ export function SentimentHeatmapPanel() {
                       className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium">{cell.district}</span>
-                        <span className="tabular-nums text-red-300">{cell.sentiment_score}</span>
+                        <span className="min-w-0 truncate font-medium">{cell.district}</span>
+                        <span className="shrink-0 tabular-nums text-red-300">
+                          {cell.sentiment_score}
+                        </span>
                       </div>
-                      <span className="text-xs text-red-400">
+                      <span className="block text-xs leading-snug text-red-400">
                         {t("grievanceRatio", { pct: Math.round(cell.grievance_ratio * 100) })}
                         {cell.hardship_hint ? ` · ${cell.hardship_hint}` : ""}
                       </span>
@@ -260,15 +274,15 @@ export function SentimentHeatmapPanel() {
               </ul>
             </div>
 
-            <div className="glass-panel rounded-xl p-4 shadow-panel">
-              <div className="flex items-center justify-between gap-2">
+            <div className="glass-panel rounded-xl p-3 shadow-panel sm:p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold">{t("recentNews")}</h3>
                 <Button size="sm" variant="ghost" onClick={() => void reloadArticles()}>
                   {t("refreshNews")}
                 </Button>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{t("recentNewsDesc")}</p>
-              <ul className="mt-4 max-h-[320px] space-y-3 overflow-y-auto">
+              <ul className="mt-3 max-h-[280px] space-y-2 overflow-y-auto sm:mt-4 sm:max-h-[360px] sm:space-y-3">
                 {articlesLoading ? (
                   <li className="text-sm text-muted-foreground">{t("loadingNews")}</li>
                 ) : articles.length === 0 ? (
@@ -279,8 +293,8 @@ export function SentimentHeatmapPanel() {
                       key={article.id}
                       className="rounded-lg border border-border/50 bg-secondary/10 px-3 py-2 text-sm"
                     >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className="text-[10px]">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <Badge variant="outline" className="max-w-[140px] truncate text-[10px]">
                           {article.sourceName}
                         </Badge>
                         {article.sentimentCategory && (
@@ -309,7 +323,7 @@ export function SentimentHeatmapPanel() {
                         rel="noopener noreferrer"
                         className="mt-1 flex items-start gap-1 font-medium leading-snug hover:text-primary"
                       >
-                        <span className="line-clamp-2">{article.title}</span>
+                        <span className="line-clamp-2 min-w-0">{article.title}</span>
                         <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 opacity-60" />
                       </a>
                     </li>
