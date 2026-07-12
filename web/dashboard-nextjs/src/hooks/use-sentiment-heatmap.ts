@@ -13,6 +13,8 @@ export interface SentimentHeatmapCell {
   grievance_ratio: number;
   sentiment_score: number;
   trend: "rising" | "stable" | "falling";
+  distress_count?: number;
+  hardship_hint?: string | null;
 }
 
 export interface SentimentHeatmap {
@@ -22,6 +24,9 @@ export interface SentimentHeatmap {
   demand_total: number;
   cells: SentimentHeatmapCell[];
   source: string;
+  narrative_bn?: string;
+  narrative_en?: string;
+  top_distressed?: string[];
 }
 
 export function useSentimentHeatmap(level: "district" | "upazila" = "district") {

@@ -23,6 +23,8 @@ import { publicFeedModule } from "./public-feed/public-feed.module";
 import { ingestionModule } from "./ingestion/ingestion.module";
 import { pipelineModule } from "./pipeline/pipeline.module";
 import { weatherModule } from "./weather/weather.module";
+import { unrestModule } from "./unrest/unrest.module";
+import { outlookModule } from "./outlook/outlook.module";
 
 const modules: AppModule[] = [
   healthModule,
@@ -41,6 +43,8 @@ const modules: AppModule[] = [
   ingestionModule,
   pipelineModule,
   weatherModule,
+  unrestModule,
+  outlookModule,
   simulatorModule,
   procurementModule,
   sovereignModule,

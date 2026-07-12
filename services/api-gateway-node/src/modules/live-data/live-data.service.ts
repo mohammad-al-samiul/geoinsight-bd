@@ -54,9 +54,27 @@ const ALERT_PATTERNS = [
   /fraud/i,
   /probe/i,
   /তদন্ত/u,
+  /আন্দোলন/u,
+  /বিক্ষোভ/u,
+  /হরতাল/u,
+  /protest/i,
+  /demonstration/i,
+  /অসন্তোষ/u,
+  /বিরোধিতা/u,
 ];
 
-const POLICY_PATTERNS = [/নীতি/u, /policy/i, /budget/i, /বাজেট/u, /cabinet/i, /মন্ত্রিসভা/u];
+const POLICY_PATTERNS = [
+  /নীতি/u,
+  /policy/i,
+  /budget/i,
+  /বাজেট/u,
+  /cabinet/i,
+  /মন্ত্রিসভা/u,
+  /আইন/u,
+  /\bbill\b/i,
+  /ordinance/i,
+  /আদেশ/u,
+];
 
 function matchesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((p) => p.test(text));

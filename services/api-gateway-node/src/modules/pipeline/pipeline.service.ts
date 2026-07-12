@@ -92,6 +92,8 @@ export class PipelineService {
       ["agro", () => this.syncAgroPrices()],
       ["hazard", () => this.refreshHazardSignals()],
       ["weather", () => this.syncWeatherData()],
+      ["unrest", () => this.refreshUnrestPulse()],
+      ["outlook", () => this.refreshStrategicOutlook()],
       ["signals", () => this.extractLiveSignals()],
     ];
 
@@ -579,6 +581,16 @@ export class PipelineService {
     const { weatherService } = await import("../weather/weather.service");
     const result = await weatherService.syncFromAi();
     return result;
+  }
+
+  async refreshUnrestPulse(): Promise<Record<string, unknown>> {
+    const { unrestService } = await import("../unrest/unrest.service");
+    return unrestService.refreshPulse();
+  }
+
+  async refreshStrategicOutlook(): Promise<Record<string, unknown>> {
+    const { outlookService } = await import("../outlook/outlook.service");
+    return outlookService.refresh();
   }
 
   async getLatestCommodityQuotes(commodity: string, limit = 30) {

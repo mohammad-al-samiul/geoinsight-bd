@@ -49,6 +49,7 @@ const envSchema = z.object({
   PIPELINE_AGRO_INTERVAL_MS: z.coerce.number().int().positive().default(1_800_000),
   PIPELINE_HAZARD_INTERVAL_MS: z.coerce.number().int().positive().default(1_800_000),
   PIPELINE_WEATHER_INTERVAL_MS: z.coerce.number().int().positive().default(600_000),
+  PIPELINE_UNREST_INTERVAL_MS: z.coerce.number().int().positive().default(900_000),
 
   LIVE_DATA_ONLY: z.string().default("true").transform((v) => v === "true"),
 

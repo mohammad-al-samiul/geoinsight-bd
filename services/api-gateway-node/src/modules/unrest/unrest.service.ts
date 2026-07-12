@@ -1,0 +1,401 @@
+import { IngestionSentiment } from "@prisma/client";
+import { prismaRead } from "../../core/database/prisma.client";
+import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
+import { broadcastDashboardRefresh } from "../pipeline/pipeline.broadcast";
+import {
+  normalizeDivisionName,
+  resolveScopeContext,
+  matchesScopeDistrict,
+  type ScopeContext,
+} from "../../shared/scope/scope-context";
+import type { DashboardScopeQuery } from "../dashboard/dashboard.service";
+
+const UNREST_CACHE_KEY = "unrest:pulse:v1";
+const UNREST_TTL_SEC = 900;
+const LOOKBACK_DAYS = 7;
+
+export type UnrestCategory =
+  | "protest"
+  | "govt_discontent"
+  | "law_reaction"
+  | "social_viral"
+  | "general_grievance";
+
+const PROTEST_KW = [
+  "আন্দোলন",
+  "বিক্ষোভ",
+  "হরতাল",
+  "অবরোধ",
+  "ধর্মঘট",
+  "মিছিল",
+  "সমাবেশ",
+  "ঘেরাও",
+  "protest",
+  "demonstration",
+  "rally",
+  "strike",
+  "hartal",
+  "blockade",
+  "sit-in",
+  "march",
+];
+
+const GOVT_DISCONTENT_KW = [
+  "অসন্তোষ",
+  "বিরোধিতা",
+  "প্রতিবাদ",
+  "সরকারের বিরুদ্ধে",
+  "সরকার বিরোধী",
+  "ক্ষোভ",
+  "অভিযোগ",
+  "দুর্নীতি",
+  "হয়রানি",
+  "government protest",
+  "anti-government",
+  "against the government",
+  "public outrage",
+  "anger against",
+  "dissatisfaction",
+];
+
+const LAW_KW = [
+  "আইন",
+  "বিল",
+  "অধ্যাদেশ",
+  "আইন পাস",
+  "নতুন আইন",
+  "খসড়া আইন",
+  "law",
+  "bill",
+  "ordinance",
+  "legislation",
+  "act passed",
+  "new law",
+  "draft law",
+];
+
+const SOCIAL_KW = [
+  "ফেসবুক",
+  "ভাইরাল",
+  "সোশ্যাল মিডিয়া",
+  "facebook",
+  "viral",
+  "social media",
+  "twitter",
+  "tiktok",
+  "online outrage",
+];
+
+function includesAny(text: string, keywords: string[]): boolean {
+  const lower = text.toLowerCase();
+  return keywords.some((k) => lower.includes(k.toLowerCase()));
+}
+
+function classifyUnrest(text: string, sentiment: IngestionSentiment | null): UnrestCategory | null {
+  const hasProtest = includesAny(text, PROTEST_KW);
+  const hasLaw = includesAny(text, LAW_KW);
+  const hasGovt = includesAny(text, GOVT_DISCONTENT_KW);
+  const hasSocial = includesAny(text, SOCIAL_KW);
+
+  if (hasLaw && (hasProtest || hasGovt)) return "law_reaction";
+  if (hasProtest) return "protest";
+  if (hasSocial && (hasGovt || hasProtest || sentiment === IngestionSentiment.Grievance)) {
+    return "social_viral";
+  }
+  if (hasGovt) return "govt_discontent";
+  if (sentiment === IngestionSentiment.Grievance) return "general_grievance";
+  return null;
+}
+
+function severityFor(category: UnrestCategory, text: string): number {
+  let base =
+    category === "protest" || category === "law_reaction"
+      ? 4
+      : category === "social_viral"
+        ? 3
+        : category === "govt_discontent"
+          ? 3
+          : 2;
+  if (/হরতাল|hartal|violence|সহিংস|clash|সংঘর্ষ/i.test(text)) base = Math.min(5, base + 1);
+  if (/nationwide|সারাদেশ|জাতীয়/i.test(text)) base = Math.min(5, base + 1);
+  return base;
+}
+
+function categoryLabelBn(category: UnrestCategory): string {
+  switch (category) {
+    case "protest":
+      return "আন্দোলন / বিক্ষোভ";
+    case "govt_discontent":
+      return "সরকার-বিরোধী অসন্তোষ";
+    case "law_reaction":
+      return "আইন/বিল নিয়ে প্রতিক্রিয়া";
+    case "social_viral":
+      return "সামাজিক মাধ্যমে ভাইরাল";
+    default:
+      return "নাগরিক অভিযোগ";
+  }
+}
+
+export interface UnrestSignal {
+  id: string;
+  title: string;
+  title_bn_hint: string;
+  category: UnrestCategory;
+  category_bn: string;
+  severity: number;
+  district: string | null;
+  division: string | null;
+  source_name: string;
+  url: string;
+  published_at: string | null;
+  sentiment: string | null;
+}
+
+export interface DistrictUnrestCell {
+  district: string;
+  division: string | null;
+  protest_count: number;
+  govt_discontent_count: number;
+  law_reaction_count: number;
+  social_viral_count: number;
+  grievance_count: number;
+  total_signals: number;
+  unrest_score: number;
+  risk_level: number;
+  trend: "rising" | "stable" | "falling";
+  top_categories: UnrestCategory[];
+  population_pressure: "high" | "medium" | "low";
+}
+
+export interface UnrestPulse {
+  districts: DistrictUnrestCell[];
+  signals: UnrestSignal[];
+  summary: {
+    districts_at_risk: number;
+    active_protests: number;
+    law_hotspots: number;
+    social_viral: number;
+    total_signals: number;
+    top_district: string | null;
+    refreshed_at: string;
+    sources: string[];
+    note_bn: string;
+    note_en: string;
+  };
+  scope?: ScopeContext;
+}
+
+export class UnrestService {
+  async refreshPulse(): Promise<Record<string, unknown>> {
+    const pulse = await this.buildPulse();
+    if (isRedisEnabled()) {
+      await getRedisClient().setex(UNREST_CACHE_KEY, UNREST_TTL_SEC, JSON.stringify(pulse));
+    }
+    await broadcastDashboardRefresh("pipeline:unrest");
+    return {
+      districts: pulse.districts.length,
+      signals: pulse.signals.length,
+      districts_at_risk: pulse.summary.districts_at_risk,
+    };
+  }
+
+  async getPulse(query: DashboardScopeQuery = {}): Promise<UnrestPulse> {
+    const ctx = await resolveScopeContext(query);
+    let pulse: UnrestPulse;
+
+    if (isRedisEnabled()) {
+      const cached = await getRedisClient().get(UNREST_CACHE_KEY);
+      if (cached) {
+        pulse = JSON.parse(cached) as UnrestPulse;
+        return this.applyScope(pulse, ctx);
+      }
+    }
+
+    pulse = await this.buildPulse();
+    if (isRedisEnabled()) {
+      await getRedisClient().setex(UNREST_CACHE_KEY, UNREST_TTL_SEC, JSON.stringify(pulse));
+    }
+    return this.applyScope(pulse, ctx);
+  }
+
+  private applyScope(pulse: UnrestPulse, ctx: ScopeContext): UnrestPulse {
+    if (!ctx.divisionName && !ctx.districtName) {
+      return { ...pulse, scope: ctx };
+    }
+
+    const districts = pulse.districts.filter((d) =>
+      matchesScopeDistrict(d.district, d.division, ctx),
+    );
+    const signals = pulse.signals.filter((s) =>
+      matchesScopeDistrict(s.district, s.division, ctx),
+    );
+
+    return {
+      districts,
+      signals,
+      summary: {
+        ...pulse.summary,
+        districts_at_risk: districts.filter((d) => d.risk_level >= 3).length,
+        active_protests: districts.reduce((n, d) => n + d.protest_count, 0),
+        law_hotspots: districts.filter((d) => d.law_reaction_count > 0).length,
+        social_viral: districts.reduce((n, d) => n + d.social_viral_count, 0),
+        total_signals: signals.length,
+        top_district: districts[0]?.district ?? null,
+      },
+      scope: ctx,
+    };
+  }
+
+  private async buildPulse(): Promise<UnrestPulse> {
+    const since = new Date(Date.now() - LOOKBACK_DAYS * 86400 * 1000);
+    const mid = new Date(Date.now() - Math.floor(LOOKBACK_DAYS / 2) * 86400 * 1000);
+
+    const articles = await prismaRead.externalArticle.findMany({
+      where: { fetchedAt: { gte: since } },
+      orderBy: { fetchedAt: "desc" },
+      take: 500,
+      select: {
+        id: true,
+        title: true,
+        summary: true,
+        url: true,
+        sourceName: true,
+        district: true,
+        division: true,
+        sentimentCategory: true,
+        publishedAt: true,
+        fetchedAt: true,
+      },
+    });
+
+    const signals: UnrestSignal[] = [];
+    const byDistrict = new Map<
+      string,
+      {
+        division: string | null;
+        protest: number;
+        govt: number;
+        law: number;
+        social: number;
+        grievance: number;
+        recent: number;
+        older: number;
+      }
+    >();
+
+    for (const article of articles) {
+      const text = `${article.title} ${article.summary ?? ""}`;
+      const category = classifyUnrest(text, article.sentimentCategory);
+      if (!category) continue;
+
+      const district = article.district && article.district !== "National"
+        ? article.district
+        : "National";
+      const division = normalizeDivisionName(article.division) ?? article.division ?? null;
+      const severity = severityFor(category, text);
+
+      signals.push({
+        id: article.id,
+        title: article.title,
+        title_bn_hint: categoryLabelBn(category),
+        category,
+        category_bn: categoryLabelBn(category),
+        severity,
+        district: district === "National" ? null : district,
+        division,
+        source_name: article.sourceName,
+        url: article.url,
+        published_at: (article.publishedAt ?? article.fetchedAt).toISOString(),
+        sentiment: article.sentimentCategory,
+      });
+
+      const key = district;
+      const entry = byDistrict.get(key) ?? {
+        division,
+        protest: 0,
+        govt: 0,
+        law: 0,
+        social: 0,
+        grievance: 0,
+        recent: 0,
+        older: 0,
+      };
+      if (category === "protest") entry.protest += 1;
+      if (category === "govt_discontent") entry.govt += 1;
+      if (category === "law_reaction") entry.law += 1;
+      if (category === "social_viral") entry.social += 1;
+      if (category === "general_grievance") entry.grievance += 1;
+      if (article.fetchedAt >= mid) entry.recent += 1;
+      else entry.older += 1;
+      if (!entry.division && division) entry.division = division;
+      byDistrict.set(key, entry);
+    }
+
+    const districts: DistrictUnrestCell[] = [];
+    for (const [district, e] of byDistrict) {
+      if (district === "National") continue;
+      const total = e.protest + e.govt + e.law + e.social + e.grievance;
+      if (total === 0) continue;
+
+      const unrestScore = Math.min(
+        100,
+        e.protest * 18 + e.law * 20 + e.govt * 12 + e.social * 10 + e.grievance * 6,
+      );
+      const riskLevel =
+        unrestScore >= 70 ? 5 : unrestScore >= 50 ? 4 : unrestScore >= 30 ? 3 : unrestScore >= 15 ? 2 : 1;
+
+      const topCategories: UnrestCategory[] = [];
+      if (e.protest > 0) topCategories.push("protest");
+      if (e.law > 0) topCategories.push("law_reaction");
+      if (e.govt > 0) topCategories.push("govt_discontent");
+      if (e.social > 0) topCategories.push("social_viral");
+      if (e.grievance > 0) topCategories.push("general_grievance");
+
+      let trend: "rising" | "stable" | "falling" = "stable";
+      if (e.recent > e.older + 1) trend = "rising";
+      else if (e.older > e.recent + 1) trend = "falling";
+
+      districts.push({
+        district,
+        division: e.division,
+        protest_count: e.protest,
+        govt_discontent_count: e.govt,
+        law_reaction_count: e.law,
+        social_viral_count: e.social,
+        grievance_count: e.grievance,
+        total_signals: total,
+        unrest_score: unrestScore,
+        risk_level: riskLevel,
+        trend,
+        top_categories: topCategories.slice(0, 3),
+        population_pressure: riskLevel >= 4 ? "high" : riskLevel >= 3 ? "medium" : "low",
+      });
+    }
+
+    districts.sort((a, b) => b.unrest_score - a.unrest_score || b.total_signals - a.total_signals);
+    signals.sort((a, b) => b.severity - a.severity);
+
+    const atRisk = districts.filter((d) => d.risk_level >= 3);
+
+    return {
+      districts,
+      signals: signals.slice(0, 80),
+      summary: {
+        districts_at_risk: atRisk.length,
+        active_protests: districts.reduce((n, d) => n + d.protest_count, 0),
+        law_hotspots: districts.filter((d) => d.law_reaction_count > 0).length,
+        social_viral: districts.reduce((n, d) => n + d.social_viral_count, 0),
+        total_signals: signals.length,
+        top_district: districts[0]?.district ?? null,
+        refreshed_at: new Date().toISOString(),
+        sources: ["rss_newspapers", "google_news", "topic_feeds"],
+        note_bn:
+          "সংবাদপত্র ও গুগল নিউজ ফিড থেকে বিশ্লেষণ। ফেসবুক সরাসরি স্ক্র্যাপ করা হয় না — সংবাদে উল্লেখিত ভাইরাল/সামাজিক মাধ্যমের সংকেত ধরা হয়।",
+        note_en:
+          "Derived from newspaper RSS and Google News topic feeds. Facebook is not scraped directly — viral/social mentions in news are captured instead.",
+      },
+    };
+  }
+}
+
+export const unrestService = new UnrestService();

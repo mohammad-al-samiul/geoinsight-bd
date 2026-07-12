@@ -47,6 +47,8 @@ export class PipelineModule extends BaseModule {
           agro: () => pipelineService.syncAgroPrices(),
           hazard: () => pipelineService.refreshHazardSignals(),
           weather: () => pipelineService.syncWeatherData(),
+          unrest: () => pipelineService.refreshUnrestPulse(),
+          outlook: () => pipelineService.refreshStrategicOutlook(),
           signals: () => pipelineService.extractLiveSignals(),
         };
         const fn = runners[job];

@@ -15,17 +15,38 @@ from app.modules.ingestion.sources import ALL_FEEDS
 
 
 def _keyword_sentiment(text: str) -> tuple[str, float]:
-    """Fast fallback when BERT is unavailable."""
-    grievance_kw = ("অভিযোগ", "দুর্নীতি", "অনিয়ম", "হতাশ", "protest", "corruption", "scandal", "fraud")
-    demand_kw = ("দাবি", "চাই", "আশা", "demand", "request", "need", "call for")
+    """Fast fallback when BERT is unavailable — tuned for BD governance distress."""
+    grievance_kw = (
+        "অভিযোগ", "দুর্নীতি", "অনিয়ম", "হতাশ", "অসন্তোষ", "ক্ষোভ", "কষ্ট",
+        "দুর্ভোগ", "ভোগান্তি", "আন্দোলন", "বিক্ষোভ", "হরতাল", "প্রতিবাদ",
+        "হত্যা", "নিহত", "সহিংস", "সংঘর্ষ", "দুর্ঘটনা", "মৃত্যু",
+        "বন্যা", "ঘূর্ণিঝড়", "বেকার", "মূল্যস্ফীতি", "দারিদ্র্য",
+        "protest", "corruption", "scandal", "fraud", "violence", "killed",
+        "murder", "outrage", "suffer", "crisis", "strike", "hartal", "clash",
+        "assault", "grievance", "anger",
+    )
+    demand_kw = (
+        "দাবি", "চাই", "আশা", "প্রয়োজন", "demand", "request", "need",
+        "call for", "appeal", "seek",
+    )
     lowered = text.lower()
-    g = sum(1 for k in grievance_kw if k in text or k in lowered)
-    d = sum(1 for k in demand_kw if k in text or k in lowered)
+    g = sum(1 for k in grievance_kw if k.lower() in lowered or k in text)
+    d = sum(1 for k in demand_kw if k.lower() in lowered or k in text)
     if g > d and g > 0:
-        return "Grievance", min(0.95, 0.55 + g * 0.1)
+        return "Grievance", min(0.95, 0.55 + g * 0.08)
     if d > 0:
         return "Demand", min(0.9, 0.5 + d * 0.1)
-    return "Neutral", 0.6
+    return "Neutral", 0.55
+
+
+def _override_with_keywords(category: str, confidence: float, text: str) -> tuple[str, float]:
+    """Always apply distress keywords on top of BERT output."""
+    kw_cat, kw_score = _keyword_sentiment(text)
+    if kw_cat == "Grievance":
+        return "Grievance", max(confidence, kw_score)
+    if kw_cat == "Demand" and category != "Grievance":
+        return "Demand", max(confidence, kw_score)
+    return category, confidence
 
 
 class IngestionService:
@@ -91,8 +112,11 @@ class IngestionService:
                 False,
             )
             for (article, text, _), raw in zip(prepared, raw_results, strict=True):
-                article.sentiment_category = str(raw["category"])
-                article.sentiment_score = float(raw["confidence"])
+                cat = str(raw["category"])
+                score = float(raw["confidence"])
+                cat, score = _override_with_keywords(cat, score, text)
+                article.sentiment_category = cat
+                article.sentiment_score = score
         except Exception as exc:
             print(f"[ingestion] Batch BERT failed ({exc}), using keyword fallback")
             for article, text, _ in prepared:

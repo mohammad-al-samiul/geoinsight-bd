@@ -28,11 +28,20 @@ class SentimentResult:
 
 
 _GRIEVANCE_KW = re.compile(
-    r"অভিযোগ|সমস্যা|ন্যায়|অনিয়ম|দুর্নীতি|হয়রানি|বঞ্চিত",
+    r"অভিযোগ|সমস্যা|ন্যায়|অনিয়ম|দুর্নীতি|হয়রানি|বঞ্চিত|"
+    r"অসন্তোষ|ক্ষোভ|কষ্ট|দুর্ভোগ|ভোগান্তি|দুর্দশা|সংকট|"
+    r"আন্দোলন|বিক্ষোভ|হরতাল|প্রতিবাদ|বিরোধিতা|"
+    r"হত্যা|খুন|ধর্ষণ|সহিংস|সংঘর্ষ|আক্রমণ|"
+    r"দুর্ঘটনা|মৃত্যু|নিহত|আহত|নিখোঁজ|"
+    r"দারিদ্র্য|বেকার|মূল্যস্ফীতি|দাম বৃদ্ধি|খাদ্য সংকট|"
+    r"বন্যা|জলোচ্ছ্বাস|ঘূর্ণিঝড়|ভূমিধস|"
+    r"corruption|protest|scandal|fraud|violence|killed|murder|"
+    r"outrage|anger|suffer|crisis|strike|hartal|clash|assault",
     re.IGNORECASE,
 )
 _DEMAND_KW = re.compile(
-    r"চাই|দাবি|প্রয়োজন|সংযোগ|উন্নয়ন|সেবা|পানি|রাস্তা|বিদ্যুৎ",
+    r"চাই|দাবি|প্রয়োজন|সংযোগ|উন্নয়ন|সেবা|পানি|রাস্তা|বিদ্যুৎ|"
+    r"demand|request|call for|need|seek|appeal",
     re.IGNORECASE,
 )
 
@@ -57,10 +66,16 @@ def _get_pipeline(model_id: str, cache_dir: str):
 
 
 def _map_to_category(text: str, raw_label: str, score: float) -> tuple[GrievanceCategory, float]:
+    # Keyword override always wins for governance distress signals
+    if _GRIEVANCE_KW.search(text):
+        return "Grievance", min(max(score, 0.7) + 0.15, 1.0)
+    if _DEMAND_KW.search(text):
+        return "Demand", min(max(score, 0.65) + 0.1, 1.0)
+
     label_lower = raw_label.lower()
-    if _GRIEVANCE_KW.search(text) or "negative" in label_lower:
+    if "negative" in label_lower or "neg" == label_lower or label_lower in {"1", "label_0"}:
         return "Grievance", min(score + 0.1, 1.0)
-    if _DEMAND_KW.search(text) or "positive" in label_lower:
+    if "positive" in label_lower or "pos" == label_lower or label_lower in {"2", "label_2"}:
         return "Demand", min(score + 0.05, 1.0)
     return "Neutral", score
 

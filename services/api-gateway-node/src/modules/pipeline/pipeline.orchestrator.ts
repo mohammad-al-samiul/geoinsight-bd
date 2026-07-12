@@ -61,6 +61,13 @@ export class PipelineOrchestrator {
         stagger + 90_000,
       ),
       new IntervalWorker(
+        "pipeline:unrest",
+        () => pipelineService.refreshUnrestPulse(),
+        env.PIPELINE_UNREST_INTERVAL_MS,
+        env.PIPELINE_RUN_ON_START,
+        stagger + 105_000,
+      ),
+      new IntervalWorker(
         "pipeline:signals",
         () => pipelineService.extractLiveSignals(),
         env.PIPELINE_NEWS_INTERVAL_MS,
@@ -72,7 +79,7 @@ export class PipelineOrchestrator {
     for (const worker of this.workers) {
       worker.start();
     }
-    console.info("[pipeline] Orchestrator started with 8 background workers");
+    console.info("[pipeline] Orchestrator started with 9 background workers");
   }
 
   stop(): void {

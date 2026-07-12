@@ -1,14 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import {
+  ExternalLink,
+  MessageSquareWarning,
+  Radio,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import { useSentimentHeatmap } from "@/hooks/use-sentiment-heatmap";
 import { useIngestionArticles } from "@/hooks/use-ingestion-articles";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useTranslations } from "next-intl";
-import { ExternalLink, MessageSquareWarning, Radio, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
 
 function scoreColor(score: number): string {
   if (score >= 70) return "bg-red-500";
@@ -24,6 +32,7 @@ function sourceLabel(source: string, t: (key: string) => string): string {
 
 export function SentimentHeatmapPanel() {
   const t = useTranslations("modules.sentiment");
+  const locale = useLocale();
   const [level, setLevel] = useState<"district" | "upazila">("district");
   const { data, loading, error, reload } = useSentimentHeatmap(level);
   const {
@@ -35,8 +44,21 @@ export function SentimentHeatmapPanel() {
     reload: reloadArticles,
   } = useIngestionArticles(15);
 
+  useRealtimeRefresh(reload);
+
+  const distressed = useMemo(
+    () =>
+      (data?.cells ?? [])
+        .filter((c) => c.grievance_count > 0 || c.sentiment_score >= 20)
+        .slice(0, 24),
+    [data],
+  );
+
   const topRising = useMemo(
-    () => data?.cells.filter((c) => c.trend === "rising").slice(0, 5) ?? [],
+    () =>
+      (data?.cells ?? [])
+        .filter((c) => c.trend === "rising" && (c.grievance_count > 0 || c.sentiment_score >= 25))
+        .slice(0, 8),
     [data],
   );
 
@@ -49,6 +71,7 @@ export function SentimentHeatmapPanel() {
   const handleSync = async () => {
     await sync();
     await reload();
+    await reloadArticles();
   };
 
   return (
@@ -117,6 +140,24 @@ export function SentimentHeatmapPanel() {
         </p>
       )}
 
+      {data && (data.narrative_bn || data.narrative_en) && (
+        <div className="mt-4 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2.5 text-sm">
+          <p className="font-medium text-red-300">{t("aiInsight")}</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {locale === "bn" ? data.narrative_bn : data.narrative_en}
+          </p>
+          {data.top_distressed && data.top_distressed.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {data.top_distressed.map((d) => (
+                <Badge key={d} className="bg-red-500/15 text-red-300">
+                  {d}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {data && (
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <div className="glass-panel overflow-hidden rounded-xl shadow-panel">
@@ -125,58 +166,70 @@ export function SentimentHeatmapPanel() {
                 <MessageSquareWarning className="h-4 w-4 text-red-400" />
                 {t("dissatisfactionHeatmap")}
               </h3>
+              <p className="mt-1 text-[11px] text-muted-foreground">{t("heatmapHint")}</p>
             </div>
-            <div className="max-h-[480px] overflow-y-auto p-3">
-              <div className="grid gap-2 sm:grid-cols-2">
-                {data.cells.map((cell) => (
-                  <div
-                    key={`${cell.district}-${cell.upazila ?? "all"}`}
-                    className="rounded-lg border border-border/50 bg-secondary/20 p-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-medium text-sm">{cell.district}</p>
-                        {cell.upazila && (
-                          <p className="text-xs text-muted-foreground">{cell.upazila}</p>
-                        )}
+            <div className="max-h-[520px] overflow-y-auto p-3">
+              {distressed.length === 0 ? (
+                <p className="p-2 text-sm text-muted-foreground">{t("noDistressed")}</p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {distressed.map((cell) => (
+                    <div
+                      key={`${cell.district}-${cell.upazila ?? "all"}`}
+                      className={cn(
+                        "rounded-lg border p-3",
+                        cell.sentiment_score >= 50
+                          ? "border-red-500/40 bg-red-500/5"
+                          : cell.sentiment_score >= 25
+                            ? "border-amber-500/40 bg-amber-500/5"
+                            : "border-border/50 bg-secondary/20",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-medium">{cell.district}</p>
+                          {cell.hardship_hint && (
+                            <p className="text-[11px] text-red-300/90">{cell.hardship_hint}</p>
+                          )}
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px]",
+                            cell.trend === "rising" && "border-red-500/40 text-red-400",
+                            cell.trend === "falling" && "border-emerald-500/40 text-emerald-400",
+                          )}
+                        >
+                          {cell.trend === "rising" ? (
+                            <TrendingUp className="mr-1 inline h-3 w-3" />
+                          ) : cell.trend === "falling" ? (
+                            <TrendingDown className="mr-1 inline h-3 w-3" />
+                          ) : null}
+                          {trendLabel(cell.trend)}
+                        </Badge>
                       </div>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-[10px]",
-                          cell.trend === "rising" && "border-red-500/40 text-red-400",
-                          cell.trend === "falling" && "border-emerald-500/40 text-emerald-400",
-                        )}
-                      >
-                        {cell.trend === "rising" ? (
-                          <TrendingUp className="mr-1 inline h-3 w-3" />
-                        ) : cell.trend === "falling" ? (
-                          <TrendingDown className="mr-1 inline h-3 w-3" />
-                        ) : null}
-                        {trendLabel(cell.trend)}
-                      </Badge>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
-                        <div
-                          className={cn("h-full rounded-full transition-all", scoreColor(cell.sentiment_score))}
-                          style={{ width: `${cell.sentiment_score}%` }}
-                        />
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                          <div
+                            className={cn("h-full rounded-full transition-all", scoreColor(cell.sentiment_score))}
+                            style={{ width: `${Math.max(cell.sentiment_score, 4)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs tabular-nums font-medium text-foreground">
+                          {cell.sentiment_score}
+                        </span>
                       </div>
-                      <span className="text-xs tabular-nums text-muted-foreground">
-                        {cell.sentiment_score}
-                      </span>
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        {t("cellCounts", {
+                          grievance: cell.grievance_count,
+                          demand: cell.demand_count,
+                          total: cell.total,
+                        })}
+                      </p>
                     </div>
-                    <p className="mt-1 text-[10px] text-muted-foreground">
-                      {t("cellCounts", {
-                        grievance: cell.grievance_count,
-                        demand: cell.demand_count,
-                        total: cell.total,
-                      })}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -193,12 +246,13 @@ export function SentimentHeatmapPanel() {
                       key={`rise-${cell.district}-${cell.upazila}`}
                       className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm"
                     >
-                      <span className="font-medium">{cell.district}</span>
-                      {cell.upazila && (
-                        <span className="text-muted-foreground"> · {cell.upazila}</span>
-                      )}
-                      <span className="ml-2 text-xs text-red-400">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{cell.district}</span>
+                        <span className="tabular-nums text-red-300">{cell.sentiment_score}</span>
+                      </div>
+                      <span className="text-xs text-red-400">
                         {t("grievanceRatio", { pct: Math.round(cell.grievance_ratio * 100) })}
+                        {cell.hardship_hint ? ` · ${cell.hardship_hint}` : ""}
                       </span>
                     </li>
                   ))
@@ -234,15 +288,19 @@ export function SentimentHeatmapPanel() {
                             variant="outline"
                             className={cn(
                               "text-[10px]",
-                              article.sentimentCategory === "Grievance" && "border-red-500/40 text-red-400",
-                              article.sentimentCategory === "Demand" && "border-amber-500/40 text-amber-400",
+                              article.sentimentCategory === "Grievance" &&
+                                "border-red-500/40 text-red-400",
+                              article.sentimentCategory === "Demand" &&
+                                "border-amber-500/40 text-amber-400",
                             )}
                           >
                             {article.sentimentCategory}
                           </Badge>
                         )}
                         {article.district && (
-                          <span className="text-[10px] text-muted-foreground">{article.district}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {article.district}
+                          </span>
                         )}
                       </div>
                       <a

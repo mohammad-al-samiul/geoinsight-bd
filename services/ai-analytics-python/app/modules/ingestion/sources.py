@@ -197,6 +197,72 @@ GOOGLE_NEWS_TOPIC_FEEDS: tuple[FeedSource, ...] = (
         "google_news",
         "bn",
     ),
+    FeedSource(
+        "Google News — BD Protest Andolon",
+        "https://news.google.com/rss/search?q=%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE%E0%A6%A6%E0%A7%87%E0%A6%B6+%E0%A6%86%E0%A6%A8%E0%A7%8D%E0%A6%A6%E0%A7%8B%E0%A6%B2%E0%A6%A8+%E0%A6%AC%E0%A6%BF%E0%A6%95%E0%A7%8D%E0%A6%B7%E0%A7%8B%E0%A6%AD&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
+        "Google News — BD Protest EN",
+        "https://news.google.com/rss/search?q=bangladesh+protest+OR+demonstration+OR+strike+OR+hartal&hl=en&gl=BD&ceid=BD:en",
+        "google_news",
+        "en",
+    ),
+    FeedSource(
+        "Google News — BD New Law Bill",
+        "https://news.google.com/rss/search?q=%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE%E0%A6%A6%E0%A7%87%E0%A6%B6+%E0%A6%86%E0%A6%87%E0%A6%A8+%E0%A6%AC%E0%A6%BF%E0%A6%B2+%E0%A6%86%E0%A6%A6%E0%A7%87%E0%A6%B6&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
+        "Google News — BD Law Protest EN",
+        "https://news.google.com/rss/search?q=bangladesh+(law+OR+bill+OR+ordinance)+protest&hl=en&gl=BD&ceid=BD:en",
+        "google_news",
+        "en",
+    ),
+    FeedSource(
+        "Google News — BD Govt Discontent",
+        "https://news.google.com/rss/search?q=%E0%A6%B8%E0%A6%B0%E0%A6%95%E0%A6%BE%E0%A6%B0+%E0%A6%AC%E0%A6%BF%E0%A6%B0%E0%A7%81%E0%A6%A6%E0%A7%8D%E0%A6%A7%E0%A7%87+%E0%A6%85%E0%A6%B8%E0%A6%A8%E0%A7%8D%E0%A6%A4%E0%A7%8B%E0%A6%B7&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
+        "Google News — BD Social Viral",
+        "https://news.google.com/rss/search?q=bangladesh+(facebook+OR+viral)+protest+OR+%E0%A6%AD%E0%A6%BE%E0%A6%87%E0%A6%B0%E0%A6%BE%E0%A6%B2&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
+        "Google News — BD Politics Analysis",
+        "https://news.google.com/rss/search?q=bangladesh+(politics+OR+election+OR+interim+government+OR+reform)+analysis&hl=en&gl=BD&ceid=BD:en",
+        "google_news",
+        "en",
+    ),
+    FeedSource(
+        "Google News — BD Economy IMF",
+        "https://news.google.com/rss/search?q=bangladesh+(IMF+OR+reserves+OR+inflation+OR+RMG+OR+remittance+OR+banking)+economy&hl=en&gl=BD&ceid=BD:en",
+        "google_news",
+        "en",
+    ),
+    FeedSource(
+        "Google News — BD Economy BN",
+        "https://news.google.com/rss/search?q=%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE%E0%A6%A6%E0%A7%87%E0%A6%B6+%E0%A6%85%E0%A6%B0%E0%A7%8D%E0%A6%A5%E0%A6%A8%E0%A7%80%E0%A6%A4%E0%A6%BF+%E0%A6%AE%E0%A7%82%E0%A6%B2%E0%A7%8D%E0%A6%AF%E0%A6%B8%E0%A7%8D%E0%A6%AB%E0%A7%80%E0%A6%A4%E0%A6%BF+%E0%A6%B0%E0%A7%87%E0%A6%AE%E0%A6%BF%E0%A6%9F%E0%A7%87%E0%A6%A8%E0%A7%8D%E0%A6%B8&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
+        "Google News — Think Tank BD",
+        "https://news.google.com/rss/search?q=bangladesh+(site:crisisgroup.org+OR+site:orfonline.org+OR+site:csis.org+OR+site:thediplomat.com+OR+site:brookings.edu)&hl=en&gl=BD&ceid=BD:en",
+        "google_news",
+        "en",
+    ),
+    FeedSource(
+        "Google News — World Bank ADB BD",
+        "https://news.google.com/rss/search?q=bangladesh+(World+Bank+OR+ADB+OR+%22Asian+Development%22)+economy&hl=en&gl=BD&ceid=BD:en",
+        "google_news",
+        "en",
+    ),
 )
 
 GOOGLE_NEWS_FEEDS: tuple[FeedSource, ...] = GOOGLE_NEWS_SITE_FEEDS + GOOGLE_NEWS_TOPIC_FEEDS
