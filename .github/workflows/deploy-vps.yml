@@ -1,0 +1,60 @@
+# GeoInsight BD — Push to main → auto-update VPS
+#
+# Flow: git push origin main → GitHub Actions SSH → VPS git pull + docker compose up --build
+#
+# Required GitHub Secrets (Settings → Secrets and variables → Actions):
+#   VPS_HOST      = 187.127.185.67   (your VPS public IP)
+#   VPS_USER      = root             (or deploy user)
+#   VPS_SSH_KEY   = private SSH key (full PEM including BEGIN/END lines)
+#
+# Optional:
+#   VPS_SSH_PORT      = 22
+#   VPS_DEPLOY_PATH   = /opt/geoinsight-bd
+
+name: Deploy VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Hostinger VPS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          script_stop: true
+          command_timeout: 45m
+          script: |
+            set -euo pipefail
+            DEPLOY_PATH="${{ secrets.VPS_DEPLOY_PATH || '/opt/geoinsight-bd' }}"
+            cd "$DEPLOY_PATH"
+
+            if [ ! -f .env ]; then
+              echo "ERROR: $DEPLOY_PATH/.env missing"
+              exit 1
+            fi
+
+            if [ ! -d .git ]; then
+              echo "ERROR: $DEPLOY_PATH is not a git clone — clone the repo there first"
+              exit 1
+            fi
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            chmod +x deploy/scripts/vps-redeploy.sh deploy/scripts/docker-db-init.sh || true
+            bash deploy/scripts/vps-redeploy.sh
+
+            echo "Deploy OK — $(date -Is)"

@@ -16,11 +16,10 @@
 #   NEXT_PUBLIC_API_URL       — e.g. https://geoinsight.gov.bd/api/v1
 #   NEXT_PUBLIC_SOCKET_URL    — e.g. https://geoinsight.gov.bd
 
-name: Deploy Production
+name: Deploy Production (GHCR)
 
 on:
-  push:
-    branches: [main]
+  # Manual only — automatic VPS updates use deploy-vps.yml (git pull + compose build)
   workflow_dispatch:
 
 concurrency:

@@ -90,8 +90,13 @@ echo "==> Building & starting stack (this can take 10–20 min)"
 docker compose -f docker-compose.yml -f docker-compose.apps.yml up -d --build
 
 echo ""
+echo "If db-init failed previously, re-run after pull:"
+echo "  docker compose -f docker-compose.yml -f docker-compose.apps.yml up -d --build"
+echo ""
 echo "Done."
 echo "  Dashboard: http://${VPS_IP}:3000"
 echo "  API:       http://${VPS_IP}:4800/api/v1/health"
 echo "Login (default seed): pmo@geoinsight.gov.bd / ChangeMe@123"
 echo "Change root password + seed login immediately."
+echo ""
+echo "CI/CD: add GitHub secrets VPS_HOST, VPS_USER, VPS_SSH_KEY then push to main."

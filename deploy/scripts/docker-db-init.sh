@@ -1,5 +1,6 @@
 #!/bin/bash
 # One-shot DB bootstrap for Docker Compose (idempotent)
+# Requires: Prisma migrations already applied (db-migrate service)
 set -euo pipefail
 
 export PGHOST="${PGHOST:-postgres}"
@@ -10,6 +11,19 @@ export PGPASSWORD="${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}"
 
 echo "[db-init] Waiting for PostgreSQL at ${PGHOST}:${PGPORT}..."
 until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE"; do
+  sleep 2
+done
+
+echo "[db-init] Waiting for schema (admin_units) from Prisma migrate..."
+for i in $(seq 1 60); do
+  if psql -tAc "SELECT 1 FROM information_schema.tables WHERE table_name='admin_units'" | grep -q 1; then
+    echo "[db-init] Schema ready."
+    break
+  fi
+  if [ "$i" -eq 60 ]; then
+    echo "[db-init] ERROR: admin_units missing — run db-migrate (prisma migrate deploy) first."
+    exit 1
+  fi
   sleep 2
 done
 
@@ -30,7 +44,11 @@ done
 echo "[db-init] Repairing Bengali admin unit labels..."
 psql -v ON_ERROR_STOP=1 -c "SET client_encoding TO 'UTF8';" -f /scripts/fix-admin-unit-bn.sql
 
-if ! psql -tAc "SELECT 1 FROM users WHERE email='pmo@geoinsight.gov.bd'" | grep -q 1; then
+PMO_EXISTS="$(psql -tAc "SELECT 1 FROM users WHERE email='pmo@geoinsight.gov.bd'" 2>/dev/null || true)"
+if [ "${PMO_EXISTS}" = "1" ]; then
+  echo "[db-init] PMO user exists — updating password hash..."
+  psql -v ON_ERROR_STOP=1 -f /scripts/bootstrap-pmo.sql
+else
   echo "[db-init] Creating PMO bootstrap user..."
   psql -v ON_ERROR_STOP=1 <<'EOSQL'
 INSERT INTO users (id, email, password_hash, role, is_active, created_at, updated_at)
@@ -42,11 +60,13 @@ VALUES (
   true,
   NOW(),
   NOW()
-);
+)
+ON CONFLICT (email) DO UPDATE SET
+  password_hash = EXCLUDED.password_hash,
+  role = EXCLUDED.role,
+  is_active = true,
+  updated_at = NOW();
 EOSQL
-else
-  echo "[db-init] PMO user exists — updating password hash..."
-  psql -v ON_ERROR_STOP=1 -f /scripts/bootstrap-pmo.sql
 fi
 
 echo "[db-init] Done."
