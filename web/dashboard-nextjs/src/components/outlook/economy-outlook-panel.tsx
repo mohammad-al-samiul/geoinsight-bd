@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   ArrowDownRight,
   ArrowLeft,
@@ -47,6 +47,7 @@ function DirIcon({ direction }: { direction: string }) {
 
 export function EconomyOutlookPanel() {
   const t = useTranslations("modules.outlookEconomy");
+  const locale = useLocale();
   const { data, loading, error, reload, refresh, refreshing } = useStrategicOutlook();
   useRealtimeRefresh(reload);
 
@@ -91,6 +92,11 @@ export function EconomyOutlookPanel() {
             <Badge variant="outline" className="text-[10px]">
               {t("badgeEconomy")}
             </Badge>
+            {data.government && (
+              <Badge className="border-teal-500/40 bg-teal-500/10 text-[10px] text-teal-200">
+                {locale === "bn" ? data.government.label_bn : data.government.label_en}
+              </Badge>
+            )}
             <Button
               size="sm"
               variant="outline"

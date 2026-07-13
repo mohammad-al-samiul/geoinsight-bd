@@ -235,7 +235,7 @@ GOOGLE_NEWS_TOPIC_FEEDS: tuple[FeedSource, ...] = (
     ),
     FeedSource(
         "Google News — BD Politics Analysis",
-        "https://news.google.com/rss/search?q=bangladesh+(politics+OR+election+OR+interim+government+OR+reform)+analysis&hl=en&gl=BD&ceid=BD:en",
+        "https://news.google.com/rss/search?q=bangladesh+(politics+OR+BNP+OR+cabinet+OR+parliament+OR+manifesto+OR+opposition)+analysis+after:2026-02-01&hl=en&gl=BD&ceid=BD:en",
         "google_news",
         "en",
     ),

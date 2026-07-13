@@ -53,6 +53,10 @@ const envSchema = z.object({
 
   LIVE_DATA_ONLY: z.string().default("true").transform((v) => v === "true"),
 
+  /** National election / new cabinet — politics/economy/unrest scoped from this date */
+  CURRENT_GOVERNMENT_SINCE: z.string().default("2026-02-15"),
+  CURRENT_GOVERNMENT_PARTY: z.string().default("BNP"),
+
   FABRIC_ENABLED: z.string().default("false").transform((v) => v === "true"),
   FABRIC_CONNECTION_PROFILE_PATH: z
     .string()

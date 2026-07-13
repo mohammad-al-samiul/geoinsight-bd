@@ -11,12 +11,13 @@ import {
   type ScopeContext,
 } from "../../shared/scope/scope-context";
 import {
-  emptyImpact,
+  aggregateSegmentedImpact,
+  buildImpactWindows,
   extractNewsImpact,
-  mergeImpact,
+  type SegmentedNewsImpact,
 } from "../../shared/impact/news-impact";
 
-const WEATHER_CACHE_KEY = "weather:live:v2";
+const WEATHER_CACHE_KEY = "weather:live:v4";
 const WEATHER_CACHE_TTL_SEC = 900;
 
 const FLOOD_KEYWORDS = ["বন্যা", "flood", "inundat", "water level", "পানি বৃদ্ধি", "landslide"];
@@ -113,15 +114,9 @@ export interface WeatherLiveSummary {
     max_severity: number;
     refreshed_at: string;
     sources: string[];
-    flood_impact: {
-      deaths: number;
-      injuries: number;
-      homes_damaged: number;
-      livestock_lost: number;
-      damage_mentions: number;
-      evidence: string[];
-      disclaimer_bn: string;
-      disclaimer_en: string;
+    flood_impact: SegmentedNewsImpact & {
+      default_window: number;
+      windows: Record<string, SegmentedNewsImpact>;
     };
   };
   scope?: ScopeContext;
@@ -439,31 +434,37 @@ export class WeatherService {
   }
 
   private async buildFloodImpactFromNews() {
-    const since = new Date(Date.now() - 7 * 86400 * 1000);
+    const disclaimers = {
+      bn: "বন্যা: আনুমানিক = জেলা/দিনে সর্বোচ্চ (যোগ নয়)। অফিসিয়াল হিসাব নয়।",
+      en: "Flood: estimate = max per district/day (not summed). Not an official tally.",
+    };
+    const since = new Date(Date.now() - 30 * 86400 * 1000);
     const articles = await prismaRead.externalArticle.findMany({
       where: { fetchedAt: { gte: since } },
-      select: { title: true, summary: true },
-      take: 400,
+      select: { title: true, summary: true, district: true, publishedAt: true, fetchedAt: true, url: true },
+      take: 600,
     });
 
-    let total = emptyImpact();
+    const items = [];
     for (const article of articles) {
       const text = `${article.title} ${article.summary ?? ""}`.toLowerCase();
       if (!FLOOD_KEYWORDS.some((k) => text.includes(k.toLowerCase()))) continue;
-      total = mergeImpact(total, extractNewsImpact(article.title, article.summary));
+      items.push({
+        district: article.district,
+        publishedAt: article.publishedAt ?? article.fetchedAt,
+        impact: extractNewsImpact(article.title, article.summary),
+        title: article.title,
+        url: article.url,
+      });
     }
 
+    const windows = buildImpactWindows(items, [1, 7, 30], new Date(), disclaimers);
+    const primary =
+      windows["7"] ?? aggregateSegmentedImpact(items, 7, new Date(), disclaimers);
     return {
-      deaths: total.deaths,
-      injuries: total.injuries,
-      homes_damaged: total.homes_damaged,
-      livestock_lost: total.livestock_lost,
-      damage_mentions: total.damage_mentions,
-      evidence: total.evidence,
-      disclaimer_bn:
-        "বন্যায় মৃত্যু/ঘরবাড়ি/গবাদি পশুর সংখ্যা সংবাদ থেকে স্বয়ংক্রিয় আহরণ — সরকারি চূড়ান্ত হিসাব নয়।",
-      disclaimer_en:
-        "Flood deaths/homes/livestock figures are auto-extracted from news — not an official tally.",
+      ...primary,
+      default_window: 7,
+      windows,
     };
   }
 
@@ -513,16 +514,9 @@ export class WeatherService {
         refreshed_at: new Date().toISOString(),
         sources: [],
         flood_impact: {
-          deaths: 0,
-          injuries: 0,
-          homes_damaged: 0,
-          livestock_lost: 0,
-          damage_mentions: 0,
-          evidence: [],
-          disclaimer_bn:
-            "বন্যায় মৃত্যু/ঘরবাড়ি/গবাদি পশুর সংখ্যা সংবাদ থেকে স্বয়ংক্রিয় আহরণ — সরকারি চূড়ান্ত হিসাব নয়।",
-          disclaimer_en:
-            "Flood deaths/homes/livestock figures are auto-extracted from news — not an official tally.",
+          ...aggregateSegmentedImpact([], 7),
+          default_window: 7,
+          windows: buildImpactWindows([], [1, 7, 30]),
         },
       },
     };

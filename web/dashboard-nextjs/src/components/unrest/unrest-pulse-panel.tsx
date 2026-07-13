@@ -69,6 +69,13 @@ export function UnrestPulsePanel() {
                 {s}
               </Badge>
             ))}
+            {data.summary.government && (
+              <Badge className="border-teal-500/40 bg-teal-500/10 text-[10px] text-teal-200">
+                {locale === "bn"
+                  ? data.summary.government.label_bn
+                  : data.summary.government.label_en}
+              </Badge>
+            )}
             {data.summary.top_district && (
               <span className="ml-auto inline-flex items-center gap-1 text-red-300">
                 <TrendingUp className="h-3.5 w-3.5" />
@@ -92,19 +99,8 @@ export function UnrestPulsePanel() {
             <ImpactStatsPanel
               title={t("impactTitle")}
               subtitle={t("impactSubtitle")}
-              stats={{
-                deaths: data.summary.impact.deaths,
-                civilian_deaths: data.summary.impact.civilian_deaths,
-                injuries: data.summary.impact.injuries,
-                homes_damaged: data.summary.impact.homes_damaged,
-                livestock_lost: data.summary.impact.livestock_lost,
-                damage_mentions: data.summary.impact.damage_mentions,
-                evidence: data.summary.impact.evidence,
-                disclaimer:
-                  locale === "bn"
-                    ? data.summary.impact.disclaimer_bn
-                    : data.summary.impact.disclaimer_en,
-              }}
+              locale={locale}
+              stats={data.summary.impact}
               labels={{
                 deaths: t("impactDeaths"),
                 civilian: t("impactCivilian"),
@@ -113,6 +109,17 @@ export function UnrestPulsePanel() {
                 livestock: t("impactLivestock"),
                 damageMentions: t("impactDamageMentions"),
                 evidence: t("impactEvidence"),
+                estimate: t("impactEstimate"),
+                mentions: t("impactMentions"),
+                window1: t("impactWindow1"),
+                window7: t("impactWindow7"),
+                window30: t("impactWindow30"),
+                byDistrict: t("impactByDistrict"),
+                byEvent: t("impactByEvent"),
+                byEventHint: t("impactByEventHint"),
+                deathMentions: t("impactDeathMentions"),
+                injuryMentions: t("impactInjuryMentions"),
+                methodHint: t("impactMethodHint"),
               }}
             />
           )}

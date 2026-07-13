@@ -17,6 +17,7 @@ class OutlookGenerateRequest(BaseModel):
     sources: list[OutlookSourceIn] = Field(default_factory=list)
     unrest_summary: dict | None = None
     metrics: dict | None = None
+    government_context: dict | None = None
 
 
 class ChallengeItem(BaseModel):

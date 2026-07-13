@@ -133,6 +133,14 @@ export interface StrategicOutlook {
   llm_used?: boolean;
   sources: OutlookSource[];
   unrest?: Record<string, unknown>;
+  government?: {
+    term_started_on: string;
+    ruling_party: string;
+    label_bn: string;
+    label_en: string;
+    election_bn: string;
+    election_en: string;
+  };
   refreshed_at?: string;
   politics_deep?: PoliticsDeep;
   economy_deep?: EconomyDeep;

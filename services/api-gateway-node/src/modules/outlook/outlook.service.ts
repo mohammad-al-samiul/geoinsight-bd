@@ -3,16 +3,22 @@ import { prismaRead } from "../../core/database/prisma.client";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
 import { broadcastDashboardRefresh } from "../pipeline/pipeline.broadcast";
 import { unrestService } from "../unrest/unrest.service";
+import {
+  getCurrentMandate,
+  mandateAnalysisSince,
+  mandatePublicMeta,
+} from "../../shared/gov/current-mandate";
 
-const OUTLOOK_CACHE_KEY = "outlook:strategic:v2";
+const OUTLOOK_CACHE_KEY = "outlook:strategic:v3";
 const OUTLOOK_TTL_SEC = 1800;
-const LOOKBACK_DAYS = 21;
+/** Rolling cap inside the current mandate window */
+const LOOKBACK_DAYS = 90;
 
 const POLITICS_KW = [
-  "politics", "election", "interim", "reform", "constitution", "democracy",
-  "parliament", "cabinet", "minister", "party", "protest", "governance",
-  "রাজনীতি", "নির্বাচন", "অন্তর্বর্তী", "সংস্কার", "সংবিধান", "সরকার",
-  "মন্ত্রিসভা", "দল", "আন্দোলন", "শাসন",
+  "politics", "election", "parliament", "cabinet", "minister", "party",
+  "protest", "governance", "opposition", "bnp", "manifesto", "reform",
+  "রাজনীতি", "নির্বাচন", "সংসদ", "মন্ত্রিসভা", "মন্ত্রী", "দল",
+  "আন্দোলন", "শাসন", "বিরোধী", "বিএনপি", "ইশতেহার", "সংস্কার", "সরকার",
 ];
 
 const ECONOMY_KW = [
@@ -80,11 +86,16 @@ export class OutlookService {
   }
 
   private async buildStrategic(lang: "bn" | "en"): Promise<Record<string, unknown>> {
-    const since = new Date(Date.now() - LOOKBACK_DAYS * 86400 * 1000);
+    const mandate = getCurrentMandate({
+      CURRENT_GOVERNMENT_SINCE: env.CURRENT_GOVERNMENT_SINCE,
+      CURRENT_GOVERNMENT_PARTY: env.CURRENT_GOVERNMENT_PARTY,
+    });
+    const since = mandateAnalysisSince(LOOKBACK_DAYS, mandate);
+
     const articles = await prismaRead.externalArticle.findMany({
       where: { fetchedAt: { gte: since } },
       orderBy: { fetchedAt: "desc" },
-      take: 400,
+      take: 800,
       select: {
         title: true,
         summary: true,
@@ -106,6 +117,8 @@ export class OutlookService {
     }> = [];
 
     for (const a of articles) {
+      const published = a.publishedAt ?? a.fetchedAt;
+      if (published < mandate.termStartedAt) continue;
       const text = `${a.title} ${a.summary ?? ""}`;
       const domain = classifyDomain(text);
       if (!domain) continue;
@@ -114,15 +127,14 @@ export class OutlookService {
         source: a.sourceName,
         url: a.url,
         domain,
-        published_at: (a.publishedAt ?? a.fetchedAt).toISOString(),
+        published_at: published.toISOString(),
         summary: a.summary,
         analyst_like: isAnalystLike(a.sourceName, text),
       });
     }
 
-    // Prefer analyst-like pieces first, then recent
     sources.sort((a, b) => Number(b.analyst_like) - Number(a.analyst_like));
-    const trimmed = sources.slice(0, 60);
+    const trimmed = sources.slice(0, 80);
 
     let unrestSummary: Record<string, unknown> = {};
     try {
@@ -137,8 +149,11 @@ export class OutlookService {
       unrestSummary = {};
     }
 
+    const government = mandatePublicMeta(mandate);
+
     const aiPayload = {
       lang,
+      government_context: government,
       sources: trimmed.map((s) => ({
         title: s.title,
         source: s.source,
@@ -185,7 +200,9 @@ export class OutlookService {
       ...aiResult,
       sources: trimmed,
       unrest: unrestSummary,
+      government,
       lookback_days: LOOKBACK_DAYS,
+      analysis_since: since.toISOString(),
       refreshed_at: new Date().toISOString(),
     };
   }

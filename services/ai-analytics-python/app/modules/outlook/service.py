@@ -26,9 +26,10 @@ from app.modules.outlook.schemas import (
 )
 
 POLITICS_THEME_KW: dict[str, tuple[str, ...]] = {
-    "governance_legitimacy": (
-        "interim", "election", "reform", "constitution", "caretaker",
-        "অন্তর্বর্তী", "নির্বাচন", "সংস্কার", "সংবিধান",
+    "governance_delivery": (
+        "cabinet", "parliament", "bnp", "ruling", "manifesto", "minister",
+        "opposition", "coalition", "governance", "delivery",
+        "মন্ত্রিসভা", "সংসদ", "বিএনপি", "ইশতেহার", "মন্ত্রী", "বিরোধী", "শাসন",
     ),
     "security_unrest": (
         "protest", "violence", "clash", "security", "police",
@@ -91,7 +92,7 @@ class OutlookService:
         scenarios = self._build_scenarios(req, bn)
         politics_deep = self._build_politics_deep(req, challenges, direction, bn)
         economy_deep = self._build_economy_deep(req, challenges, direction, bn)
-        narrative = self._build_narrative(challenges, direction, scenarios, bn)
+        narrative = self._build_narrative(req, challenges, direction, scenarios, bn)
         llm_used = False
 
         if self._ollama.enabled and req.sources:
@@ -150,7 +151,7 @@ class OutlookService:
             )
 
         labels = {
-            "governance_legitimacy": ("শাসন ও নির্বাচনী বৈধতা", "Governance & electoral legitimacy"),
+            "governance_delivery": ("নির্বাচিত সরকারের শাসন ও প্রতিশ্রুতি", "Elected government delivery & pledges"),
             "security_unrest": ("নিরাপত্তা ও জনঅসন্তোষ", "Security & public unrest"),
             "institutional_reform": ("প্রাতিষ্ঠানিক সংস্কার চাপ", "Institutional reform pressure"),
             "foreign_policy": ("পররাষ্ট্র ও ভূরাজনীতি", "Foreign policy & geopolitics"),
@@ -161,9 +162,9 @@ class OutlookService:
         }
 
         summaries = {
-            "governance_legitimacy": (
-                "নির্বাচন/সংস্কার/অন্তর্বর্তী শাসন নিয়ে সংবাদে চাপ — রাজনৈতিক রোডম্যাপের অনিশ্চয়তা সরকারের প্রধান চ্যালেঞ্জ।",
-                "News stress around elections/reforms/interim governance — roadmap uncertainty is a core political challenge.",
+            "governance_delivery": (
+                "ফেব্রুয়ারি ২০২৬ নির্বাচনের পর ক্ষমতাসীন সরকারের ইশতেহার/মন্ত্রিসভা/সংসদ কার্যক্রম নিয়ে সংবাদ চাপ — বাস্তবায়নই মূল চ্যালেঞ্জ।",
+                "Post–Feb 2026 election: news stress on ruling cabinet/parliament/manifesto delivery — implementation is the core challenge.",
             ),
             "security_unrest": (
                 "বিক্ষোভ/সহিংসতা/জেলাভিত্তিক অসন্তোষ সংকেত সক্রিয় — আইনশৃঙ্খলা ও সামাজিক স্থিতি রক্ষায় চাপ।",
@@ -280,9 +281,9 @@ class OutlookService:
                 domain="politics",
                 trajectory=pol_traj,
                 summary=(
-                    f"রাজনীতি: {traj_bn[pol_traj]} — নির্বাচন/সংস্কার/অসন্তোষ সংকেত অনুযায়ী দিক নির্ধারণ।"
+                    f"রাজনীতি: {traj_bn[pol_traj]} — নির্বাচিত সরকারের বাস্তবায়ন/সংস্কার/অসন্তোষ সংকেত অনুযায়ী।"
                     if bn
-                    else f"Politics: {pol_traj} — direction inferred from election/reform/unrest signals."
+                    else f"Politics: {pol_traj} — direction inferred from delivery/reform/unrest signals."
                 ),
                 drivers=[
                     f"politics sources: {pol}",
@@ -312,15 +313,15 @@ class OutlookService:
                     label="ভিত্তি দৃশ্যপট (Base)",
                     horizon="৩–৫ বছর",
                     probability_band="base",
-                    politics="ধাপে ধাপে নির্বাচনী/প্রাতিষ্ঠানিক সংস্কার; অসন্তোষ নিয়ন্ত্রণযোগ্য থাকলে স্থিতিশীলতা বাড়ে।",
+                    politics="নির্বাচিত সরকার ধাপে ধাপে ইশতেহার/প্রাতিষ্ঠানিক সংস্কার এগোয়; অসন্তোষ নিয়ন্ত্রণযোগ্য থাকলে স্থিতিশীলতা বাড়ে।",
                     economy="IMF কর্মসূচি ও রেমিট্যান্স/RMG পুনরুদ্ধার ধীর গতিতে ম্যাক্রো স্থিতি ফেরায়; মূল্যস্ফীতি ধীরে কমতে পারে।",
-                    watchpoints=["নির্বাচনী রোডম্যাপ", "রিজার্ভ ও মূল্যস্ফীতি", "ব্যাংকিং সংস্কার"],
+                    watchpoints=["ইশতেহার বাস্তবায়ন", "রিজার্ভ ও মূল্যস্ফীতি", "ব্যাংকিং সংস্কার"],
                 ),
                 ScenarioItem(
                     label="প্রতিকূল দৃশ্যপট (Adverse)",
                     horizon="৩–৫ বছর",
                     probability_band="adverse",
-                    politics="সংস্কার বিলম্ব + বিক্ষোভ/জেলা অসন্তোষ তীব্র হলে শাসন ক্ষমতা ও বৈধতা চাপে পড়ে।",
+                    politics="প্রতিশ্রুতি বিলম্ব + বিক্ষোভ/জেলা অসন্তোষ তীব্র হলে শাসন ক্ষমতা ও জনআস্থা চাপে পড়ে।",
                     economy="রিজার্ভ চাপ, ব্যাংকিং দুর্বলতা ও রপ্তানি মন্দার সমন্বয়ে প্রবৃদ্ধি ও কর্মসংস্থান ক্ষতিগ্রস্ত।",
                     watchpoints=["সহিংসতা/হরতাল", "IMF শর্ত পূরণ ব্যর্থতা", "RMG অর্ডার পতন"],
                 ),
@@ -328,7 +329,7 @@ class OutlookService:
                     label="সংস্কার দৃশ্যপট (Reform)",
                     horizon="৩–৫ বছর",
                     probability_band="reform",
-                    politics="স্বচ্ছ নির্বাচন ও প্রাতিষ্ঠানিক সংস্কার এগোলে রাজনৈতিক অনিশ্চয়তা কমে বিনিয়োগ আস্থা বাড়ে।",
+                    politics="দৃশ্যমান শাসন ডেলিভারি ও প্রাতিষ্ঠানিক সংস্কার এগোলে রাজনৈতিক অনিশ্চয়তা কমে বিনিয়োগ আস্থা বাড়ে।",
                     economy="আর্থিক খাত পরিচ্ছন্নতা + রপ্তানি বৈচিত্র্য + জ্বালানি স্থিতি থাকলে মধ্যমেয়াদে স্থিতিশীল প্রবৃদ্ধি সম্ভব।",
                     watchpoints=["সংস্কার বাস্তবায়ন গতি", "FDI/বিনিয়োগ প্রবাহ", "শ্রমবাজার স্থিতি"],
                 ),
@@ -338,15 +339,15 @@ class OutlookService:
                 label="Base case",
                 horizon="3–5 years",
                 probability_band="base",
-                politics="Gradual electoral/institutional reform; stability improves if unrest stays manageable.",
+                politics="Elected government gradually delivers manifesto/institutional reform; stability improves if unrest stays manageable.",
                 economy="IMF program plus remittance/RMG recovery slowly restore macro stability; inflation eases gradually.",
-                watchpoints=["Election roadmap", "Reserves & inflation", "Banking reform"],
+                watchpoints=["Manifesto delivery", "Reserves & inflation", "Banking reform"],
             ),
             ScenarioItem(
                 label="Adverse case",
                 horizon="3–5 years",
                 probability_band="adverse",
-                politics="Reform delays plus sharper protests/district unrest weaken governance capacity and legitimacy.",
+                politics="Delivery slippage plus sharper protests/district unrest put governing capacity and public trust under pressure.",
                 economy="Combined reserve stress, banking weakness and export slowdown hit growth and jobs.",
                 watchpoints=["Violence/hartals", "IMF program slippage", "RMG order drop"],
             ),
@@ -354,7 +355,7 @@ class OutlookService:
                 label="Reform case",
                 horizon="3–5 years",
                 probability_band="reform",
-                politics="Credible elections and institutional reform reduce uncertainty and lift investment confidence.",
+                politics="Visible governing delivery and institutional reform reduce uncertainty and lift investment confidence.",
                 economy="Financial cleanup + export diversification + energy stability enable steadier medium-term growth.",
                 watchpoints=["Reform delivery speed", "FDI inflows", "Labor-market stability"],
             ),
@@ -362,6 +363,7 @@ class OutlookService:
 
     def _build_narrative(
         self,
+        req: OutlookGenerateRequest,
         challenges: list[ChallengeItem],
         direction: list[DirectionItem],
         scenarios: list[ScenarioItem],
@@ -370,8 +372,10 @@ class OutlookService:
         pol = [c for c in challenges if c.domain == "politics"]
         eco = [c for c in challenges if c.domain == "economy"]
         if bn:
+            gov = (req.government_context or {}).get("label_bn") or "বর্তমান সরকার (BNP, ফেব্রুয়ারি ২০২৬–)"
             lines = [
-                "বাংলাদেশ — রাজনৈতিক ও অর্থনৈতিক কৌশলগত আউটলুক (খোলা সোর্স ভিত্তিক)।",
+                f"বাংলাদেশ — রাজনৈতিক ও অর্থনৈতিক কৌশলগত আউটলুক · {gov}।",
+                "বিশ্লেষণ শুধু জাতীয় নির্বাচন ফেব্রুয়ারি ২০২৬-এর পরের মেয়াদ নিয়ে।",
                 "",
                 "বর্তমান সরকারের প্রধান চ্যালেঞ্জ:",
             ]
@@ -389,8 +393,10 @@ class OutlookService:
                 lines.append(f"• {s.label}: {s.politics} | {s.economy}")
             return "\n".join(lines)
 
+        gov = (req.government_context or {}).get("label_en") or "Current government (BNP, Feb 2026–)"
         lines = [
-            "Bangladesh — Political & Economic Strategic Outlook (open-source grounded).",
+            f"Bangladesh — Political & Economic Strategic Outlook · {gov}.",
+            "Scoped to the post–February 2026 national election mandate only.",
             "",
             "Current government challenges:",
         ]
@@ -459,10 +465,10 @@ class OutlookService:
                 ),
                 PressureItem(
                     id="pol_election",
-                    title="নির্বাচনী রোডম্যাপ ও বৈধতা চাপ",
+                    title="ইশতেহার ও শাসন বাস্তবায়ন চাপ",
                     intensity=gov_i,
                     status="active",
-                    summary="নির্বাচন/অন্তর্বর্তী শাসন/সংবিধান সংস্কার নিয়ে অনিশ্চয়তা রাজনৈতিক বৈধতার কেন্দ্রীয় চাপ।",
+                    summary="ফেব্রুয়ারি ২০২৬ নির্বাচনের পর ক্ষমতাসীন সরকারের প্রতিশ্রুতি/মন্ত্রিসভা সিদ্ধান্ত বাস্তবায়নই বৈধতা ও জনআস্থার কেন্দ্র।",
                     evidence=cites,
                 ),
                 PressureItem(
@@ -485,11 +491,11 @@ class OutlookService:
             upcoming = [
                 RiskItem(
                     id="risk_election_delay",
-                    title="নির্বাচন/রোডম্যাপ বিলম্ব",
+                    title="প্রতিশ্রুতি/বাস্তবায়ন বিলম্ব",
                     likelihood="high" if gov_i >= 50 else "medium",
                     horizon="৬–১৮ মাস",
-                    summary="রোডম্যাপ অস্পষ্ট থাকলে রাস্তার চাপ ও দলীয় মেরুকরণ তীব্র হতে পারে।",
-                    early_signals=["নির্বাচন কমিশন বিতর্ক", "বড় বিক্ষোভ", "সংস্কার বিলম্ব সংবাদ"],
+                    summary="ইশতেহার বাস্তবায়ন ধীর হলে বিরোধী চাপ ও রাস্তার অসন্তোষ বাড়তে পারে।",
+                    early_signals=["মন্ত্রিসভা বিতর্ক", "বড় বিক্ষোভ", "সংস্কার বিলম্ব সংবাদ"],
                 ),
                 RiskItem(
                     id="risk_local_violence",
@@ -519,14 +525,14 @@ class OutlookService:
             solutions = [
                 SolutionItem(
                     id="sol_roadmap",
-                    title="স্বচ্ছ নির্বাচনী রোডম্যাপ প্রকাশ",
+                    title="ইশতেহার ডেলিভারি স্কোরকার্ড",
                     targets=["pol_election", "risk_election_delay"],
                     steps=[
-                        "তারিখ/ধাপসহ রোডম্যাপ জনসমক্ষে প্রকাশ",
-                        "নির্বাচন কমিশনের স্বাধীনতা নিশ্চিত করার দৃশ্যমান পদক্ষেপ",
-                        "পর্যবেক্ষক ও নাগরিক সমাজের সাথে নিয়মিত ব্রিফিং",
+                        "প্রধান প্রতিশ্রুতির মাসিক পাবলিক অগ্রগতি",
+                        "মন্ত্রণালয়ভিত্তিক দায়িত্ব ও সময়সীমা প্রকাশ",
+                        "সংসদ ও নাগরিক সমাজের সাথে নিয়মিত ব্রিফিং",
                     ],
-                    expected_effect="অনিশ্চয়তা কমে বৈধতা চাপ ও রাস্তার উত্তেজনা কমতে পারে।",
+                    expected_effect="বাস্তবায়ন দৃশ্যমান হলে বৈধতা চাপ ও রাস্তার উত্তেজনা কমতে পারে।",
                     timeframe="৩–৯ মাস",
                 ),
                 SolutionItem(
@@ -587,9 +593,10 @@ class OutlookService:
                 ),
             ]
             narrative = (
-                f"রাজনৈতিক চাপ এখন মূলত নির্বাচনী অনিশ্চয়তা, প্রাতিষ্ঠানিক সংস্কার বিলম্ব ও জেলা অসন্তোষকে ঘিরে। "
+                f"রাজনৈতিক চাপ এখন মূলত নির্বাচিত সরকারের প্রতিশ্রুতি বাস্তবায়ন, প্রাতিষ্ঠানিক সংস্কার ও জেলা অসন্তোষকে ঘিরে "
+                f"(ফেব্রুয়ারি ২০২৬ নির্বাচন–পরবর্তী মেয়াদ)। "
                 f"দিক: {(pol_dir.trajectory if pol_dir else 'uncertain')}। "
-                "সমাধান = স্বচ্ছ রোডম্যাপ + ডি-এস্কেলেশন + দৃশ্যমান সংস্কার ডেলিভারি; প্রতিরোধ = আর্লি-ওয়ার্নিং ও অন্তর্ভুক্তিমূলক সংলাপ।"
+                "সমাধান = দৃশ্যমান ডেলিভারি + ডি-এস্কেলেশন + সংস্কার স্কোরকার্ড; প্রতিরোধ = আর্লি-ওয়ার্নিং ও অন্তর্ভুক্তিমূলক সংলাপ।"
             )
         else:
             pressures = [
@@ -603,10 +610,10 @@ class OutlookService:
                 ),
                 PressureItem(
                     id="pol_election",
-                    title="Election roadmap & legitimacy pressure",
+                    title="Manifesto & governing delivery pressure",
                     intensity=gov_i,
                     status="active",
-                    summary="Uncertainty around elections/interim governance/constitutional reform is the core legitimacy stress.",
+                    summary="After the Feb 2026 election, delivery on ruling-party pledges/cabinet decisions is the core legitimacy stress.",
                     evidence=cites,
                 ),
                 PressureItem(
@@ -629,11 +636,11 @@ class OutlookService:
             upcoming = [
                 RiskItem(
                     id="risk_election_delay",
-                    title="Election/roadmap slippage",
+                    title="Pledge/delivery slippage",
                     likelihood="high" if gov_i >= 50 else "medium",
                     horizon="6–18 months",
-                    summary="Vague roadmap can sharpen street pressure and partisan polarization.",
-                    early_signals=["EC controversies", "mass protests", "reform delay headlines"],
+                    summary="Slow manifesto delivery can sharpen opposition pressure and street discontent.",
+                    early_signals=["Cabinet controversies", "mass protests", "reform delay headlines"],
                 ),
                 RiskItem(
                     id="risk_local_violence",
@@ -663,14 +670,14 @@ class OutlookService:
             solutions = [
                 SolutionItem(
                     id="sol_roadmap",
-                    title="Publish a credible election roadmap",
+                    title="Publish a manifesto delivery scorecard",
                     targets=["pol_election", "risk_election_delay"],
                     steps=[
-                        "Public dated roadmap",
-                        "Visible steps for EC independence",
-                        "Regular briefings with observers and civil society",
+                        "Monthly public progress on top pledges",
+                        "Ministry owners and deadlines",
+                        "Regular briefings with parliament and civil society",
                     ],
-                    expected_effect="Lower uncertainty and street temperature.",
+                    expected_effect="Visible delivery lowers legitimacy stress and street temperature.",
                     timeframe="3–9 months",
                 ),
                 SolutionItem(
@@ -731,13 +738,13 @@ class OutlookService:
                 ),
             ]
             narrative = (
-                f"Political pressure centers on election uncertainty, reform delivery lags and district unrest. "
+                f"Political pressure centers on post–Feb 2026 elected-government delivery, reform lags and district unrest. "
                 f"Trajectory: {(pol_dir.trajectory if pol_dir else 'uncertain')}. "
-                "Solution stack = roadmap + de-escalation + visible reform delivery; prevention = early-warning and inclusive dialogue."
+                "Solution stack = visible delivery + de-escalation + reform scorecard; prevention = early-warning and inclusive dialogue."
             )
 
         gauges = [
-            GaugeItem(id="g_legitimacy", label="নির্বাচনী চাপ" if bn else "Electoral pressure", value=gov_i, tone="bad" if gov_i >= 60 else "warn"),
+            GaugeItem(id="g_legitimacy", label="শাসন/প্রতিশ্রুতি চাপ" if bn else "Delivery pressure", value=gov_i, tone="bad" if gov_i >= 60 else "warn"),
             GaugeItem(id="g_unrest", label="অসন্তোষ চাপ" if bn else "Unrest pressure", value=unrest_i, tone="bad" if unrest_i >= 60 else "warn"),
             GaugeItem(id="g_reform", label="সংস্কার চাপ" if bn else "Reform pressure", value=reform_i, tone="warn"),
             GaugeItem(id="g_foreign", label="কূটনৈতিক চাপ" if bn else "Diplomatic pressure", value=foreign_i, tone="neutral"),
@@ -990,15 +997,18 @@ class OutlookService:
         bn: bool,
     ) -> str | None:
         system = (
-            "তুমি GeoInsight BD এর কৌশলগত বিশ্লেষক। নিচের JSON-এ ইতিমধ্যে challenges, direction, scenarios তৈরি আছে। "
+            "তুমি GeoInsight BD এর কৌশলগত বিশ্লেষক। প্রসঙ্গ: ফেব্রুয়ারি ২০২৬ জাতীয় নির্বাচনের পরবর্তী বর্তমান সরকার (BNP)। "
+            "অন্তর্বর্তী সরকার/পুরনো যুগের কাহিনি লিখবে না। নিচের JSON-এ challenges, direction, scenarios আছে — "
             "শুধু সেগুলো ব্যবহার করে বাংলায় ১২–১৮ লাইনের নির্বাহী সারাংশ লেখো। "
-            "নতুন পরিসংখ্যান/থিসিস/লেখক বানাবে না। সোর্স তালিকা বর্ণনা করবে না — সরাসরি চ্যালেঞ্জ, দিক ও ৩–৫ বছরের দৃশ্যপট লেখো।"
+            "নতুন পরিসংখ্যান/থিসিস/লেখক বানাবে না।"
             if bn
-            else "You are GeoInsight BD strategic analyst. The JSON already contains challenges, direction, and scenarios. "
+            else "You are GeoInsight BD strategic analyst. Context: current government after the February 2026 national election (BNP). "
+            "Do not frame this as an interim/caretaker era. The JSON already contains challenges, direction, and scenarios. "
             "Write a 12–18 line executive summary in English using ONLY those fields. "
-            "Do not invent stats/papers/authors. Do not describe the source list — cover challenges, direction, and 3–5 year scenarios directly."
+            "Do not invent stats/papers/authors."
         )
         slim = {
+            "government": req.government_context,
             "challenges": [c.model_dump() for c in challenges],
             "direction": [d.model_dump() for d in direction],
             "scenarios": [s.model_dump() for s in scenarios],

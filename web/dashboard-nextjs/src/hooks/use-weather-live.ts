@@ -41,6 +41,42 @@ export interface DisasterAlert {
   source: string;
 }
 
+export interface FloodImpactWindow {
+  deaths: number;
+  injuries: number;
+  civilian_deaths?: number;
+  homes_damaged: number;
+  livestock_lost: number;
+  damage_mentions: number;
+  death_mentions?: number;
+  injury_mentions?: number;
+  article_count?: number;
+  raw_sum_deaths?: number;
+  excluded_historical_articles?: number;
+  excluded_historical_peak?: number;
+    by_district?: Array<{
+      district: string;
+      deaths: number;
+      injuries: number;
+      death_mentions?: number;
+    }>;
+    by_event?: Array<{
+      id: string;
+      label: string;
+      title: string;
+      district: string;
+      day: string;
+      deaths: number;
+      injuries: number;
+      url?: string | null;
+    }>;
+    evidence: string[];
+  disclaimer_bn: string;
+  disclaimer_en: string;
+  window_days?: number;
+  method?: string;
+}
+
 export interface WeatherImpact {
   total_population_at_risk: number;
   high_flood_divisions: string[];
@@ -50,15 +86,9 @@ export interface WeatherImpact {
   max_severity: number;
   refreshed_at: string;
   sources: string[];
-  flood_impact?: {
-    deaths: number;
-    injuries: number;
-    homes_damaged: number;
-    livestock_lost: number;
-    damage_mentions: number;
-    evidence: string[];
-    disclaimer_bn: string;
-    disclaimer_en: string;
+  flood_impact?: FloodImpactWindow & {
+    default_window?: number;
+    windows?: Record<string, FloodImpactWindow>;
   };
 }
 

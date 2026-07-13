@@ -10,15 +10,25 @@ import {
 } from "../../shared/scope/scope-context";
 import type { DashboardScopeQuery } from "../dashboard/dashboard.service";
 import {
-  emptyImpact,
+  aggregateSegmentedImpact,
+  buildImpactWindows,
   extractNewsImpact,
-  mergeImpact,
+  type ImpactArticleInput,
   type NewsImpactExtract,
+  type SegmentedNewsImpact,
 } from "../../shared/impact/news-impact";
+import { env } from "../../core/config/env";
+import {
+  getCurrentMandate,
+  mandateAnalysisSince,
+  mandatePublicMeta,
+} from "../../shared/gov/current-mandate";
 
-const UNREST_CACHE_KEY = "unrest:pulse:v2";
+const UNREST_CACHE_KEY = "unrest:pulse:v5";
 const UNREST_TTL_SEC = 900;
-const LOOKBACK_DAYS = 7;
+/** Fetch window — impact UI can slice 1d / 7d / 30d (floored at current mandate) */
+const LOOKBACK_DAYS = 30;
+const DEFAULT_IMPACT_WINDOW = 7;
 
 export type UnrestCategory =
   | "protest"
@@ -192,19 +202,36 @@ export interface UnrestPulse {
     sources: string[];
     note_bn: string;
     note_en: string;
-    impact: {
-      deaths: number;
-      civilian_deaths: number;
-      injuries: number;
-      damage_mentions: number;
-      homes_damaged: number;
-      livestock_lost: number;
-      evidence: string[];
-      disclaimer_bn: string;
-      disclaimer_en: string;
+    government?: ReturnType<typeof mandatePublicMeta>;
+    impact: SegmentedNewsImpact & {
+      default_window: number;
+      windows: Record<string, SegmentedNewsImpact>;
     };
   };
   scope?: ScopeContext;
+}
+
+const IMPACT_DISCLAIMERS = {
+  bn: "আনুমানিক = একই জেলা/দিনে খবরের সর্বোচ্চ (যোগ নয়)। বড় ঐতিহাসিক মোট (≥৮০) আলাদা। অফিসিয়াল হিসাব নয়।",
+  en: "Estimate = max per district/day (not summed across papers). Large historical tallies (≥80) excluded. Not official.",
+};
+
+function impactFromSignals(signals: UnrestSignal[]): UnrestPulse["summary"]["impact"] {
+  const items: ImpactArticleInput[] = signals.map((s) => ({
+    district: s.district,
+    publishedAt: s.published_at ?? new Date().toISOString(),
+    impact: s.impact,
+    title: s.title,
+    url: s.url,
+  }));
+  const windows = buildImpactWindows(items, [1, 7, 30], new Date(), IMPACT_DISCLAIMERS);
+  const primary = windows[String(DEFAULT_IMPACT_WINDOW)] ??
+    aggregateSegmentedImpact(items, DEFAULT_IMPACT_WINDOW, new Date(), IMPACT_DISCLAIMERS);
+  return {
+    ...primary,
+    default_window: DEFAULT_IMPACT_WINDOW,
+    windows,
+  };
 }
 
 export class UnrestService {
@@ -263,31 +290,25 @@ export class UnrestService {
         social_viral: districts.reduce((n, d) => n + d.social_viral_count, 0),
         total_signals: signals.length,
         top_district: districts[0]?.district ?? null,
-        impact: {
-          ...pulse.summary.impact,
-          deaths: districts.reduce((n, d) => n + d.deaths, 0),
-          civilian_deaths: districts.reduce((n, d) => n + d.civilian_deaths, 0),
-          injuries: districts.reduce((n, d) => n + d.injuries, 0),
-          damage_mentions: districts.reduce((n, d) => n + d.damage_mentions, 0),
-          homes_damaged: signals.reduce((n, s) => n + (s.impact?.homes_damaged ?? 0), 0),
-          livestock_lost: signals.reduce((n, s) => n + (s.impact?.livestock_lost ?? 0), 0),
-          evidence: signals
-            .flatMap((s) => s.impact?.evidence ?? [])
-            .slice(0, 8),
-        },
+        impact: impactFromSignals(signals),
       },
       scope: ctx,
     };
   }
 
   private async buildPulse(): Promise<UnrestPulse> {
-    const since = new Date(Date.now() - LOOKBACK_DAYS * 86400 * 1000);
-    const mid = new Date(Date.now() - Math.floor(LOOKBACK_DAYS / 2) * 86400 * 1000);
+    const mandate = getCurrentMandate({
+      CURRENT_GOVERNMENT_SINCE: env.CURRENT_GOVERNMENT_SINCE,
+      CURRENT_GOVERNMENT_PARTY: env.CURRENT_GOVERNMENT_PARTY,
+    });
+    const since = mandateAnalysisSince(LOOKBACK_DAYS, mandate);
+    const mid = new Date(Date.now() - Math.floor(DEFAULT_IMPACT_WINDOW / 2) * 86400 * 1000);
+    const districtWindowSince = mandateAnalysisSince(DEFAULT_IMPACT_WINDOW, mandate);
 
     const articles = await prismaRead.externalArticle.findMany({
       where: { fetchedAt: { gte: since } },
       orderBy: { fetchedAt: "desc" },
-      take: 500,
+      take: 800,
       select: {
         id: true,
         title: true,
@@ -314,16 +335,14 @@ export class UnrestService {
         grievance: number;
         recent: number;
         older: number;
-        deaths: number;
-        injuries: number;
-        civilian_deaths: number;
-        damage_mentions: number;
+        impactItems: ImpactArticleInput[];
       }
     >();
 
-    let impactTotal = emptyImpact();
-
     for (const article of articles) {
+      const published = article.publishedAt ?? article.fetchedAt;
+      if (published < mandate.termStartedAt) continue;
+
       const text = `${article.title} ${article.summary ?? ""}`;
       const category = classifyUnrest(text, article.sentimentCategory);
       if (!category) continue;
@@ -334,7 +353,7 @@ export class UnrestService {
       const division = normalizeDivisionName(article.division) ?? article.division ?? null;
       const severity = severityFor(category, text);
       const impact = extractNewsImpact(article.title, article.summary);
-      impactTotal = mergeImpact(impactTotal, impact);
+      const publishedAt = (article.publishedAt ?? article.fetchedAt).toISOString();
 
       signals.push({
         id: article.id,
@@ -347,7 +366,7 @@ export class UnrestService {
         division,
         source_name: article.sourceName,
         url: article.url,
-        published_at: (article.publishedAt ?? article.fetchedAt).toISOString(),
+        published_at: publishedAt,
         sentiment: article.sentimentCategory,
         impact,
       });
@@ -362,10 +381,7 @@ export class UnrestService {
         grievance: 0,
         recent: 0,
         older: 0,
-        deaths: 0,
-        injuries: 0,
-        civilian_deaths: 0,
-        damage_mentions: 0,
+        impactItems: [],
       };
       if (category === "protest") entry.protest += 1;
       if (category === "govt_discontent") entry.govt += 1;
@@ -374,10 +390,15 @@ export class UnrestService {
       if (category === "general_grievance") entry.grievance += 1;
       if (article.fetchedAt >= mid) entry.recent += 1;
       else entry.older += 1;
-      entry.deaths += impact.deaths;
-      entry.injuries += impact.injuries;
-      entry.civilian_deaths += impact.civilian_deaths;
-      entry.damage_mentions += impact.damage_mentions;
+      if ((article.publishedAt ?? article.fetchedAt) >= districtWindowSince) {
+        entry.impactItems.push({
+          district: district === "National" ? null : district,
+          publishedAt,
+          impact,
+          title: article.title,
+          url: article.url,
+        });
+      }
       if (!entry.division && division) entry.division = division;
       byDistrict.set(key, entry);
     }
@@ -388,6 +409,13 @@ export class UnrestService {
       const total = e.protest + e.govt + e.law + e.social + e.grievance;
       if (total === 0) continue;
 
+      const districtImpact = aggregateSegmentedImpact(
+        e.impactItems,
+        DEFAULT_IMPACT_WINDOW,
+        new Date(),
+        IMPACT_DISCLAIMERS,
+      );
+
       const unrestScore = Math.min(
         100,
         e.protest * 18 +
@@ -395,8 +423,8 @@ export class UnrestService {
           e.govt * 12 +
           e.social * 10 +
           e.grievance * 6 +
-          e.deaths * 8 +
-          e.injuries * 2,
+          Math.min(districtImpact.deaths, 20) * 8 +
+          Math.min(districtImpact.injuries, 50) * 2,
       );
       const riskLevel =
         unrestScore >= 70 ? 5 : unrestScore >= 50 ? 4 : unrestScore >= 30 ? 3 : unrestScore >= 15 ? 2 : 1;
@@ -426,10 +454,10 @@ export class UnrestService {
         trend,
         top_categories: topCategories.slice(0, 3),
         population_pressure: riskLevel >= 4 ? "high" : riskLevel >= 3 ? "medium" : "low",
-        deaths: e.deaths,
-        injuries: e.injuries,
-        civilian_deaths: e.civilian_deaths,
-        damage_mentions: e.damage_mentions,
+        deaths: districtImpact.deaths,
+        injuries: districtImpact.injuries,
+        civilian_deaths: districtImpact.civilian_deaths,
+        damage_mentions: districtImpact.damage_mentions,
       });
     }
 
@@ -437,10 +465,11 @@ export class UnrestService {
     signals.sort((a, b) => b.severity - a.severity);
 
     const atRisk = districts.filter((d) => d.risk_level >= 3);
+    const impact = impactFromSignals(signals);
 
     return {
       districts,
-      signals: signals.slice(0, 80),
+      signals: signals.slice(0, 120),
       summary: {
         districts_at_risk: atRisk.length,
         active_protests: districts.reduce((n, d) => n + d.protest_count, 0),
@@ -451,22 +480,11 @@ export class UnrestService {
         refreshed_at: new Date().toISOString(),
         sources: ["rss_newspapers", "google_news", "topic_feeds"],
         note_bn:
-          "সংবাদপত্র ও গুগল নিউজ ফিড থেকে বিশ্লেষণ। ফেসবুক সরাসরি স্ক্র্যাপ করা হয় না — সংবাদে উল্লেখিত ভাইরাল/সামাজিক মাধ্যমের সংকেত ধরা হয়।",
+          `${mandate.labelBn} — শুধু এই মেয়াদের সংবাদ। সংবাদপত্র ও গুগল নিউজ থেকে বিশ্লেষণ; ফেসবুক সরাসরি স্ক্র্যাপ নয়।`,
         note_en:
-          "Derived from newspaper RSS and Google News topic feeds. Facebook is not scraped directly — viral/social mentions in news are captured instead.",
-        impact: {
-          deaths: impactTotal.deaths,
-          civilian_deaths: impactTotal.civilian_deaths,
-          injuries: impactTotal.injuries,
-          damage_mentions: impactTotal.damage_mentions,
-          homes_damaged: impactTotal.homes_damaged,
-          livestock_lost: impactTotal.livestock_lost,
-          evidence: impactTotal.evidence,
-          disclaimer_bn:
-            "মৃত্যু/আহত/ক্ষতির সংখ্যা সংবাদ শিরোনাম থেকে স্বয়ংক্রিয়ভাবে আহরণ — সরকারি চূড়ান্ত হিসাব নয়।",
-          disclaimer_en:
-            "Death/injury/damage counts are auto-extracted from news headlines — not an official tally.",
-        },
+          `${mandate.labelEn} — news from this mandate only. Newspaper RSS and Google News; Facebook is not scraped directly.`,
+        government: mandatePublicMeta(mandate),
+        impact,
       },
     };
   }

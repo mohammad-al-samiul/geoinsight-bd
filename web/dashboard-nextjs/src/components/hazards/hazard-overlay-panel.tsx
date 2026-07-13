@@ -104,18 +104,8 @@ export function HazardOverlayPanel() {
             <ImpactStatsPanel
               title={t("floodImpactTitle")}
               subtitle={t("floodImpactSubtitle")}
-              stats={{
-                deaths: impact.flood_impact.deaths,
-                injuries: impact.flood_impact.injuries,
-                homes_damaged: impact.flood_impact.homes_damaged,
-                livestock_lost: impact.flood_impact.livestock_lost,
-                damage_mentions: impact.flood_impact.damage_mentions,
-                evidence: impact.flood_impact.evidence,
-                disclaimer:
-                  locale === "bn"
-                    ? impact.flood_impact.disclaimer_bn
-                    : impact.flood_impact.disclaimer_en,
-              }}
+              locale={locale}
+              stats={impact.flood_impact}
               labels={{
                 deaths: t("impactDeaths"),
                 civilian: t("impactCivilian"),
@@ -124,6 +114,17 @@ export function HazardOverlayPanel() {
                 livestock: t("impactLivestock"),
                 damageMentions: t("impactDamageMentions"),
                 evidence: t("impactEvidence"),
+                estimate: t("impactEstimate"),
+                mentions: t("impactMentions"),
+                window1: t("impactWindow1"),
+                window7: t("impactWindow7"),
+                window30: t("impactWindow30"),
+                byDistrict: t("impactByDistrict"),
+                byEvent: t("impactByEvent"),
+                byEventHint: t("impactByEventHint"),
+                deathMentions: t("impactDeathMentions"),
+                injuryMentions: t("impactInjuryMentions"),
+                methodHint: t("impactMethodHint"),
               }}
             />
           )}

@@ -54,6 +54,55 @@ export interface DistrictUnrestCell {
   damage_mentions?: number;
 }
 
+export interface SegmentedImpactPayload {
+  deaths: number;
+  civilian_deaths?: number;
+  injuries: number;
+  damage_mentions: number;
+  homes_damaged: number;
+  livestock_lost: number;
+  death_mentions?: number;
+  injury_mentions?: number;
+  article_count?: number;
+  raw_sum_deaths?: number;
+  excluded_historical_articles?: number;
+  excluded_historical_peak?: number;
+  by_district?: Array<{
+    district: string;
+    deaths: number;
+    injuries: number;
+    death_mentions?: number;
+    injury_mentions?: number;
+  }>;
+  by_event?: Array<{
+    id: string;
+    label: string;
+    title: string;
+    district: string;
+    day: string;
+    deaths: number;
+    injuries: number;
+    civilian_deaths?: number;
+    url?: string | null;
+  }>;
+  evidence: string[];
+  disclaimer_bn: string;
+  disclaimer_en: string;
+  window_days?: number;
+  method?: string;
+  default_window?: number;
+  windows?: Record<string, Omit<SegmentedImpactPayload, "windows" | "default_window">>;
+}
+
+export interface GovernmentMandateMeta {
+  term_started_on: string;
+  ruling_party: string;
+  label_bn: string;
+  label_en: string;
+  election_bn: string;
+  election_en: string;
+}
+
 export interface UnrestPulse {
   districts: DistrictUnrestCell[];
   signals: UnrestSignal[];
@@ -68,17 +117,8 @@ export interface UnrestPulse {
     sources: string[];
     note_bn: string;
     note_en: string;
-    impact?: {
-      deaths: number;
-      civilian_deaths: number;
-      injuries: number;
-      damage_mentions: number;
-      homes_damaged: number;
-      livestock_lost: number;
-      evidence: string[];
-      disclaimer_bn: string;
-      disclaimer_en: string;
-    };
+    government?: GovernmentMandateMeta;
+    impact?: SegmentedImpactPayload;
   };
   scope?: { divisionName?: string; districtName?: string };
 }
