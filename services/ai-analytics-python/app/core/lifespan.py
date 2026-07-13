@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 
@@ -13,12 +14,11 @@ from app.modules.arbitrage.worker import ArbitrageBackgroundWorker
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Boot AI service without blocking health on optional infra (Rabbit/Ollama)."""
     settings = get_settings()
     try:
         settings.model_cache_dir.mkdir(parents=True, exist_ok=True)
     except OSError:
-        # Docker non-root user may lack write on bundled ml_models/ — use /tmp
-        from pathlib import Path
         fallback = Path("/tmp/ml_models/cache")
         fallback.mkdir(parents=True, exist_ok=True)
         settings.model_cache_dir = fallback
@@ -26,24 +26,53 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     executor = startup_executor(settings.worker_pool_size)
     app.state.executor = executor
     app.state.settings = settings
-    app.state.redis = create_redis_pool(settings)
+
+    try:
+        app.state.redis = create_redis_pool(settings)
+    except Exception as exc:  # noqa: BLE001 — keep HTTP up on Redis blip
+        print(f"[lifespan] Redis unavailable at boot: {exc}")
+        app.state.redis = None
 
     publisher = RabbitPublisher(settings)
-    await publisher.connect()
-    app.state.publisher = publisher
+    try:
+        await publisher.connect()
+        app.state.publisher = publisher
+    except Exception as exc:  # noqa: BLE001
+        print(f"[lifespan] RabbitMQ unavailable at boot: {exc}")
+        app.state.publisher = None
+        publisher = None
 
-    consumer = AiQueueConsumer(settings, publisher)
-    await consumer.start()
-    app.state.consumer = consumer
+    consumer = None
+    arb_worker = None
+    if publisher is not None:
+        try:
+            consumer = AiQueueConsumer(settings, publisher)
+            await consumer.start()
+            app.state.consumer = consumer
+        except Exception as exc:  # noqa: BLE001
+            print(f"[lifespan] AI queue consumer failed: {exc}")
+            app.state.consumer = None
 
-    arb_worker = ArbitrageBackgroundWorker(settings, publisher, executor, app.state.redis)
-    await arb_worker.start()
-    app.state.arb_worker = arb_worker
+        if app.state.redis is not None:
+            try:
+                arb_worker = ArbitrageBackgroundWorker(
+                    settings, publisher, executor, app.state.redis
+                )
+                await arb_worker.start()
+                app.state.arb_worker = arb_worker
+            except Exception as exc:  # noqa: BLE001
+                print(f"[lifespan] Arbitrage worker failed: {exc}")
+                app.state.arb_worker = None
 
+    # Health endpoint is available as soon as we yield
     yield
 
-    await arb_worker.stop()
-    await consumer.stop()
-    await publisher.close()
-    await close_redis_pool()
+    if arb_worker is not None:
+        await arb_worker.stop()
+    if consumer is not None:
+        await consumer.stop()
+    if publisher is not None:
+        await publisher.close()
+    if app.state.redis is not None:
+        await close_redis_pool()
     shutdown_executor(executor)

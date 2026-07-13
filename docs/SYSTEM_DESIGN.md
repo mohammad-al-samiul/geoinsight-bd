@@ -1,12 +1,15 @@
 # GeoInsight BD — System Design Documentation
 
-বাংলাদেশের জাতীয় শাসনব্যবস্থার জন্য তৈরি **National Governance Intelligence Platform**। এই ডকুমেন্টে HLD, LLD, functional/non-functional requirements, ERD, tech stack rationale — সব একসাথে দেওয়া হয়েছে।
+**GeoInsight BD** হলো বাংলাদেশের জন্য তৈরি একটি **National Governance Intelligence Platform**।  
+Division → District → Upazila → Union hierarchy ধরে KPI, project tracking, red-flag alerts, agro-market data আর AI analytics এক জায়গায় আনা হয়েছে।
+
+এই ডকুমেন্টে আছে: **HLD**, **LLD**, functional/non-functional requirements, **ERD**, tech stack rationale — সব একসাথে।
 
 ---
 
 ## Table of Contents
 
-- [১. প্রজেক্ট কনটেক্সট ও লক্ষ্য](#১-প্রজেক্ট-কনটেক্সট-ও-লক্ষ্য)
+- [১. Project Context ও Goal](#১-project-context-ও-goal)
 - [২. Functional Requirements](#২-functional-requirements)
 - [৩. Non-Functional Requirements](#৩-non-functional-requirements)
 - [৪. High Level Design (HLD)](#৪-high-level-design-hld)
@@ -18,18 +21,18 @@
 - [১০. Data Flow Example](#১০-data-flow--end-to-end-example-arbitrage-heatmap)
 - [১১. Monorepo Structure](#১১-monorepo-structure)
 - [১২. Service Ports](#১২-service-ports-reference)
-- [১৩. Architecture Decision Summary](#১৩-সারাংশ--architecture-decision-record-adr)
+- [১৩. Architecture Decision Summary](#১৩-summary--architecture-decision-record-adr)
 
 ---
 
-## ১. প্রজেক্ট কনটেক্সট ও লক্ষ্য
+## ১. Project Context ও Goal
 
-| বিষয় | বর্ণনা |
+| বিষয় | বিবরণ |
 |--------|--------|
-| **নাম** | GeoInsight BD |
-| **উদ্দেশ্য** | বিভাগ → জেলা → উপজেলা → ইউনিয়ন hierarchy অনুযায়ী KPI, প্রকল্প, সতর্কতা, কৃষি বাজার, AI analytics এক জায়গায় |
-| **ব্যবহারকারী** | PMO (জাতীয়), মন্ত্রী (বিভাগ), DC (জেলা), ইউনিয়ন চেয়ারম্যান |
-| **আর্কিটেকচার স্টাইল** | Monorepo microservices — ৩টি অ্যাপ সার্ভিস + shared infrastructure |
+| **Name** | GeoInsight BD |
+| **Goal** | Division → District → Upazila → Union hierarchy অনুযায়ী KPI, project, alert, agro market আর AI analytics এক platform-এ দেখানো |
+| **Users** | **PMO** (national), **Minister** (division), **DC** (district), **Union Chairman** |
+| **Architecture style** | Monorepo microservices — ৩টা app service + shared infrastructure |
 
 ---
 
@@ -38,95 +41,95 @@
 ### ২.১ Authentication & Authorization
 
 - Email/password দিয়ে login
-- JWT access token (১৫ মিনিট) + refresh token (৭ দিন) rotation
+- **JWT** access token (১৫ মিনিট) + refresh token (৭ দিন) — rotation সহ
 - Role-based access: `PMO`, `MINISTER`, `DC`, `UNION_CHAIRMAN`
-- প্রতিটি role নির্দিষ্ট `admin_unit_id` scope-এ সীমাবদ্ধ
+- প্রতিটি role নির্দিষ্ট `admin_unit_id` **scope**-এ সীমাবদ্ধ
 - Session revoke / JWT denylist
-- PMO-only user registration
+- User registration শুধু **PMO** করতে পারে
 
 ### ২.২ Administrative Hierarchy
 
-- Bangladesh admin structure: DIVISION → DISTRICT → UPAZILA → UNION
-- GeoJSON boundary সহ admin unit management
-- Hierarchy-based data filtering (denormalized `division_id`, `district_id`, `upazila_id`)
+- Bangladesh admin structure: `DIVISION → DISTRICT → UPAZILA → UNION`
+- **GeoJSON** boundary সহ admin unit management
+- Hierarchy-based filtering (denormalized `division_id`, `district_id`, `upazila_id`)
 
 ### ২.৩ Representative & KPI Management
 
-- প্রতিনিধি (MP, Minister, DC, Union Chairman ইত্যাদি) CRUD
-- KPI definition ও record (DRAFT → SUBMITTED → VERIFIED → REJECTED)
-- Representative/project/admin unit/national level KPI
-- Optional Hyperledger blockchain hash anchoring
+- Representative (MP, Minister, DC, Union Chairman ইত্যাদি) **CRUD**
+- KPI definition ও record: `DRAFT → SUBMITTED → VERIFIED → REJECTED`
+- Representative / project / admin unit / national level KPI
+- Optional **Hyperledger** blockchain hash anchoring
 
 ### ২.৪ Project Tracking & Red Flags
 
-- প্রকল্প budget, status, contractor tracking
-- AI-generated red flag alerts: budget overrun, delay, corruption risk, quality, contractor fraud
-- Alert resolve workflow + audit trail
+- Project budget, status, contractor tracking
+- AI-generated **red flag** alerts: budget overrun, delay, corruption risk, quality, contractor fraud
+- Alert resolve workflow + **audit trail**
 
 ### ২.৫ Dashboard & Real-time
 
-- Choropleth map (Bangladesh districts/divisions)
+- **Choropleth map** (Bangladesh districts/divisions)
 - KPI scorecards, budget variance, completion charts
-- Socket.io দিয়ে live update: `kpi:update`, `alert:created`, dashboard refresh
+- **Socket.io** দিয়ে live update: `kpi:update`, `alert:created`, dashboard refresh
 - Role-scoped hierarchical rooms
 
 ### ২.৬ Agro-Economic Intelligence
 
 - Agro market (wholesale, retail, haat, mandi) mapping
-- Global commodity price time-series (TimescaleDB hypertable)
-- Arbitrage heatmap — দেশভিত্তিক landed cost comparison
+- Global commodity price time-series (**TimescaleDB** hypertable)
+- **Arbitrage heatmap** — দেশভিত্তিক landed cost comparison
 - Background scraping worker (৫ মিনিট interval)
 
 ### ২.৭ AI & NLP Modules (Python Service)
 
 | Module | কাজ |
 |--------|-----|
-| **Sentiment** | Bangla-BERT দিয়ে 333/999 public feed sentiment |
-| **Briefing** | Ollama LLM দিয়ে executive briefing |
+| **Sentiment** | **Bangla-BERT** দিয়ে 333/999 public feed sentiment |
+| **Briefing** | **Ollama** LLM দিয়ে executive briefing |
 | **Sovereign LLM** | On-prem generative AI (data sovereignty) |
 | **Documents** | Document intelligence / analysis |
 | **Procurement** | Procurement risk analysis |
 | **Predictive** | Predictive analytics |
 | **Accountability** | Accountability scoring |
-| **Hazards** | Hazard/risk assessment |
-| **Simulator** | Policy/budget simulator |
+| **Hazards** | Hazard / risk assessment |
+| **Simulator** | Policy / budget simulator |
 | **Twin** | Digital twin scenarios |
 | **Citizen** | Citizen-facing chatbot |
 | **Risk** | Risk scoring |
 
 ### ২.৮ Public Feeds (Unauthenticated)
 
-- National helpline 333 ও emergency 999 feed stream
+- National helpline **333** ও emergency **999** feed stream
 - Sovereign IP guard + strict rate limiting
 - Bangla sentiment analysis overlay
 
 ### ২.৯ Blockchain (Optional)
 
-- Hyperledger Fabric project milestone anchoring
-- Retry queue with dead-letter handling
+- **Hyperledger Fabric** project milestone anchoring
+- Retry queue + dead-letter handling
 - Default: `FABRIC_ENABLED=false`
 
 ### ২.১০ Audit & Search
 
-- সব critical action-এর audit log (user, IP, old/new value)
+- Critical action-এর **audit log** (user, IP, old/new value)
 - Cross-module search
 
 ### ২.১১ Document Storage
 
-- MinIO-তে national intelligence documents (`national-intelligence-docs` bucket)
+- **MinIO**-তে national intelligence documents (`national-intelligence-docs` bucket)
 
 ---
 
 ## ৩. Non-Functional Requirements
 
-| শ্রেণি | প্রয়োজনীয়তা | বাস্তবায়ন |
-|--------|---------------|------------|
+| Category | Requirement | Implementation |
+|----------|-------------|----------------|
 | **Performance** | Dashboard query < 500ms; commodity time-series fast aggregation | TimescaleDB hypertable, read replica, PgBouncer pooling, Redis cache |
 | **Scalability** | Horizontal gateway scaling | Socket.io Redis adapter, stateless API, RabbitMQ async |
 | **Availability** | Production 99.5%+ uptime | Docker healthchecks, retry workers, dead-letter queues |
-| **Security** | JWT in HTTP-only cookies; no localStorage token | Next.js BFF pattern, Helmet, CORS, bcrypt (12 rounds) |
-| **Data Sovereignty** | Tier-4 NDC deployment — no external telemetry | Ollama on-prem, `SOVEREIGN_MODE`, HF offline, MinIO self-hosted |
-| **Rate Limiting** | DDoS protection on public feeds | Redis-backed rate limiter, nginx edge limits |
+| **Security** | JWT in HTTP-only cookies; browser-এ localStorage token নেই | Next.js **BFF** pattern, Helmet, CORS, bcrypt (12 rounds) |
+| **Data Sovereignty** | Tier-4 NDC deployment — external telemetry বন্ধ | Ollama on-prem, `SOVEREIGN_MODE`, HF offline, MinIO self-hosted |
+| **Rate Limiting** | Public feed-এ DDoS protection | Redis-backed rate limiter, nginx edge limits |
 | **Observability** | Metrics, alerts, dashboards | Prometheus, Grafana, Alertmanager |
 | **i18n** | Bangla + English UI | next-intl (`bn.json`, `en.json`) |
 | **Auditability** | Immutable action trail | `audit_logs` table + optional Fabric |
@@ -141,7 +144,7 @@
 
 ```mermaid
 flowchart TB
-    subgraph Users["ব্যবহারকারী"]
+    subgraph Users["Users"]
         PMO[PMO / National]
         MIN[Minister / Division]
         DC[DC / District]
@@ -179,11 +182,11 @@ flowchart TB
 
 ### ৪.২ Service Responsibilities
 
-| Service | দায়িত্ব | কেন আলাদা? |
-|---------|---------|------------|
-| **Next.js Dashboard** | UI, BFF auth, cookie management, map/charts | Frontend isolation, security (token browser-এ নয়) |
-| **API Gateway** | REST, RBAC, DB, Socket.io, Fabric, MQ consumer | Single entry point, business logic orchestration |
-| **AI Analytics** | ML/NLP/LLM heavy compute | Python ecosystem (PyTorch, Transformers); GPU-friendly; async worker |
+| Service | Responsibility | কেন আলাদা রাখা হয়েছে? |
+|---------|----------------|------------------------|
+| **Next.js Dashboard** | UI, BFF auth, cookie management, map/charts | Frontend আলাদা রাখা; token browser-এ যায় না |
+| **API Gateway** | REST, RBAC, DB, Socket.io, Fabric, MQ consumer | Single entry point + business logic orchestration |
+| **AI Analytics** | ML / NLP / LLM heavy compute | Python ecosystem (PyTorch, Transformers); GPU-friendly; async worker |
 
 ### ৪.৩ Communication Patterns
 
@@ -198,7 +201,7 @@ Pattern 3: Real-time Push (Socket.io)
   RabbitMQ consumer → broadcastToHierarchy() → scoped WebSocket rooms
 
 Pattern 4: BFF (Browser → Next.js → Gateway)
-  Cookie-based auth, same-origin, CORS সহজ
+  Cookie-based auth, same-origin — CORS সহজ ও secure
 ```
 
 ### ৪.৪ RabbitMQ Topology
@@ -297,7 +300,7 @@ DATABASE_URL        → PgBouncer geoinsight_write → Primary PostgreSQL
 DATABASE_READ_URL   → PgBouncer geoinsight_read  → Read Replica
 DIRECT_DATABASE_URL → Primary (Prisma migrations only)
 
-prismaWrite  → mutations (INSERT/UPDATE/DELETE)
+prismaWrite  → mutations (INSERT / UPDATE / DELETE)
 prismaRead   → analytics, dashboards, heavy SELECT
 ```
 
@@ -488,11 +491,11 @@ erDiagram
     }
 ```
 
-### ERD নোট
+### ERD Notes
 
-- `CommodityPriceLog`: composite PK `(id, created_at)` — TimescaleDB hypertable (`prisma/migrations/20250627150000_timescale_commodity_perf/`)
+- `CommodityPriceLog`: composite PK `(id, created_at)` — **TimescaleDB** hypertable (`prisma/migrations/20250627150000_timescale_commodity_perf/`)
 - `AdminUnit`: self-referencing hierarchy + denormalized ancestor IDs (trigger-maintained)
-- `RolePermission`: static RBAC matrix (role × resource × action)
+- `RolePermission`: static **RBAC** matrix (role × resource × action)
 - `RefreshToken`: hashed token storage, rotation support
 
 **Source of truth:** `services/api-gateway-node/prisma/schema.prisma`
@@ -503,27 +506,27 @@ erDiagram
 
 ### ৭.১ Application Layer
 
-| Technology | কেন ব্যবহার | কোন সমস্যা সমাধান |
-|------------|------------|-------------------|
-| **Next.js 15** | React SSR/SSG, App Router, API routes | Fast dashboard, BFF pattern, SEO, i18n |
+| Technology | কেন ব্যবহার করছি | কোন সমস্যা সমাধান করে |
+|------------|------------------|------------------------|
+| **Next.js 15** | React SSR/SSG, App Router, API routes | Fast dashboard, **BFF** pattern, SEO, i18n |
 | **Express + TypeScript** | Mature REST ecosystem, team familiarity | Type-safe API gateway, modular routing |
 | **FastAPI (Python)** | Async, auto OpenAPI, ML ecosystem | AI/ML workloads Python-এ সহজ |
 | **Prisma** | Type-safe ORM, migrations | Schema versioning, read/write split support |
 | **Tailwind + Radix UI** | Utility CSS + accessible components | Consistent gov-grade UI |
-| **Leaflet** | Open-source maps | Bangladesh choropleth without Google dependency |
-| **Recharts** | React-native charts | KPI/budget visualization |
+| **Leaflet** | Open-source maps | Bangladesh choropleth — Google Maps dependency ছাড়া |
+| **Recharts** | React charts | KPI / budget visualization |
 | **next-intl** | i18n | Bangla + English bilingual dashboard |
 
 ### ৭.২ Data & Storage
 
-| Technology | কেন ব্যবহার | কোন সমস্যা সমাধান |
-|------------|------------|-------------------|
+| Technology | কেন ব্যবহার করছি | কোন সমস্যা সমাধান করে |
+|------------|------------------|------------------------|
 | **PostgreSQL 16** | ACID, JSON, mature | Relational governance data integrity |
-| **TimescaleDB** | PostgreSQL extension, hypertables | Commodity price time-series — millions of rows efficient query/retention |
-| **PgBouncer** | Connection pooling (transaction mode) | Node.js many short connections → DB overload prevent |
+| **TimescaleDB** | PostgreSQL extension, hypertables | Commodity price time-series — lakhs of rows-এও fast query/retention |
+| **PgBouncer** | Connection pooling (transaction mode) | Node.js-এর অনেক short connection → DB overload আটকানো |
 | **Read Replica** | Streaming replication | Dashboard analytics primary DB-কে block করে না |
 | **Redis 7** | In-memory, pub/sub, TTL | নিচে বিস্তারিত |
-| **MinIO** | S3-compatible, self-hosted | Cloud S3 ছাড়াই document storage — data sovereignty |
+| **MinIO** | S3-compatible, self-hosted | Cloud S3 ছাড়াই document storage — **data sovereignty** |
 
 ### ৭.৩ Redis — কেন? (৫টি use case)
 
@@ -532,8 +535,8 @@ erDiagram
 │  Redis Use Cases in GeoInsight BD                       │
 ├─────────────────────────────────────────────────────────┤
 │  1. JWT Denylist / Session Revocation                   │
-│     Problem: Stateless JWT logout করলেও token valid    │
-│     Solution: revoked jti → Redis TTL = token expiry   │
+│     Problem: Stateless JWT logout করলেও token valid থাকে │
+│     Solution: revoked jti → Redis TTL = token expiry    │
 ├─────────────────────────────────────────────────────────┤
 │  2. Rate Limiting                                       │
 │     Problem: Public 333/999 feeds DDoS target           │
@@ -562,8 +565,8 @@ erDiagram
 │  RabbitMQ Use Cases                                     │
 ├─────────────────────────────────────────────────────────┤
 │  1. Async AI Jobs                                       │
-│     Problem: Sentiment/arbitrage/risk = seconds-long    │
-│     Solution: Queue → AI worker processes in background │
+│     Problem: Sentiment / arbitrage / risk = seconds-long│
+│     Solution: Queue → AI worker background-এ process করে│
 ├─────────────────────────────────────────────────────────┤
 │  2. Service Decoupling                                  │
 │     Problem: Gateway directly call AI = tight coupling  │
@@ -590,39 +593,39 @@ erDiagram
 
 ### ৭.৫ AI/ML Stack
 
-| Technology | কেন | সমস্যা |
-|------------|-----|--------|
+| Technology | কেন | কোন সমস্যা সমাধান করে |
+|------------|-----|------------------------|
 | **Bangla-BERT** (`l3cube-pune/bengali-sentiment-analysis`) | Pre-trained Bangla NLP | English models Bangla 333/999 text বুঝে না |
-| **Ollama + llama3.1:8b** | Local LLM, no cloud API | Data sovereignty — citizen data বাইরে যায় না |
+| **Ollama + llama3.1:8b** | Local LLM, no cloud API | **Data sovereignty** — citizen data বাইরে যায় না |
 | **PyTorch + Transformers** | Industry standard ML | Model loading, inference pipeline |
-| **HuggingFace offline mode** | Tier-4 air-gapped deploy | Production-এ internet ছাড়া model serve |
+| **HuggingFace offline mode** | Tier-4 air-gapped deploy | Production-এ internet ছাড়াই model serve |
 
 ### ৭.৬ Blockchain
 
-| Technology | কেন | সমস্যা |
-|------------|-----|--------|
+| Technology | কেন | কোন সমস্যা সমাধান করে |
+|------------|-----|------------------------|
 | **Hyperledger Fabric** | Permissioned enterprise blockchain | Public chain-এ sensitive gov data যায় না; milestone immutability |
 
 ### ৭.৭ Infrastructure & Ops
 
-| Technology | কেন | সমস্যা |
-|------------|-----|--------|
-| **Docker Compose** | Multi-service local + prod parity | "Works on my machine" eliminate |
+| Technology | কেন | কোন সমস্যা সমাধান করে |
+|------------|-----|------------------------|
+| **Docker Compose** | Multi-service local + prod parity | "Works on my machine" problem eliminate করা |
 | **nginx** | Reverse proxy, TLS, CSP, rate limit | Production edge security (Tier-4 NDC) |
 | **Prometheus + Grafana** | Metrics collection + visualization | Gateway/AI `/metrics` endpoint monitor |
 | **Alertmanager** | Alert routing | DB down, high latency notification |
 | **GitHub Actions + GHCR** | CI/CD pipeline | Auto test → build → deploy VPS |
-| **Locust** | Load testing | Public feed/gateway capacity verify |
+| **Locust** | Load testing | Public feed / gateway capacity verify |
 
 ### ৭.৮ Security Stack
 
-| Technology | কেন | সমস্যা |
-|------------|-----|--------|
+| Technology | কেন | কোন সমস্যা সমাধান করে |
+|------------|-----|------------------------|
 | **HTTP-only cookies** | XSS থেকে token চুরি রোধ | localStorage vulnerable |
-| **bcrypt (12 rounds)** | Password hashing | Plain text password store না |
+| **bcrypt (12 rounds)** | Password hashing | Plain text password store না করা |
 | **Helmet** | Security headers | XSS, clickjacking protection |
 | **Zod validation** | Runtime schema validation | Invalid input reject |
-| **JWT short TTL + refresh** | Compromised token window ছোট | 15min access, 7day refresh |
+| **JWT short TTL + refresh** | Compromised token window ছোট রাখা | 15min access, 7day refresh |
 
 ---
 
@@ -701,7 +704,7 @@ geoinsight-bd/
 ├── web/dashboard-nextjs/       # Frontend + BFF
 ├── services/
 │   ├── api-gateway-node/       # Core API + DB + Socket.io
-│   └── ai-analytics-python/    # ML/NLP/LLM
+│   └── ai-analytics-python/    # ML / NLP / LLM
 ├── deploy/
 │   ├── init/                   # Postgres, RabbitMQ, MinIO init
 │   ├── nginx/                  # Production edge
@@ -736,17 +739,17 @@ geoinsight-bd/
 
 ---
 
-## ১৩. সারাংশ — Architecture Decision Record (ADR)
+## ১৩. Summary — Architecture Decision Record (ADR)
 
-| Decision | বিকল্প | কেন এটা বেছে নেওয়া |
-|----------|--------|-------------------|
-| Monorepo microservices | Single monolith | AI compute আলাদা scale; Python + Node best-of-breed |
-| BFF pattern | Direct browser → Gateway | JWT security; same-origin cookies |
-| TimescaleDB | Plain PostgreSQL | Commodity time-series performance |
+| Decision | Alternative | কেন এটা বেছে নেওয়া হয়েছে |
+|----------|-------------|----------------------------|
+| Monorepo microservices | Single monolith | AI compute আলাদা scale করা যায়; Python + Node best-of-breed |
+| **BFF** pattern | Direct browser → Gateway | JWT security; same-origin cookies |
+| **TimescaleDB** | Plain PostgreSQL | Commodity time-series performance |
 | Redis + RabbitMQ | শুধু Redis | Cache vs reliable async — আলাদা দায়িত্ব |
-| Ollama on-prem | OpenAI API | Bangladesh data sovereignty (Tier-4 NDC) |
+| **Ollama** on-prem | OpenAI API | Bangladesh **data sovereignty** (Tier-4 NDC) |
 | PgBouncer + Replica | Direct DB | Connection exhaustion + read scaling |
-| Socket.io | SSE/Polling | Bi-directional real-time + room-based scope |
+| **Socket.io** | SSE / Polling | Bi-directional real-time + room-based scope |
 | Hyperledger (optional) | Public blockchain | Permissioned gov data anchoring |
 
 ---

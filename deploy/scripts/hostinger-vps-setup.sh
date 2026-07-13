@@ -86,12 +86,16 @@ if [[ ! -f /swapfile ]]; then
   echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
-echo "==> Building & starting stack (this can take 10–20 min)"
-docker compose -f docker-compose.yml -f docker-compose.apps.yml up -d --build
+echo "==> Building & starting stack (use tmux if SSH drops: apt install tmux && tmux)"
+echo "    Prefer: bash deploy/scripts/vps-redeploy.sh"
+chmod +x deploy/scripts/vps-redeploy.sh deploy/scripts/docker-db-init.sh 2>/dev/null || true
+bash deploy/scripts/vps-redeploy.sh
 
 echo ""
-echo "If db-init failed previously, re-run after pull:"
-echo "  docker compose -f docker-compose.yml -f docker-compose.apps.yml up -d --build"
+echo "If session dropped mid-build, reconnect and run:"
+echo "  cd $DEPLOY_PATH && bash deploy/scripts/vps-redeploy.sh"
+echo "  docker ps -a"
+echo "  docker logs geoinsight-ai-analytics --tail 50"
 echo ""
 echo "Done."
 echo "  Dashboard: http://${VPS_IP}:3000"

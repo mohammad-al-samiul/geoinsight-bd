@@ -3,12 +3,6 @@
 
 $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
-
-if (-not (Test-Path "$Root\.env")) {
-  Write-Host "Copy .env.example to .env first." -ForegroundColor Yellow
-  exit 1
-}
-
 Set-Location $Root
 
 function Get-EnvValue {
@@ -19,6 +13,26 @@ function Get-EnvValue {
     return ($match.Line -split "=", 2)[1].Trim().Trim('"').Trim("'")
   }
   return $Default
+}
+
+if (-not (Test-Path "$Root\.env")) {
+  Write-Host "Copy .env.example to .env first (local Windows)." -ForegroundColor Yellow
+  Write-Host "  Do NOT use .env.production.example on this PC." -ForegroundColor Yellow
+  exit 1
+}
+
+# Guard: production VPS .env accidentally used on Windows
+$cors = Get-EnvValue "CORS_ORIGIN" ""
+$pgPort = Get-EnvValue "POSTGRES_PORT" "55432"
+if ($cors -match "187\.|YOUR_VPS|geoinsight\.gov") {
+  Write-Host "ERROR: .env looks like PRODUCTION (CORS_ORIGIN=$cors)" -ForegroundColor Red
+  Write-Host "  Local PC needs localhost URLs. Restore from .env.example:" -ForegroundColor White
+  Write-Host "    Copy-Item .env.example .env -Force" -ForegroundColor Cyan
+  Write-Host "  VPS keeps its own /opt/geoinsight-bd/.env separately." -ForegroundColor White
+  exit 1
+}
+if ($pgPort -eq "5432") {
+  Write-Host "NOTE: POSTGRES_PORT=5432 often fails on Windows Hyper-V. Prefer 55432." -ForegroundColor Yellow
 }
 
 $DashboardPort = [int](Get-EnvValue "DASHBOARD_PORT" "3000")

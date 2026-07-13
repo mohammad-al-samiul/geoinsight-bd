@@ -92,8 +92,9 @@ services:
     depends_on:
       db-init:
         condition: service_completed_successfully
+      # Don't block API on AI health — small VPS AI boot can take minutes / OOM
       ai-analytics:
-        condition: service_healthy
+        condition: service_started
       pgbouncer:
         condition: service_started
       redis:
@@ -106,8 +107,8 @@ services:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/v1/health || exit 1"]
       interval: 30s
       timeout: 5s
-      retries: 5
-      start_period: 90s
+      retries: 8
+      start_period: 120s
 
   ai-analytics:
     build:
@@ -120,6 +121,8 @@ services:
     environment:
       NODE_ENV: production
       AI_CORE_PORT: 8000
+      # 1 worker on VPS — 2 workers often OOM / freeze Docker on 4–8GB Hostinger plans
+      AI_WORKER_POOL_SIZE: ${AI_WORKER_POOL_SIZE:-1}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
       RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-geoinsight_exchange}
@@ -132,6 +135,7 @@ services:
       AI_MODEL_CACHE_DIR: /tmp/ml_models/cache
       CORS_ORIGINS: ${CORS_ORIGIN:-http://localhost:3000},http://api-gateway:4000
       HF_HUB_DISABLE_TELEMETRY: "1"
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
     depends_on:
       redis:
         condition: service_healthy
@@ -141,24 +145,40 @@ services:
       - geoinsight_net
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # Single uvicorn worker — lower RAM, faster healthy on VPS
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--workers",
+        "1",
+      ]
     healthcheck:
       test:
         [
           "CMD-SHELL",
           'python -c "import urllib.request; urllib.request.urlopen(''http://127.0.0.1:8000/api/v1/health'')"',
         ]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
+      interval: 20s
+      timeout: 10s
+      retries: 15
+      start_period: 180s
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
 
   dashboard-nextjs:
     build:
       context: ./web/dashboard-nextjs
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:${API_GATEWAY_PORT:-4800}/api/v1
-        NEXT_PUBLIC_SOCKET_URL: http://localhost:${API_GATEWAY_PORT:-4800}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4800/api/v1}
+        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-http://localhost:4800}
     image: geoinsight/dashboard:local
     container_name: geoinsight-dashboard
     restart: unless-stopped
@@ -173,6 +193,6 @@ services:
       COOKIE_SECURE: "false"
     depends_on:
       api-gateway:
-        condition: service_healthy
+        condition: service_started
     networks:
       - geoinsight_net
