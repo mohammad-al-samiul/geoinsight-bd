@@ -1,7 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { DashboardViewport } from "@/components/dashboard/dashboard-viewport";
-
-export default function DashboardPage() {
-  return <DashboardViewport />;
+/** Removed from nav — keep redirect so old bookmarks still work. */
+export default function CommandDashboardRedirect() {
+  redirect("/");
 }

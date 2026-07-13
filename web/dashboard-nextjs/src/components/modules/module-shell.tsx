@@ -1,11 +1,13 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { AdminCascadeFilter } from "@/components/filters/admin-cascade-filter";
 import { useAdminHierarchy } from "@/hooks/use-admin-hierarchy";
 import { ScorecardSkeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IntelCard } from "@/components/ui/intel-card";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
@@ -32,24 +34,33 @@ export function ModuleShell({
   const t = useTranslations("common");
 
   return (
-    <div className="mx-auto max-w-7xl animate-fade-in space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+    <div className="mx-auto max-w-7xl animate-rise space-y-7">
+      <div className="surface-hero intel-rail px-5 py-5 sm:px-7 sm:py-6">
+        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="pl-3">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+              GeoInsight · Command
+            </p>
+            <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
+              {title}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              {description}
+            </p>
+          </div>
+          {onRetry && (
+            <Button variant="outline" size="sm" onClick={onRetry} className="gap-2 self-start sm:self-auto">
+              <RefreshCw className="h-3.5 w-3.5" />
+              {t("refresh")}
+            </Button>
+          )}
         </div>
-        {onRetry && (
-          <Button variant="outline" size="sm" onClick={onRetry} className="gap-2">
-            <RefreshCw className="h-3.5 w-3.5" />
-            {t("refresh")}
-          </Button>
-        )}
       </div>
 
       <AdminCascadeFilter variant="glass" />
 
       {error && (
-        <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+        <div className="flex items-start gap-3 rounded-xl border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive animate-fade-in">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <p className="font-medium">{t("loadFailed")}</p>
@@ -67,7 +78,7 @@ export function ModuleShell({
           ))}
         </div>
       ) : (
-        children
+        <div className="animate-rise-delay-1 space-y-6">{children}</div>
       )}
     </div>
   );
@@ -88,17 +99,38 @@ const ACCENT: Record<NonNullable<StatCardProps["accent"]>, string> = {
 };
 
 export function StatCard({ label, value, hint, accent = "default" }: StatCardProps) {
+  const intelAccent =
+    accent === "danger"
+      ? "danger"
+      : accent === "warning"
+        ? "warning"
+        : accent === "success"
+          ? "success"
+          : "default";
+
   return (
-    <div className="glass-panel rounded-xl p-4 shadow-panel">
-      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={cn("mt-2 text-2xl font-bold tabular-nums", ACCENT[accent])}>{value}</p>
-      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
-    </div>
+    <IntelCard accent={intelAccent} className="!p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </p>
+      <motion.p
+        className={cn(
+          "mt-2.5 font-display text-2xl font-semibold tabular-nums tracking-tight",
+          ACCENT[accent],
+        )}
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      >
+        {value}
+      </motion.p>
+      {hint && <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{hint}</p>}
+    </IntelCard>
   );
 }
 
 export function StatGrid({ children }: { children: ReactNode }) {
-  return <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{children}</div>;
+  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>;
 }
 
 interface DataTableProps<T extends { id?: string }> {
@@ -122,20 +154,20 @@ export function DataTable<T extends { id?: string }>({
   const empty = emptyMessage ?? t("noData");
   if (rows.length === 0) {
     return (
-      <div className="glass-panel rounded-xl p-8 text-center text-sm text-muted-foreground">
+      <div className="glass-panel rounded-xl p-10 text-center text-sm text-muted-foreground">
         {empty}
       </div>
     );
   }
 
   return (
-    <div className="glass-panel overflow-hidden rounded-xl shadow-panel">
+    <div className="glass-panel overflow-hidden rounded-xl">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border/60 bg-secondary/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border/50 bg-secondary/25 text-left text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               {columns.map((col) => (
-                <th key={col.key} className="px-4 py-3 font-semibold">
+                <th key={col.key} className="px-4 py-3.5 font-semibold">
                   {col.label}
                 </th>
               ))}
@@ -146,14 +178,16 @@ export function DataTable<T extends { id?: string }>({
               <tr
                 key={row.id ?? i}
                 className={cn(
-                  "border-b border-border/40 transition-colors",
-                  onRowClick ? "cursor-pointer hover:bg-primary/5" : "hover:bg-secondary/20",
+                  "border-b border-border/30 transition-colors",
+                  onRowClick ? "cursor-pointer hover:bg-primary/5" : "hover:bg-secondary/25",
                 )}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
                 {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-3">
-                    {col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key] ?? "—")}
+                  <td key={col.key} className="px-4 py-3.5">
+                    {col.render
+                      ? col.render(row)
+                      : String((row as Record<string, unknown>)[col.key] ?? "—")}
                   </td>
                 ))}
               </tr>

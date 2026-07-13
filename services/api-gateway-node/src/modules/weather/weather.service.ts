@@ -10,8 +10,13 @@ import {
   resolveScopeContext,
   type ScopeContext,
 } from "../../shared/scope/scope-context";
+import {
+  emptyImpact,
+  extractNewsImpact,
+  mergeImpact,
+} from "../../shared/impact/news-impact";
 
-const WEATHER_CACHE_KEY = "weather:live:v1";
+const WEATHER_CACHE_KEY = "weather:live:v2";
 const WEATHER_CACHE_TTL_SEC = 900;
 
 const FLOOD_KEYWORDS = ["বন্যা", "flood", "inundat", "water level", "পানি বৃদ্ধি", "landslide"];
@@ -108,6 +113,16 @@ export interface WeatherLiveSummary {
     max_severity: number;
     refreshed_at: string;
     sources: string[];
+    flood_impact: {
+      deaths: number;
+      injuries: number;
+      homes_damaged: number;
+      livestock_lost: number;
+      damage_mentions: number;
+      evidence: string[];
+      disclaimer_bn: string;
+      disclaimer_en: string;
+    };
   };
   scope?: ScopeContext;
 }
@@ -390,6 +405,7 @@ export class WeatherService {
     const highHeat = [...new Set(observations.filter((o) => o.heat_stress >= 4).map((o) => o.division))];
     const totalPop = observations.reduce((sum, o) => sum + o.population_at_risk, 0);
     const maxSeverity = alerts.length > 0 ? Math.max(...alerts.map((a) => a.severity)) : 0;
+    const flood_impact = await this.buildFloodImpactFromNews();
 
     return {
       observations,
@@ -417,7 +433,37 @@ export class WeatherService {
         max_severity: maxSeverity,
         refreshed_at: new Date().toISOString(),
         sources,
+        flood_impact,
       },
+    };
+  }
+
+  private async buildFloodImpactFromNews() {
+    const since = new Date(Date.now() - 7 * 86400 * 1000);
+    const articles = await prismaRead.externalArticle.findMany({
+      where: { fetchedAt: { gte: since } },
+      select: { title: true, summary: true },
+      take: 400,
+    });
+
+    let total = emptyImpact();
+    for (const article of articles) {
+      const text = `${article.title} ${article.summary ?? ""}`.toLowerCase();
+      if (!FLOOD_KEYWORDS.some((k) => text.includes(k.toLowerCase()))) continue;
+      total = mergeImpact(total, extractNewsImpact(article.title, article.summary));
+    }
+
+    return {
+      deaths: total.deaths,
+      injuries: total.injuries,
+      homes_damaged: total.homes_damaged,
+      livestock_lost: total.livestock_lost,
+      damage_mentions: total.damage_mentions,
+      evidence: total.evidence,
+      disclaimer_bn:
+        "বন্যায় মৃত্যু/ঘরবাড়ি/গবাদি পশুর সংখ্যা সংবাদ থেকে স্বয়ংক্রিয় আহরণ — সরকারি চূড়ান্ত হিসাব নয়।",
+      disclaimer_en:
+        "Flood deaths/homes/livestock figures are auto-extracted from news — not an official tally.",
     };
   }
 
@@ -466,6 +512,18 @@ export class WeatherService {
         max_severity: 0,
         refreshed_at: new Date().toISOString(),
         sources: [],
+        flood_impact: {
+          deaths: 0,
+          injuries: 0,
+          homes_damaged: 0,
+          livestock_lost: 0,
+          damage_mentions: 0,
+          evidence: [],
+          disclaimer_bn:
+            "বন্যায় মৃত্যু/ঘরবাড়ি/গবাদি পশুর সংখ্যা সংবাদ থেকে স্বয়ংক্রিয় আহরণ — সরকারি চূড়ান্ত হিসাব নয়।",
+          disclaimer_en:
+            "Flood deaths/homes/livestock figures are auto-extracted from news — not an official tally.",
+        },
       },
     };
   }

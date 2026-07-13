@@ -17,6 +17,9 @@ import { Badge } from "@/components/ui/badge";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useUnrestPulse, type UnrestCategory } from "@/hooks/use-unrest-pulse";
+import { ProgressMeter } from "@/components/ui/progress-meter";
+import { IntelCard } from "@/components/ui/intel-card";
+import { ImpactStatsPanel } from "@/components/shared/impact-stats-panel";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_STYLE: Record<UnrestCategory, string> = {
@@ -26,13 +29,6 @@ const CATEGORY_STYLE: Record<UnrestCategory, string> = {
   social_viral: "border-sky-500/40 bg-sky-500/10 text-sky-300",
   general_grievance: "border-amber-500/40 bg-amber-500/10 text-amber-300",
 };
-
-function riskBar(score: number) {
-  if (score >= 70) return "bg-red-500";
-  if (score >= 50) return "bg-orange-500";
-  if (score >= 30) return "bg-amber-500";
-  return "bg-emerald-500";
-}
 
 export function UnrestPulsePanel() {
   const t = useTranslations("modules.unrest");
@@ -92,6 +88,35 @@ export function UnrestPulsePanel() {
             {locale === "bn" ? data.summary.note_bn : data.summary.note_en}
           </p>
 
+          {data.summary.impact && (
+            <ImpactStatsPanel
+              title={t("impactTitle")}
+              subtitle={t("impactSubtitle")}
+              stats={{
+                deaths: data.summary.impact.deaths,
+                civilian_deaths: data.summary.impact.civilian_deaths,
+                injuries: data.summary.impact.injuries,
+                homes_damaged: data.summary.impact.homes_damaged,
+                livestock_lost: data.summary.impact.livestock_lost,
+                damage_mentions: data.summary.impact.damage_mentions,
+                evidence: data.summary.impact.evidence,
+                disclaimer:
+                  locale === "bn"
+                    ? data.summary.impact.disclaimer_bn
+                    : data.summary.impact.disclaimer_en,
+              }}
+              labels={{
+                deaths: t("impactDeaths"),
+                civilian: t("impactCivilian"),
+                injuries: t("impactInjured"),
+                homes: t("impactHomes"),
+                livestock: t("impactLivestock"),
+                damageMentions: t("impactDamageMentions"),
+                evidence: t("impactEvidence"),
+              }}
+            />
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <LegendCard
               icon={<Megaphone className="h-4 w-4 text-red-400" />}
@@ -121,22 +146,19 @@ export function UnrestPulsePanel() {
               {data.districts.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{t("noDistricts")}</p>
               ) : (
-                <ul className="max-h-[520px] space-y-2 overflow-y-auto">
-                  {data.districts.map((d) => (
-                    <li
-                      key={d.district}
-                      className={cn(
-                        "rounded-lg border px-3 py-2.5",
-                        d.risk_level >= 4
-                          ? "border-red-500/40 bg-red-500/5"
-                          : d.risk_level >= 3
-                            ? "border-amber-500/40 bg-amber-500/5"
-                            : "border-border/50",
-                      )}
-                    >
+                <ul className="max-h-[520px] space-y-2.5 overflow-y-auto">
+                  {data.districts.map((d, i) => (
+                    <li key={d.district}>
+                      <IntelCard
+                        index={i}
+                        accent={
+                          d.risk_level >= 4 ? "danger" : d.risk_level >= 3 ? "warning" : "default"
+                        }
+                        padding="sm"
+                      >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-sm font-medium">{d.district}</p>
+                          <p className="text-sm font-semibold tracking-tight">{d.district}</p>
                           {d.division && (
                             <p className="text-xs text-muted-foreground">{d.division}</p>
                           )}
@@ -146,12 +168,17 @@ export function UnrestPulsePanel() {
                           <Badge variant="outline">L{d.risk_level}</Badge>
                         </div>
                       </div>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/40">
-                        <div
-                          className={cn("h-full rounded-full transition-all", riskBar(d.unrest_score))}
-                          style={{ width: `${d.unrest_score}%` }}
-                        />
+                      <div className="mt-2.5">
+                        <ProgressMeter value={d.unrest_score} invert delay={0.04 + i * 0.02} />
                       </div>
+                      {(d.deaths || d.injuries) ? (
+                        <p className="mt-1.5 text-[11px] text-red-300/90">
+                          {t("districtCasualties", {
+                            deaths: d.deaths ?? 0,
+                            injured: d.injuries ?? 0,
+                          })}
+                        </p>
+                      ) : null}
                       <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
                         <span>
                           {t("score")}: {d.unrest_score}
@@ -190,6 +217,7 @@ export function UnrestPulsePanel() {
                           </span>
                         ))}
                       </div>
+                      </IntelCard>
                     </li>
                   ))}
                 </ul>

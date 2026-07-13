@@ -1,19 +1,32 @@
 import type { Metadata } from "next";
-import { Inter, Noto_Sans_Bengali } from "next/font/google";
+import { JetBrains_Mono, Noto_Sans_Bengali, Sora } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
-const inter = Inter({
+const sora = Sora({
   subsets: ["latin"],
-  variable: "--font-geist-sans",
+  variable: "--font-sans",
+  weight: ["300", "400", "500", "600", "700"],
+});
+
+const soraDisplay = Sora({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["500", "600", "700"],
 });
 
 const notoBengali = Noto_Sans_Bengali({
   subsets: ["bengali"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-bengali",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  weight: ["400", "500", "600"],
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -32,8 +45,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang={locale} className="dark">
       <body
         className={cn(
-          inter.variable,
+          sora.variable,
+          soraDisplay.variable,
           notoBengali.variable,
+          jetbrainsMono.variable,
+          "app-atmosphere min-h-screen",
           locale === "bn" ? "font-bengali" : "font-sans",
         )}
       >

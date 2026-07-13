@@ -16,14 +16,9 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ProgressMeter } from "@/components/ui/progress-meter";
+import { IntelCard } from "@/components/ui/intel-card";
 import { cn } from "@/lib/utils";
-
-function scoreColor(score: number): string {
-  if (score >= 70) return "bg-red-500";
-  if (score >= 45) return "bg-orange-500";
-  if (score >= 25) return "bg-amber-500";
-  return "bg-emerald-500";
-}
 
 function sourceLabel(source: string, t: (key: string) => string): string {
   if (source === "news_rss_google") return t("sourceNews");
@@ -177,21 +172,25 @@ export function SentimentHeatmapPanel() {
                 <p className="p-2 text-sm text-muted-foreground">{t("noDistressed")}</p>
               ) : (
                 <div className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-2">
-                  {distressed.map((cell) => (
-                    <div
+                  {distressed.map((cell, i) => (
+                    <IntelCard
                       key={`${cell.district}-${cell.upazila ?? "all"}`}
-                      className={cn(
-                        "min-w-0 rounded-lg border p-2.5 sm:p-3",
+                      index={i}
+                      accent={
                         cell.sentiment_score >= 50
-                          ? "border-red-500/40 bg-red-500/5"
+                          ? "danger"
                           : cell.sentiment_score >= 25
-                            ? "border-amber-500/40 bg-amber-500/5"
-                            : "border-border/50 bg-secondary/20",
-                      )}
+                            ? "warning"
+                            : "default"
+                      }
+                      padding="sm"
+                      className="min-w-0"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">{cell.district}</p>
+                          <p className="truncate text-sm font-semibold tracking-tight">
+                            {cell.district}
+                          </p>
                           {cell.hardship_hint && (
                             <p className="truncate text-[11px] text-red-300/90">
                               {cell.hardship_hint}
@@ -217,28 +216,25 @@ export function SentimentHeatmapPanel() {
                           </span>
                         </Badge>
                       </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-secondary">
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-all",
-                              scoreColor(cell.sentiment_score),
-                            )}
-                            style={{ width: `${Math.max(cell.sentiment_score, 4)}%` }}
-                          />
-                        </div>
-                        <span className="shrink-0 text-xs font-medium tabular-nums text-foreground">
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <ProgressMeter
+                          value={cell.sentiment_score}
+                          invert
+                          className="min-w-0 flex-1"
+                          delay={0.05 + i * 0.03}
+                        />
+                        <span className="shrink-0 font-display text-xs font-semibold tabular-nums">
                           {cell.sentiment_score}
                         </span>
                       </div>
-                      <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+                      <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
                         {t("cellCounts", {
                           grievance: cell.grievance_count,
                           demand: cell.demand_count,
                           total: cell.total,
                         })}
                       </p>
-                    </div>
+                    </IntelCard>
                   ))}
                 </div>
               )}

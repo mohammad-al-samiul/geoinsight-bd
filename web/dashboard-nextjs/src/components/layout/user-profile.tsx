@@ -31,19 +31,23 @@ export function UserProfile({ collapsed }: { collapsed?: boolean }) {
   }
 
   return (
-    <div className="mx-3 mb-4 rounded-lg border border-sidebar-border bg-secondary/30 p-3">
+    <div className="mx-3 mb-3 rounded-xl border border-sidebar-border/80 bg-gradient-to-br from-secondary/50 to-secondary/20 p-3.5 shadow-soft">
       <div className="flex items-start gap-3">
-        <Avatar className="h-10 w-10 shrink-0 ring-2 ring-primary/30">
+        <Avatar className="h-10 w-10 shrink-0 ring-2 ring-primary/25">
           <AvatarFallback className="bg-primary/15 text-sm font-bold text-primary">
             {initials}
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-sidebar-foreground">{user.fullName}</p>
+          <p className="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
+            {user.fullName}
+          </p>
           <p className="truncate text-xs text-muted-foreground">{user.email}</p>
           <Badge
             variant="outline"
-            className={cn("mt-2 border text-[10px] font-bold uppercase tracking-wide")}
+            className={cn(
+              "mt-2 border-primary/30 bg-primary/10 text-[10px] font-semibold uppercase tracking-wider text-primary",
+            )}
           >
             <Shield className="mr-1 h-3 w-3" />
             {tr(user.role)}

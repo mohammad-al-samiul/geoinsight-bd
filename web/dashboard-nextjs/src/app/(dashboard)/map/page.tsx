@@ -1,7 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { DashboardViewport } from "@/components/dashboard/dashboard-viewport";
-
-export default function MapPage() {
-  return <DashboardViewport />;
+/** Removed from nav — geographic map lives on National Overview. */
+export default function MapRedirect() {
+  redirect("/");
 }

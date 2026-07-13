@@ -23,6 +23,15 @@ export interface UnrestSignal {
   url: string;
   published_at: string | null;
   sentiment: string | null;
+  impact?: {
+    deaths: number;
+    civilian_deaths: number;
+    injuries: number;
+    homes_damaged: number;
+    livestock_lost: number;
+    damage_mentions: number;
+    evidence: string[];
+  };
 }
 
 export interface DistrictUnrestCell {
@@ -39,6 +48,10 @@ export interface DistrictUnrestCell {
   trend: "rising" | "stable" | "falling";
   top_categories: UnrestCategory[];
   population_pressure: "high" | "medium" | "low";
+  deaths?: number;
+  injuries?: number;
+  civilian_deaths?: number;
+  damage_mentions?: number;
 }
 
 export interface UnrestPulse {
@@ -55,6 +68,17 @@ export interface UnrestPulse {
     sources: string[];
     note_bn: string;
     note_en: string;
+    impact?: {
+      deaths: number;
+      civilian_deaths: number;
+      injuries: number;
+      damage_mentions: number;
+      homes_damaged: number;
+      livestock_lost: number;
+      evidence: string[];
+      disclaimer_bn: string;
+      disclaimer_en: string;
+    };
   };
   scope?: { divisionName?: string; districtName?: string };
 }

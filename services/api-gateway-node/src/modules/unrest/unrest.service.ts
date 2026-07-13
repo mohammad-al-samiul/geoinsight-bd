@@ -9,8 +9,14 @@ import {
   type ScopeContext,
 } from "../../shared/scope/scope-context";
 import type { DashboardScopeQuery } from "../dashboard/dashboard.service";
+import {
+  emptyImpact,
+  extractNewsImpact,
+  mergeImpact,
+  type NewsImpactExtract,
+} from "../../shared/impact/news-impact";
 
-const UNREST_CACHE_KEY = "unrest:pulse:v1";
+const UNREST_CACHE_KEY = "unrest:pulse:v2";
 const UNREST_TTL_SEC = 900;
 const LOOKBACK_DAYS = 7;
 
@@ -149,6 +155,7 @@ export interface UnrestSignal {
   url: string;
   published_at: string | null;
   sentiment: string | null;
+  impact: NewsImpactExtract;
 }
 
 export interface DistrictUnrestCell {
@@ -165,6 +172,10 @@ export interface DistrictUnrestCell {
   trend: "rising" | "stable" | "falling";
   top_categories: UnrestCategory[];
   population_pressure: "high" | "medium" | "low";
+  deaths: number;
+  injuries: number;
+  civilian_deaths: number;
+  damage_mentions: number;
 }
 
 export interface UnrestPulse {
@@ -181,6 +192,17 @@ export interface UnrestPulse {
     sources: string[];
     note_bn: string;
     note_en: string;
+    impact: {
+      deaths: number;
+      civilian_deaths: number;
+      injuries: number;
+      damage_mentions: number;
+      homes_damaged: number;
+      livestock_lost: number;
+      evidence: string[];
+      disclaimer_bn: string;
+      disclaimer_en: string;
+    };
   };
   scope?: ScopeContext;
 }
@@ -241,6 +263,18 @@ export class UnrestService {
         social_viral: districts.reduce((n, d) => n + d.social_viral_count, 0),
         total_signals: signals.length,
         top_district: districts[0]?.district ?? null,
+        impact: {
+          ...pulse.summary.impact,
+          deaths: districts.reduce((n, d) => n + d.deaths, 0),
+          civilian_deaths: districts.reduce((n, d) => n + d.civilian_deaths, 0),
+          injuries: districts.reduce((n, d) => n + d.injuries, 0),
+          damage_mentions: districts.reduce((n, d) => n + d.damage_mentions, 0),
+          homes_damaged: signals.reduce((n, s) => n + (s.impact?.homes_damaged ?? 0), 0),
+          livestock_lost: signals.reduce((n, s) => n + (s.impact?.livestock_lost ?? 0), 0),
+          evidence: signals
+            .flatMap((s) => s.impact?.evidence ?? [])
+            .slice(0, 8),
+        },
       },
       scope: ctx,
     };
@@ -280,8 +314,14 @@ export class UnrestService {
         grievance: number;
         recent: number;
         older: number;
+        deaths: number;
+        injuries: number;
+        civilian_deaths: number;
+        damage_mentions: number;
       }
     >();
+
+    let impactTotal = emptyImpact();
 
     for (const article of articles) {
       const text = `${article.title} ${article.summary ?? ""}`;
@@ -293,6 +333,8 @@ export class UnrestService {
         : "National";
       const division = normalizeDivisionName(article.division) ?? article.division ?? null;
       const severity = severityFor(category, text);
+      const impact = extractNewsImpact(article.title, article.summary);
+      impactTotal = mergeImpact(impactTotal, impact);
 
       signals.push({
         id: article.id,
@@ -307,6 +349,7 @@ export class UnrestService {
         url: article.url,
         published_at: (article.publishedAt ?? article.fetchedAt).toISOString(),
         sentiment: article.sentimentCategory,
+        impact,
       });
 
       const key = district;
@@ -319,6 +362,10 @@ export class UnrestService {
         grievance: 0,
         recent: 0,
         older: 0,
+        deaths: 0,
+        injuries: 0,
+        civilian_deaths: 0,
+        damage_mentions: 0,
       };
       if (category === "protest") entry.protest += 1;
       if (category === "govt_discontent") entry.govt += 1;
@@ -327,6 +374,10 @@ export class UnrestService {
       if (category === "general_grievance") entry.grievance += 1;
       if (article.fetchedAt >= mid) entry.recent += 1;
       else entry.older += 1;
+      entry.deaths += impact.deaths;
+      entry.injuries += impact.injuries;
+      entry.civilian_deaths += impact.civilian_deaths;
+      entry.damage_mentions += impact.damage_mentions;
       if (!entry.division && division) entry.division = division;
       byDistrict.set(key, entry);
     }
@@ -339,7 +390,13 @@ export class UnrestService {
 
       const unrestScore = Math.min(
         100,
-        e.protest * 18 + e.law * 20 + e.govt * 12 + e.social * 10 + e.grievance * 6,
+        e.protest * 18 +
+          e.law * 20 +
+          e.govt * 12 +
+          e.social * 10 +
+          e.grievance * 6 +
+          e.deaths * 8 +
+          e.injuries * 2,
       );
       const riskLevel =
         unrestScore >= 70 ? 5 : unrestScore >= 50 ? 4 : unrestScore >= 30 ? 3 : unrestScore >= 15 ? 2 : 1;
@@ -369,6 +426,10 @@ export class UnrestService {
         trend,
         top_categories: topCategories.slice(0, 3),
         population_pressure: riskLevel >= 4 ? "high" : riskLevel >= 3 ? "medium" : "low",
+        deaths: e.deaths,
+        injuries: e.injuries,
+        civilian_deaths: e.civilian_deaths,
+        damage_mentions: e.damage_mentions,
       });
     }
 
@@ -393,6 +454,19 @@ export class UnrestService {
           "সংবাদপত্র ও গুগল নিউজ ফিড থেকে বিশ্লেষণ। ফেসবুক সরাসরি স্ক্র্যাপ করা হয় না — সংবাদে উল্লেখিত ভাইরাল/সামাজিক মাধ্যমের সংকেত ধরা হয়।",
         note_en:
           "Derived from newspaper RSS and Google News topic feeds. Facebook is not scraped directly — viral/social mentions in news are captured instead.",
+        impact: {
+          deaths: impactTotal.deaths,
+          civilian_deaths: impactTotal.civilian_deaths,
+          injuries: impactTotal.injuries,
+          damage_mentions: impactTotal.damage_mentions,
+          homes_damaged: impactTotal.homes_damaged,
+          livestock_lost: impactTotal.livestock_lost,
+          evidence: impactTotal.evidence,
+          disclaimer_bn:
+            "মৃত্যু/আহত/ক্ষতির সংখ্যা সংবাদ শিরোনাম থেকে স্বয়ংক্রিয়ভাবে আহরণ — সরকারি চূড়ান্ত হিসাব নয়।",
+          disclaimer_en:
+            "Death/injury/damage counts are auto-extracted from news headlines — not an official tally.",
+        },
       },
     };
   }

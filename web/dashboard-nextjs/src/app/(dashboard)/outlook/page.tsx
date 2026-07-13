@@ -1,5 +1,5 @@
-import { StrategicOutlookPanel } from "@/components/outlook/strategic-outlook-panel";
+import { OutlookHubPanel } from "@/components/outlook/outlook-hub-panel";
 
 export default function OutlookPage() {
-  return <StrategicOutlookPanel />;
+  return <OutlookHubPanel />;
 }

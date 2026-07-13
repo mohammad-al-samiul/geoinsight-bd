@@ -7,7 +7,7 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import {
   AlertTriangle,
   CloudRain,
@@ -20,6 +20,7 @@ import {
   HazardWeatherMap,
   WeatherDivisionCards,
 } from "@/components/hazards/hazard-weather-map";
+import { ImpactStatsPanel } from "@/components/shared/impact-stats-panel";
 
 function formatPopulation(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -29,6 +30,7 @@ function formatPopulation(n: number): string {
 
 export function HazardOverlayPanel() {
   const t = useTranslations("modules.hazards");
+  const locale = useLocale();
   const { filter, isFiltered } = useAdminFilter();
   const { overlay, loading, error, reload: reloadOverlay } = useHazardOverlay();
   const { data: weather, loading: weatherLoading, error: weatherError, reload: reloadWeather } =
@@ -97,6 +99,34 @@ export function HazardOverlayPanel() {
               </span>
             )}
           </div>
+
+          {impact?.flood_impact && (
+            <ImpactStatsPanel
+              title={t("floodImpactTitle")}
+              subtitle={t("floodImpactSubtitle")}
+              stats={{
+                deaths: impact.flood_impact.deaths,
+                injuries: impact.flood_impact.injuries,
+                homes_damaged: impact.flood_impact.homes_damaged,
+                livestock_lost: impact.flood_impact.livestock_lost,
+                damage_mentions: impact.flood_impact.damage_mentions,
+                evidence: impact.flood_impact.evidence,
+                disclaimer:
+                  locale === "bn"
+                    ? impact.flood_impact.disclaimer_bn
+                    : impact.flood_impact.disclaimer_en,
+              }}
+              labels={{
+                deaths: t("impactDeaths"),
+                civilian: t("impactCivilian"),
+                injuries: t("impactInjured"),
+                homes: t("impactHomes"),
+                livestock: t("impactLivestock"),
+                damageMentions: t("impactDamageMentions"),
+                evidence: t("impactEvidence"),
+              }}
+            />
+          )}
 
           <WeatherDivisionCards observations={weather.observations} />
 

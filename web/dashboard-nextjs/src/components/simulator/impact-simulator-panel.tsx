@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { useImpactSimulator } from "@/hooks/use-impact-simulator";
 import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { IntelCard } from "@/components/ui/intel-card";
+import { AnimatedSlider } from "@/components/ui/animated-slider";
+import { ProgressMeter } from "@/components/ui/progress-meter";
 import { cn } from "@/lib/utils";
 import { useAppLang } from "@/hooks/use-app-lang";
 import { useTranslations } from "next-intl";
@@ -21,7 +25,7 @@ export function ImpactSimulatorPanel() {
   const lang = useAppLang();
   const t = useTranslations("modules.simulator");
   const tc = useTranslations("common");
-  const [conflict, setConflict] = useState(0.65);
+  const [conflict, setConflict] = useState(0.4);
   const [sanctions, setSanctions] = useState(0.4);
   const [trade, setTrade] = useState(0.5);
   const [migration, setMigration] = useState(0.55);
@@ -78,10 +82,12 @@ export function ImpactSimulatorPanel() {
         )
       }
     >
-      <div className="glass-panel space-y-5 rounded-xl p-5 shadow-panel">
+      <IntelCard accent="info" padding="lg" hoverLift={false} className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <SlidersHorizontal className="h-4 w-4 text-primary" />
+          <h3 className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/25 bg-primary/10">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
+            </span>
             {t("scenarioSliders")}
           </h3>
           <Button size="sm" onClick={handleRun} disabled={loading} className="gap-2">
@@ -90,66 +96,71 @@ export function ImpactSimulatorPanel() {
           </Button>
         </div>
 
-        {sliders.map((s) => (
-          <div key={s.label}>
-            <div className="mb-1 flex justify-between text-xs">
-              <span className="text-muted-foreground">{s.label}</span>
-              <span className="tabular-nums">{(s.value * 100).toFixed(0)}%</span>
-            </div>
-            <input
-              type="range"
+        <div className="space-y-5">
+          {sliders.map((s, i) => (
+            <AnimatedSlider
+              key={s.label}
+              index={i}
+              label={s.label}
+              value={s.value}
+              onChange={s.set}
               min={0}
               max={1}
               step={0.05}
-              value={s.value}
-              onChange={(e) => s.set(Number(e.target.value))}
-              className="w-full accent-primary"
+              format="percent"
             />
-          </div>
-        ))}
+          ))}
 
-        <div>
-          <div className="mb-1 flex justify-between text-xs">
-            <span className="text-muted-foreground">{t("budgetReallocation")}</span>
-            <span className="tabular-nums">
-              {budgetShift > 0 ? "+" : ""}
-              {budgetShift}%
-            </span>
-          </div>
-          <input
-            type="range"
+          <AnimatedSlider
+            index={sliders.length}
+            label={t("budgetReallocation")}
+            value={budgetShift}
+            onChange={setBudgetShift}
             min={-20}
             max={20}
             step={1}
-            value={budgetShift}
-            onChange={(e) => setBudgetShift(Number(e.target.value))}
-            className="w-full accent-primary"
+            format="signedPercent"
           />
         </div>
-      </div>
+      </IntelCard>
 
       {result && (
-        <div className="mt-6 space-y-4">
-          <p className={cn("text-sm font-medium", BAND_COLOR[result.risk_band] ?? "")}>
-            <Globe2 className="mr-1 inline h-4 w-4" />
-            {lang === "bn" ? result.narrative_bn : result.narrative}
-          </p>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 space-y-4"
+        >
+          <IntelCard hoverLift={false} accent="warning" padding="md">
+            <p className={cn("text-sm leading-relaxed font-medium", BAND_COLOR[result.risk_band] ?? "")}>
+              <Globe2 className="mr-1.5 inline h-4 w-4" />
+              {lang === "bn" ? result.narrative_bn : result.narrative}
+            </p>
+          </IntelCard>
+
           <div className="grid gap-3 md:grid-cols-2">
-            {result.ministry_impacts.map((m) => (
-              <div key={m.ministry} className="glass-panel rounded-lg border border-border/50 p-4">
+            {result.ministry_impacts.map((m, i) => (
+              <IntelCard key={m.ministry} index={i} accent="default" className="h-full">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold">
+                  <p className="font-display text-sm font-semibold tracking-tight">
                     {lang === "bn" ? m.ministry_bn : m.ministry}
                   </p>
-                  <Badge variant="outline">{m.impact_score}/100</Badge>
+                  <Badge
+                    variant="outline"
+                    className="border-primary/30 bg-primary/10 text-[10px] text-primary"
+                  >
+                    {m.impact_score}/100
+                  </Badge>
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">
+                <div className="mt-3">
+                  <ProgressMeter value={m.impact_score} invert delay={0.08 + i * 0.04} />
+                </div>
+                <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
                   {lang === "bn" ? m.narrative_bn : m.narrative}
                 </p>
-              </div>
+              </IntelCard>
             ))}
           </div>
-        </div>
+        </motion.div>
       )}
     </ModuleShell>
   );

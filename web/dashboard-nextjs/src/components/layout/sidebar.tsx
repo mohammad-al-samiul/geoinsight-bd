@@ -17,10 +17,8 @@ import {
   FileText,
   Globe2,
   Landmark,
-  LayoutDashboard,
   LineChart,
   Link2,
-  Map,
   MessageCircle,
   MessageSquareWarning,
   Package,
@@ -41,9 +39,9 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: "/", key: "nationalOverview", icon: Globe2, minTier: 1 },
-  { href: "/dashboard", key: "commandDashboard", icon: LayoutDashboard, minTier: 1 },
   { href: "/briefing", key: "briefing", icon: Sun, minTier: 1 },
-  { href: "/outlook", key: "outlook", icon: LineChart, minTier: 1 },
+  { href: "/outlook/politics", key: "outlookPolitics", icon: Landmark, minTier: 1 },
+  { href: "/outlook/economy", key: "outlookEconomy", icon: LineChart, minTier: 1 },
   { href: "/sovereign-ai", key: "sovereignAi", icon: Shield, minTier: 1 },
   { href: "/digital-twin", key: "digitalTwin", icon: Cpu, minTier: 1 },
   { href: "/sentiment", key: "sentiment", icon: MessageSquareWarning, minTier: 1 },
@@ -58,7 +56,6 @@ const NAV: NavItem[] = [
   { href: "/citizen-chat", key: "citizenChat", icon: MessageCircle, minTier: 2 },
   { href: "/hazards", key: "hazards", icon: CloudRain, minTier: 2 },
   { href: "/agro", key: "agro", icon: Sprout, minTier: 3 },
-  { href: "/map", key: "map", icon: Map, minTier: 3 },
   { href: "/representatives", key: "representatives", icon: Users, minTier: 4 },
 ];
 
@@ -86,15 +83,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "flex h-full flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-300 ease-in-out",
-        collapsed ? "w-[68px]" : "w-64",
+        "flex h-full flex-col border-r border-sidebar-border/80 bg-sidebar/95 backdrop-blur-xl transition-[width] duration-300 ease-in-out",
+        collapsed ? "w-[72px]" : "w-[272px]",
       )}
     >
-      <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-3">
+      <div className="flex h-14 items-center justify-between border-b border-sidebar-border/80 px-3">
         {!collapsed && (
-          <div className="flex flex-col">
-            <span className="text-gradient-gov text-sm font-bold tracking-tight">GeoInsight BD</span>
-            <span className="text-[10px] text-muted-foreground">{ts("brandSubtitle")}</span>
+          <div className="flex min-w-0 flex-col pl-1">
+            <span className="font-display text-gradient-gov text-[15px] font-bold tracking-tight">
+              GeoInsight BD
+            </span>
+            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+              {ts("brandSubtitle")}
+            </span>
           </div>
         )}
         <Button
@@ -110,11 +111,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       <UserProfile collapsed={collapsed} />
 
-      <Separator className="bg-sidebar-border" />
+      <Separator className="bg-sidebar-border/80" />
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2.5">
         {visibleNav.map((item) => {
-          const active = pathname === item.href;
+          const active =
+            item.href === "/"
+              ? pathname === "/"
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
           const label = t(item.key);
           const Icon = item.icon;
           return (
@@ -123,14 +127,22 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               href={item.href}
               title={collapsed ? label : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 active
-                  ? "bg-sidebar-accent/30 text-primary shadow-glow"
-                  : "text-sidebar-foreground/70 hover:bg-accent hover:text-foreground",
+                  ? "bg-primary/12 text-primary"
+                  : "text-sidebar-foreground/65 hover:bg-accent/80 hover:text-foreground",
                 collapsed && "justify-center px-2",
               )}
             >
-              <Icon className={cn("h-4 w-4 shrink-0", active && "text-primary")} />
+              {active && (
+                <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+              )}
+              <Icon
+                className={cn(
+                  "h-4 w-4 shrink-0 transition-colors",
+                  active ? "text-primary" : "text-muted-foreground group-hover:text-foreground",
+                )}
+              />
               {!collapsed && <span className="truncate">{label}</span>}
             </Link>
           );
@@ -138,7 +150,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </nav>
 
       {!collapsed && (
-        <div className="border-t border-sidebar-border p-3 text-[10px] text-muted-foreground">
+        <div className="border-t border-sidebar-border/80 p-3.5 text-[10px] leading-relaxed tracking-wide text-muted-foreground">
           {ts("classifiedFooter")}
         </div>
       )}

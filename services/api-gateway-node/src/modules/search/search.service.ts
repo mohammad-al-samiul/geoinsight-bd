@@ -11,9 +11,10 @@ export interface SearchResult {
 
 const PAGES: SearchResult[] = [
   { type: "page", id: "home", title: "National Overview", href: "/" },
-  { type: "page", id: "dashboard", title: "Command Dashboard", href: "/dashboard" },
   { type: "page", id: "briefing", title: "PM Briefing Copilot", href: "/briefing" },
   { type: "page", id: "outlook", title: "Political & Economic Outlook", href: "/outlook" },
+  { type: "page", id: "outlook-politics", title: "Political Outlook", href: "/outlook/politics" },
+  { type: "page", id: "outlook-economy", title: "Economic Outlook", href: "/outlook/economy" },
   { type: "page", id: "sovereign", title: "Sovereign Bangla LLM", href: "/sovereign-ai" },
   { type: "page", id: "twin", title: "KPI Digital Twin", href: "/digital-twin" },
   { type: "page", id: "sentiment", title: "Citizen Sentiment", href: "/sentiment" },
@@ -27,7 +28,6 @@ const PAGES: SearchResult[] = [
   { type: "page", id: "audit", title: "AI Audit Trail", href: "/audit-trail" },
   { type: "page", id: "citizen", title: "Citizen Chatbot", href: "/citizen-chat" },
   { type: "page", id: "hazards", title: "Flood & Cyclone Risk", href: "/hazards" },
-  { type: "page", id: "map", title: "Geo Spatial Map", href: "/map" },
   { type: "page", id: "reps", title: "Representatives", href: "/representatives" },
 ];
 

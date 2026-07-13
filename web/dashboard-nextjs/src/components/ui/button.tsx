@@ -1,23 +1,27 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold tracking-tight transition-shadow duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        default:
+          "relative overflow-hidden btn-gradient text-primary-foreground shadow-soft hover:shadow-glow border border-white/10",
+        secondary:
+          "bg-secondary text-secondary-foreground border border-border/70 hover:border-border hover:bg-secondary/85",
         ghost: "hover:bg-accent hover:text-accent-foreground",
-        outline: "border border-border bg-transparent hover:bg-accent",
+        outline:
+          "border border-border/80 bg-transparent hover:border-primary/40 hover:bg-primary/10",
       },
       size: {
         default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
+        sm: "h-8 rounded-lg px-3 text-xs",
         icon: "h-9 w-9",
-        lg: "h-10 px-6",
+        lg: "h-11 px-6 text-[15px]",
       },
     },
     defaultVariants: { variant: "default", size: "default" },
@@ -31,10 +35,34 @@ export interface ButtonProps
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
+  ({ className, variant, size, asChild = false, disabled, children, ...props }, ref) => {
+    const classes = cn(buttonVariants({ variant, size, className }));
+
+    if (asChild) {
+      return (
+        <Slot className={classes} ref={ref} {...props}>
+          {children}
+        </Slot>
+      );
+    }
+
     return (
-      <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+      <motion.button
+        ref={ref}
+        className={classes}
+        disabled={disabled}
+        whileHover={disabled ? undefined : { y: -1, scale: 1.015 }}
+        whileTap={disabled ? undefined : { scale: 0.97 }}
+        transition={{ type: "spring", stiffness: 420, damping: 24 }}
+        {...(props as React.ComponentProps<typeof motion.button>)}
+      >
+        {variant === "default" && (
+          <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
+            <span className="btn-sheen" />
+          </span>
+        )}
+        <span className="relative z-[1] inline-flex items-center gap-2">{children}</span>
+      </motion.button>
     );
   },
 );

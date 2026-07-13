@@ -13,7 +13,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Desktop sidebar */}
       <div className="hidden lg:flex">
         <Sidebar
           collapsed={sidebarCollapsed}
@@ -21,14 +20,13 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         />
       </div>
 
-      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute left-0 top-0 h-full animate-slide-in">
+          <div className="absolute left-0 top-0 h-full animate-slide-in shadow-soft">
             <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
           </div>
         </div>
@@ -42,15 +40,16 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           feedOpen={feedOpen}
         />
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <main
-            className={cn(
-              "flex-1 overflow-y-auto bg-gradient-to-b from-background to-secondary/20 p-4 lg:p-6",
-            )}
-          >
+          <main className="app-atmosphere flex-1 overflow-y-auto p-4 lg:p-7">
             {children}
           </main>
           {feedOpen && (
-            <aside className="hidden w-[min(100%,340px)] shrink-0 border-l border-border/60 bg-background/50 p-3 xl:block">
+            <aside
+              className={cn(
+                "hidden w-[min(100%,340px)] shrink-0 border-l border-border/50",
+                "bg-sidebar/80 p-3 backdrop-blur-md xl:block",
+              )}
+            >
               <AnomalyFeedPanel compact className="h-full" />
             </aside>
           )}

@@ -57,17 +57,21 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
-        bengali: ["var(--font-bengali)", "var(--font-geist-sans)", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "monospace"],
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
+        bengali: ["var(--font-bengali)", "var(--font-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
       },
       boxShadow: {
-        glow: "0 0 24px -4px hsl(var(--primary) / 0.35)",
-        panel: "0 4px 24px -4px hsl(0 0% 0% / 0.5)",
+        glow: "0 0 0 1px hsl(var(--primary) / 0.25), 0 8px 28px -10px hsl(var(--primary) / 0.35)",
+        panel:
+          "0 1px 0 hsl(210 40% 98% / 0.04) inset, 0 12px 40px -18px hsl(0 0% 0% / 0.65)",
+        soft: "0 8px 30px -12px hsl(0 0% 0% / 0.45)",
       },
       animation: {
-        "fade-in": "fadeIn 0.2s ease-out",
-        "slide-in": "slideIn 0.25s ease-out",
+        "fade-in": "fadeIn 0.28s ease-out",
+        "slide-in": "slideIn 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
+        rise: "riseIn 0.45s cubic-bezier(0.22, 1, 0.36, 1)",
       },
       keyframes: {
         fadeIn: {
@@ -75,7 +79,11 @@ const config: Config = {
           to: { opacity: "1" },
         },
         slideIn: {
-          from: { opacity: "0", transform: "translateY(-4px)" },
+          from: { opacity: "0", transform: "translateX(-8px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
+        riseIn: {
+          from: { opacity: "0", transform: "translateY(10px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
       },

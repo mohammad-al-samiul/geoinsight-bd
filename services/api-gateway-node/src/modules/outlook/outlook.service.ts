@@ -4,7 +4,7 @@ import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis
 import { broadcastDashboardRefresh } from "../pipeline/pipeline.broadcast";
 import { unrestService } from "../unrest/unrest.service";
 
-const OUTLOOK_CACHE_KEY = "outlook:strategic:v1";
+const OUTLOOK_CACHE_KEY = "outlook:strategic:v2";
 const OUTLOOK_TTL_SEC = 1800;
 const LOOKBACK_DAYS = 21;
 

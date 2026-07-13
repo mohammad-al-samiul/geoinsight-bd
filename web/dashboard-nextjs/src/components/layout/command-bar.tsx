@@ -30,7 +30,7 @@ export function CommandBar({
   const tr = useTranslations("roles");
 
   return (
-    <header className="sticky top-0 z-[100] overflow-visible border-b border-command-border bg-command shadow-panel">
+    <header className="sticky top-0 z-[100] overflow-visible border-b border-command-border/80 bg-command/90 shadow-panel backdrop-blur-xl">
       <div className="flex h-14 items-center gap-3 px-4 lg:px-6">
         <Button
           variant="ghost"
@@ -42,13 +42,18 @@ export function CommandBar({
           <Menu className="h-5 w-5" />
         </Button>
 
-        <div className="hidden items-center gap-2 sm:flex">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/20">
-            <Radio className="h-4 w-4 text-primary" />
+        <div className="hidden items-center gap-3 sm:flex">
+          <div className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-primary/25 bg-primary/10">
+            <span className="absolute inset-0 rounded-lg bg-primary/10 blur-md" />
+            <Radio className="relative h-4 w-4 text-primary" />
           </div>
           <div>
-            <p className="text-sm font-semibold leading-none">{t("commandCenter")}</p>
-            <p className="text-[10px] text-muted-foreground">{t("commandSubtitle")}</p>
+            <p className="font-display text-sm font-semibold leading-none tracking-tight">
+              {t("commandCenter")}
+            </p>
+            <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              {t("commandSubtitle")}
+            </p>
           </div>
         </div>
 
@@ -60,7 +65,9 @@ export function CommandBar({
           <LocaleSwitcher />
           <Badge
             variant="outline"
-            className={cn("hidden border text-[10px] font-bold uppercase sm:inline-flex")}
+            className={cn(
+              "hidden border-primary/30 bg-primary/10 text-[10px] font-semibold uppercase tracking-wider text-primary sm:inline-flex",
+            )}
           >
             {tr(user.role)}
           </Badge>
@@ -88,7 +95,12 @@ export function CommandBar({
         </div>
       </div>
 
-      <div className={cn("border-t border-command-border/50 px-4 py-3 lg:px-6", sidebarCollapsed && "lg:pl-4")}>
+      <div
+        className={cn(
+          "border-t border-command-border/40 bg-background/20 px-4 py-3 lg:px-6",
+          sidebarCollapsed && "lg:pl-4",
+        )}
+      >
         <AdminCascadeFilter variant="solid" />
       </div>
     </header>

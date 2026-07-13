@@ -24,9 +24,10 @@ const TYPE_ICONS: Record<SearchResult["type"], typeof Search> = {
 
 const PAGE_HREF_TO_NAV: Record<string, string> = {
   "/": "nationalOverview",
-  "/dashboard": "commandDashboard",
   "/briefing": "briefing",
   "/outlook": "outlook",
+  "/outlook/politics": "outlookPolitics",
+  "/outlook/economy": "outlookEconomy",
   "/sovereign-ai": "sovereignAi",
   "/digital-twin": "digitalTwin",
   "/sentiment": "sentiment",
@@ -40,7 +41,6 @@ const PAGE_HREF_TO_NAV: Record<string, string> = {
   "/audit-trail": "auditTrail",
   "/citizen-chat": "citizenChat",
   "/hazards": "hazards",
-  "/map": "map",
   "/representatives": "representatives",
   "/agro": "agro",
 };
@@ -130,14 +130,14 @@ export function CommandSearch() {
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         placeholder={t("placeholder")}
-        className="h-9 w-full rounded-md border border-input bg-secondary/40 pl-9 pr-3 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+        className="h-9 w-full rounded-lg border border-border/70 bg-secondary/35 pl-9 pr-3 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/35 focus:bg-secondary/50 focus:ring-2 focus:ring-primary/15"
         aria-label={t("placeholder")}
         aria-expanded={showDropdown}
         role="combobox"
       />
 
       {showDropdown && (
-        <div className="absolute left-0 right-0 top-full z-[200] mt-1 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
+        <div className="absolute left-0 right-0 top-full z-[200] mt-1.5 max-h-80 overflow-y-auto rounded-xl border border-border/70 bg-popover/95 shadow-panel backdrop-blur-xl">
           {loading && results.length === 0 ? (
             <p className="px-4 py-3 text-sm text-muted-foreground">{t("searching")}</p>
           ) : results.length === 0 ? (
@@ -145,7 +145,7 @@ export function CommandSearch() {
               {t("noResults", { query })}
             </p>
           ) : (
-            <ul className="py-1">
+            <ul className="py-1.5">
               {results.map((item, idx) => {
                 const Icon = TYPE_ICONS[item.type];
                 return (
@@ -156,17 +156,17 @@ export function CommandSearch() {
                       onClick={() => navigate(item.href)}
                       className={cn(
                         "flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors",
-                        idx === activeIdx ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
+                        idx === activeIdx ? "bg-primary/10 text-foreground" : "hover:bg-accent/60",
                       )}
                     >
                       <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium">{displayTitle(item)}</p>
+                        <p className="truncate font-medium tracking-tight">{displayTitle(item)}</p>
                         {item.subtitle && (
                           <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
                         )}
                       </div>
-                      <span className="shrink-0 text-[10px] uppercase text-muted-foreground">
+                      <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground">
                         {typeLabel(item.type)}
                       </span>
                     </button>

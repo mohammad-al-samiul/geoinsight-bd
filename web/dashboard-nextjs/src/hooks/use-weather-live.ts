@@ -50,6 +50,16 @@ export interface WeatherImpact {
   max_severity: number;
   refreshed_at: string;
   sources: string[];
+  flood_impact?: {
+    deaths: number;
+    injuries: number;
+    homes_damaged: number;
+    livestock_lost: number;
+    damage_mentions: number;
+    evidence: string[];
+    disclaimer_bn: string;
+    disclaimer_en: string;
+  };
 }
 
 export interface WeatherLiveData {

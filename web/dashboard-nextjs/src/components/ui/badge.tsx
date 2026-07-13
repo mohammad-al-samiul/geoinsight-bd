@@ -8,9 +8,9 @@ export const Badge = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
-      variant === "default" && "border-transparent bg-primary/20 text-primary",
-      variant === "outline" && "text-foreground",
+      "inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold tracking-wide transition-colors",
+      variant === "default" && "border-primary/20 bg-primary/15 text-primary",
+      variant === "outline" && "border-border/80 bg-secondary/40 text-foreground/90",
       className,
     )}
     {...props}
