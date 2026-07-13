@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import UTC, datetime
 from typing import Any
@@ -5,6 +6,21 @@ from typing import Any
 import aio_pika
 
 from app.core.config import Settings
+
+
+async def connect_with_retry(connect_func: Any, retries: int = 6, delay_seconds: float = 2.0) -> Any:
+    last_error: Exception | None = None
+    for attempt in range(retries):
+        try:
+            return await connect_func()
+        except Exception as exc:  # pragma: no cover - simple retry wrapper
+            last_error = exc
+            if attempt == retries - 1:
+                raise
+            await asyncio.sleep(delay_seconds)
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("RabbitMQ connection retry loop exited without a result")
 
 
 class RabbitPublisher:
@@ -15,7 +31,11 @@ class RabbitPublisher:
         self._exchange: aio_pika.Exchange | None = None
 
     async def connect(self) -> None:
-        self._connection = await aio_pika.connect_robust(self._settings.rabbitmq_url)
+        self._connection = await connect_with_retry(
+            lambda: aio_pika.connect_robust(self._settings.rabbitmq_url),
+            retries=8,
+            delay_seconds=2.0,
+        )
         self._channel = await self._connection.channel()
         self._exchange = await self._channel.declare_exchange(
             self._settings.rabbitmq_exchange,

@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from requests import get
 
 
 class KpiSnapshot(BaseModel):

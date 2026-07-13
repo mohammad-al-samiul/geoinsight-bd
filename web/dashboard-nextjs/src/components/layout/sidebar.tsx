@@ -24,6 +24,7 @@ import {
   MessageSquareWarning,
   Package,
   Shield,
+  ShieldCheck,
   SlidersHorizontal,
   Sprout,
   Sun,
@@ -56,6 +57,7 @@ const NAV: NavItem[] = [
   { href: "/agro", key: "agro", icon: Sprout, minTier: 3 },
   { href: "/map", key: "map", icon: Map, minTier: 3 },
   { href: "/representatives", key: "representatives", icon: Users, minTier: 4 },
+  { href: "/anti-phishing", key: "antiPhishing", icon: ShieldCheck, minTier: 2 },
 ];
 
 const TIER: Record<string, number> = {

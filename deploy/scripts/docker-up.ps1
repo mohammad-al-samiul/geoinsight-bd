@@ -25,7 +25,7 @@ $DashboardPort = [int](Get-EnvValue "DASHBOARD_PORT" "3000")
 $ApiPort = [int](Get-EnvValue "API_GATEWAY_PORT" "4800")
 
 function Test-DockerDaemon {
-  docker info *> $null
+  cmd /c "docker info >nul 2>nul"
   return $LASTEXITCODE -eq 0
 }
 

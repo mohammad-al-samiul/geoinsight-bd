@@ -4,6 +4,24 @@
 #   docker compose -f docker-compose.yml -f docker-compose.apps.yml logs -f api-gateway dashboard-nextjs
 
 services:
+  db-migrate:
+    build:
+      context: ./services/api-gateway-node
+      dockerfile: Dockerfile
+    image: geoinsight/api-gateway:local
+    container_name: geoinsight-db-migrate
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoinsight_db}?schema=public
+      DIRECT_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoinsight_db}?schema=public
+      TZ: ${TZ:-Asia/Dhaka}
+    entrypoint: ["/bin/sh", "-c", "npx prisma migrate deploy"]
+    networks:
+      - geoinsight_net
+
   db-init:
     image: timescale/timescaledb:2.17.2-pg16
     container_name: geoinsight-db-init
@@ -13,6 +31,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       PGUSER: ${POSTGRES_USER}

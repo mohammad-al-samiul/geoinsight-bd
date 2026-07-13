@@ -1,13 +1,30 @@
 {
   "rabbit_version": "3.13.0",
   "rabbitmq_version": "3.13.0",
-  "users": [],
+  "users": [
+    {
+      "name": "geoinsight_mq",
+      "password_hash": "+m39iG3/pVfrZRTxO4xeyB6sZJWtlIQ+5S3NrFNe28G+BHdw",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": [
+        "administrator"
+      ]
+    }
+  ],
   "vhosts": [
     {
       "name": "/"
     }
   ],
-  "permissions": [],
+  "permissions": [
+    {
+      "user": "geoinsight_mq",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
   "topic_permissions": [],
   "parameters": [],
   "global_parameters": [

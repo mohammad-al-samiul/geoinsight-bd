@@ -21,7 +21,8 @@
     "hazards": "Flood & Cyclone Risk",
     "agro": "Agri Markets",
     "map": "Geo Spatial Map",
-    "representatives": "Representatives"
+    "representatives": "Representatives",
+    "antiPhishing": "Anti-Phishing Shield"
   },
   "shell": {
     "brandSubtitle": "National Intelligence",
