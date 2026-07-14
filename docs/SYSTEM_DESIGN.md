@@ -759,6 +759,8 @@ geoinsight-bd/
 | Document | Location |
 |----------|----------|
 | Setup & quick start | `README.md` |
+| CI/CD, VPS deploy, Ollama approach | [`docs/DEPLOYMENT_AND_OPS.md`](./DEPLOYMENT_AND_OPS.md) |
+| Ollama production setup | [`docs/OLLAMA_PRODUCTION.md`](./OLLAMA_PRODUCTION.md) |
 | Environment variables | `.env.example` |
 | Tier-4 sovereignty | `deploy/security/tier4-sovereignty.env.example` |
 | Database schema | `services/api-gateway-node/prisma/schema.prisma` |

@@ -1524,7 +1524,8 @@ See [`.env.example`](.env.example). Key groups:
 | JWT | `JWT_SECRET`, `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_DAYS` |
 | AI / LLM | `AI_SERVICE_URL`, `OLLAMA_URL`, `OLLAMA_MODEL`, `SENTIMENT_USE_MOCK` |
 
-Production Ollama (separate AI server): [`docs/OLLAMA_PRODUCTION.md`](docs/OLLAMA_PRODUCTION.md)
+Production Ollama (separate AI server): [`docs/OLLAMA_PRODUCTION.md`](docs/OLLAMA_PRODUCTION.md)  
+CI/CD · VPS deploy · কেন কোন approach: [`docs/DEPLOYMENT_AND_OPS.md`](docs/DEPLOYMENT_AND_OPS.md)
 | Fabric | `FABRIC_ENABLED`, `FABRIC_*` |
 | Dashboard | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SOCKET_URL`, `API_GATEWAY_URL` |
 
