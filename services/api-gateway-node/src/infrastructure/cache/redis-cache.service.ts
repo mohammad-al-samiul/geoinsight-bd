@@ -19,6 +19,19 @@ export class RedisCacheService {
     await getRedisClient().set(key, JSON.stringify(value), "EX", ttlSeconds);
   }
 
+  /** Cache-aside helper — returns cached value or computes, stores, and returns it. */
+  async getOrSet<T>(
+    key: string,
+    ttlSeconds: number,
+    factory: () => Promise<T>,
+  ): Promise<T> {
+    const cached = await this.get<T>(key);
+    if (cached !== null) return cached;
+    const value = await factory();
+    await this.set(key, value, ttlSeconds);
+    return value;
+  }
+
   async del(key: string): Promise<void> {
     if (!isRedisEnabled()) return;
     await getRedisClient().del(key);

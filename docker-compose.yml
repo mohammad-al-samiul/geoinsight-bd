@@ -68,6 +68,8 @@ services:
   postgres-replica:
     image: timescale/timescaledb:2.17.2-pg16
     container_name: geoinsight-postgres-replica
+    # Opt-in only — small VPS should not burn 2GB on an unused replica
+    profiles: ["with-replica"]
     restart: unless-stopped
     logging: *default-logging
     environment:

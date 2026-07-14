@@ -1,0 +1,70 @@
+# GeoInsight BD — VPS / Hostinger slim overlay (4–8GB RAM)
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.apps.yml -f docker-compose.vps.yml up -d
+#
+# Saves RAM: lower memory caps, AI mock default, no pipeline storm on boot.
+# Replica is already behind profile "with-replica" in docker-compose.yml.
+
+services:
+  postgres:
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  rabbitmq:
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  minio:
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  pgbouncer:
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  api-gateway:
+    environment:
+      # Avoid CPU/DB spike right after redeploy — cron intervals still run
+      INGESTION_RUN_ON_START: ${INGESTION_RUN_ON_START:-false}
+      PIPELINE_RUN_ON_START: ${PIPELINE_RUN_ON_START:-false}
+      INGESTION_STARTUP_DELAY_MS: ${INGESTION_STARTUP_DELAY_MS:-120000}
+      PIPELINE_STARTUP_DELAY_MS: ${PIPELINE_STARTUP_DELAY_MS:-180000}
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+  ai-analytics:
+    environment:
+      # Bangla-BERT on small VPS causes OOM / thrash — mock keeps stack responsive
+      SENTIMENT_USE_MOCK: ${SENTIMENT_USE_MOCK:-true}
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-1}
+      AI_WORKER_POOL_SIZE: ${AI_WORKER_POOL_SIZE:-1}
+      # Point OLLAMA_URL at a remote AI server in .env (not localhost on small VPS)
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+  dashboard-nextjs:
+    deploy:
+      resources:
+        limits:
+          memory: 512M

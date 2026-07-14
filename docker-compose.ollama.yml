@@ -1,0 +1,55 @@
+# GeoInsight BD — Dedicated Ollama LLM server (separate from app VPS)
+#
+# Run this on an AI machine with ≥16GB RAM (GPU optional but recommended).
+# Do NOT run on the same 4–8GB Hostinger app VPS as the dashboard.
+#
+# Usage:
+#   cp .env.ollama.example .env.ollama
+#   docker compose -f docker-compose.ollama.yml --env-file .env.ollama up -d
+#   docker exec geoinsight-ollama ollama pull llama3.1:8b
+#
+# Then on the APP VPS set:
+#   OLLAMA_URL=http://<AI_SERVER_PRIVATE_OR_PUBLIC_IP>:11434
+#   OLLAMA_MODEL=llama3.1:8b
+#   LLM_PROVIDER=ollama
+
+name: geoinsight-ollama
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: geoinsight-ollama
+    restart: unless-stopped
+    environment:
+      # Listen on all interfaces so the app VPS can reach this host
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Uncomment if the AI box has an NVIDIA GPU + nvidia-container-toolkit
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+volumes:
+  ollama_data:
+    name: geoinsight_ollama_data

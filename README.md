@@ -1523,6 +1523,8 @@ See [`.env.example`](.env.example). Key groups:
 | MinIO | `MINIO_*` |
 | JWT | `JWT_SECRET`, `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_DAYS` |
 | AI / LLM | `AI_SERVICE_URL`, `OLLAMA_URL`, `OLLAMA_MODEL`, `SENTIMENT_USE_MOCK` |
+
+Production Ollama (separate AI server): [`docs/OLLAMA_PRODUCTION.md`](docs/OLLAMA_PRODUCTION.md)
 | Fabric | `FABRIC_ENABLED`, `FABRIC_*` |
 | Dashboard | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SOCKET_URL`, `API_GATEWAY_URL` |
 

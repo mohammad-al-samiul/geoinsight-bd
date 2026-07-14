@@ -5,8 +5,11 @@ import {
   RedFlagType,
 } from "@prisma/client";
 import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
+import { redisCacheService } from "../../infrastructure/cache/redis-cache.service";
 import type { DashboardScopeQuery } from "../dashboard/dashboard.service";
 import { ingestionService } from "../ingestion/ingestion.service";
+
+const NATIONAL_METRICS_TTL_SEC = 90;
 
 const PROJECT_PATTERNS = [
   /প্রকল্প/u,
@@ -323,112 +326,121 @@ export class LiveDataService {
     return { id: updated.id, resolvedAt: updated.resolvedAt! };
   }
 
-  async getNationalMetrics(_query: DashboardScopeQuery = {}) {
-    const days = 30;
-    const since = new Date(Date.now() - days * 86400 * 1000);
+  async getNationalMetrics(query: DashboardScopeQuery = {}) {
+    const scopeKey = [
+      query.divisionId ?? "",
+      query.districtId ?? "",
+      query.upazilaId ?? "",
+      query.unionId ?? "",
+    ].join(":");
+    const cacheKey = `dash:national:live:${scopeKey || "all"}`;
 
-    const [articles, commodityRows, projectCount, alertCount, repCount, districts] =
-      await Promise.all([
-        prismaRead.externalArticle.count({ where: { fetchedAt: { gte: since } } }),
-        prismaRead.$queryRaw<
-          Array<{
-            commodity_code: string;
-            country_code: string;
-            country_name: string;
-            unit_price_usd: string;
-            landed_cost_usd: string;
-            min_landed: string;
-          }>
-        >`
-          SELECT DISTINCT ON (commodity_code, country_code)
-            commodity_code, country_code, country_name,
-            unit_price_usd::text, landed_cost_usd::text,
-            MIN(landed_cost_usd) OVER (PARTITION BY commodity_code)::text AS min_landed
-          FROM commodity_price_logs
-          WHERE created_at >= NOW() - INTERVAL '7 days'
-          ORDER BY commodity_code, country_code, created_at DESC
-        `,
-        prismaRead.liveSignal.count({
-          where: {
-            signalType: { in: [LiveSignalType.PROJECT, LiveSignalType.POLICY] },
-            createdAt: { gte: since },
-          },
-        }),
-        prismaRead.liveSignal.count({
-          where: {
-            signalType: LiveSignalType.ALERT,
-            resolvedAt: null,
-            createdAt: { gte: since },
-          },
-        }),
-        prismaRead.liveSignal.count({
-          where: { signalType: LiveSignalType.REPRESENTATIVE, createdAt: { gte: since } },
-        }),
-        prismaRead.liveSignal.groupBy({
-          by: ["district"],
-          where: { createdAt: { gte: since }, district: { not: null } },
-        }),
-      ]);
+    return redisCacheService.getOrSet(cacheKey, NATIONAL_METRICS_TTL_SEC, async () => {
+      const days = 30;
+      const since = new Date(Date.now() - days * 86400 * 1000);
 
-    const heatmap = await ingestionService.buildHeatmap("district", 64);
-    const grievanceRatio =
-      heatmap.total_logs > 0 ? heatmap.grievance_total / heatmap.total_logs : 0;
-    const completionRate = Math.round(Math.max(55, 100 - grievanceRatio * 45) * 10) / 10;
+      const [articles, commodityRows, projectCount, alertCount, repCount, districts, heatmap, weeklyTrend] =
+        await Promise.all([
+          prismaRead.externalArticle.count({ where: { fetchedAt: { gte: since } } }),
+          prismaRead.$queryRaw<
+            Array<{
+              commodity_code: string;
+              country_code: string;
+              country_name: string;
+              unit_price_usd: string;
+              landed_cost_usd: string;
+              min_landed: string;
+            }>
+          >`
+            SELECT DISTINCT ON (commodity_code, country_code)
+              commodity_code, country_code, country_name,
+              unit_price_usd::text, landed_cost_usd::text,
+              MIN(landed_cost_usd) OVER (PARTITION BY commodity_code)::text AS min_landed
+            FROM commodity_price_logs
+            WHERE created_at >= NOW() - INTERVAL '7 days'
+            ORDER BY commodity_code, country_code, created_at DESC
+          `,
+          prismaRead.liveSignal.count({
+            where: {
+              signalType: { in: [LiveSignalType.PROJECT, LiveSignalType.POLICY] },
+              createdAt: { gte: since },
+            },
+          }),
+          prismaRead.liveSignal.count({
+            where: {
+              signalType: LiveSignalType.ALERT,
+              resolvedAt: null,
+              createdAt: { gte: since },
+            },
+          }),
+          prismaRead.liveSignal.count({
+            where: { signalType: LiveSignalType.REPRESENTATIVE, createdAt: { gte: since } },
+          }),
+          prismaRead.liveSignal.groupBy({
+            by: ["district"],
+            where: { createdAt: { gte: since }, district: { not: null } },
+          }),
+          ingestionService.buildHeatmap("district", 64),
+          prismaRead.$queryRaw<Array<{ week: string; count: bigint }>>`
+            SELECT TO_CHAR(DATE_TRUNC('week', fetched_at), 'Mon DD') AS week,
+                   COUNT(*)::bigint AS count
+            FROM external_articles
+            WHERE fetched_at >= NOW() - INTERVAL '8 weeks'
+            GROUP BY DATE_TRUNC('week', fetched_at)
+            ORDER BY DATE_TRUNC('week', fetched_at)
+          `,
+        ]);
 
-    const weeklyTrend = await prismaRead.$queryRaw<Array<{ week: string; count: bigint }>>`
-      SELECT TO_CHAR(DATE_TRUNC('week', fetched_at), 'Mon DD') AS week,
-             COUNT(*)::bigint AS count
-      FROM external_articles
-      WHERE fetched_at >= NOW() - INTERVAL '8 weeks'
-      GROUP BY DATE_TRUNC('week', fetched_at)
-      ORDER BY DATE_TRUNC('week', fetched_at)
-    `;
+      const grievanceRatio =
+        heatmap.total_logs > 0 ? heatmap.grievance_total / heatmap.total_logs : 0;
+      const completionRate = Math.round(Math.max(55, 100 - grievanceRatio * 45) * 10) / 10;
 
-    const completionTrend = weeklyTrend.map((w) => ({
-      month: w.week,
-      rate: Math.round(completionRate + Number(w.count) * 0.05),
-    }));
-
-    const arbitrageMatrix = commodityRows.slice(0, 24).map((row) => {
-      const landed = Number(row.landed_cost_usd);
-      const minLanded = Number(row.min_landed);
-      const marginPct =
-        minLanded > 0 ? Math.round(((landed - minLanded) / minLanded) * 1000) / 10 : 0;
-      return {
-        commodity: row.commodity_code.charAt(0) + row.commodity_code.slice(1).toLowerCase(),
-        market: row.country_name,
-        marginPct: Math.max(0, marginPct + 4),
-      };
-    });
-
-    const unitScores = heatmap.cells
-      .filter((c) => c.district !== "National")
-      .map((c) => ({
-        unitId: c.district,
-        performanceScore: Math.round(100 - c.grievance_ratio * 100),
-        riskScore: Math.min(95, Math.round(c.grievance_ratio * 100 + c.grievance_count * 2)),
-        openAlerts: c.grievance_count,
+      const completionTrend = weeklyTrend.map((w) => ({
+        month: w.week,
+        rate: Math.round(completionRate + Number(w.count) * 0.05),
       }));
 
-    const budgetVariance = await this.buildLiveBudgetVariance(since, commodityRows);
+      const arbitrageMatrix = commodityRows.slice(0, 24).map((row) => {
+        const landed = Number(row.landed_cost_usd);
+        const minLanded = Number(row.min_landed);
+        const marginPct =
+          minLanded > 0 ? Math.round(((landed - minLanded) / minLanded) * 1000) / 10 : 0;
+        return {
+          commodity: row.commodity_code.charAt(0) + row.commodity_code.slice(1).toLowerCase(),
+          market: row.country_name,
+          marginPct: Math.max(0, marginPct + 4),
+        };
+      });
 
-    return {
-      summary: {
-        units: districts.length,
-        projects: projectCount,
-        openAlerts: alertCount,
-        representatives: repCount,
-        newsArticles: articles,
-      },
-      completionRate,
-      completionTrend,
-      budgetVariance,
-      arbitrageMatrix,
-      tradeFlows: [],
-      unitScores,
-      dataSource: "live_pipeline",
-      timestamp: new Date().toISOString(),
-    };
+      const unitScores = heatmap.cells
+        .filter((c) => c.district !== "National")
+        .map((c) => ({
+          unitId: c.district,
+          performanceScore: Math.round(100 - c.grievance_ratio * 100),
+          riskScore: Math.min(95, Math.round(c.grievance_ratio * 100 + c.grievance_count * 2)),
+          openAlerts: c.grievance_count,
+        }));
+
+      const budgetVariance = await this.buildLiveBudgetVariance(since, commodityRows);
+
+      return {
+        summary: {
+          units: districts.length,
+          projects: projectCount,
+          openAlerts: alertCount,
+          representatives: repCount,
+          newsArticles: articles,
+        },
+        completionRate,
+        completionTrend,
+        budgetVariance,
+        arbitrageMatrix,
+        tradeFlows: [],
+        unitScores,
+        dataSource: "live_pipeline",
+        timestamp: new Date().toISOString(),
+      };
+    });
   }
 
   private async buildLiveBudgetVariance(

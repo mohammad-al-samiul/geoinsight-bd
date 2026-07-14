@@ -8,6 +8,7 @@
 #   bash deploy/scripts/vps-redeploy.sh              # background (recommended)
 #   bash deploy/scripts/vps-redeploy.sh --foreground # watch live (SSH client only)
 #   bash deploy/scripts/vps-redeploy.sh --status     # show log / running state
+#   bash deploy/scripts/vps-redeploy.sh --force      # kill stuck redeploy, start fresh
 #
 # Watch progress:
 #   tail -f /opt/geoinsight-bd/logs/redeploy.log
@@ -59,7 +60,7 @@ run_deploy() {
 
   export COMPOSE_HTTP_TIMEOUT="${COMPOSE_HTTP_TIMEOUT:-300}"
   export DOCKER_CLIENT_TIMEOUT="${DOCKER_CLIENT_TIMEOUT:-300}"
-  COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.apps.yml)
+  COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.apps.yml -f docker-compose.vps.yml)
 
   if [[ ! -f .env ]]; then
     echo "ERROR: .env missing in $DEPLOY_PATH"
@@ -74,10 +75,14 @@ run_deploy() {
     git pull --ff-only origin main || git pull --ff-only || true
   fi
 
+  echo "==> Stopping unused postgres-replica (saves ~2GB RAM on VPS)..."
+  docker stop geoinsight-postgres-replica 2>/dev/null || true
+  docker rm geoinsight-postgres-replica 2>/dev/null || true
+
   echo "==> Building images (this can take 10–20 min)..."
   "${COMPOSE[@]}" build api-gateway ai-analytics dashboard-nextjs pgbouncer
 
-  echo "==> Starting stack (detached)..."
+  echo "==> Starting slim VPS stack (detached, no replica)..."
   "${COMPOSE[@]}" up -d --remove-orphans
 
   echo "==> Waiting for containers..."
@@ -99,10 +104,33 @@ run_deploy() {
     sleep 5
   done
 
+  echo "==> Memory snapshot:"
+  docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}" 2>/dev/null || true
+  free -h 2>/dev/null || true
+
   "${COMPOSE[@]}" ps
   echo "==> Redeploy done at: $(date -Is)"
   echo "    Dashboard: use NEXT_PUBLIC / CORS host from .env (port 3000)"
   echo "    API health: curl -s http://127.0.0.1:4800/api/v1/health"
+  echo "    Tip: dashboard/national is Redis-cached ~90s for faster loads"
+}
+
+kill_running_redeploy() {
+  mkdir -p "$LOG_DIR"
+  if [[ ! -f "$PID_FILE" ]]; then
+    echo "==> No PID file — nothing to kill"
+    return 0
+  fi
+  local old
+  old="$(cat "$PID_FILE" 2>/dev/null || true)"
+  if [[ -n "${old:-}" ]] && kill -0 "$old" 2>/dev/null; then
+    echo "==> Stopping stuck/running redeploy (pid $old)..."
+    kill "$old" 2>/dev/null || true
+    sleep 2
+    kill -9 "$old" 2>/dev/null || true
+  fi
+  rm -f "$PID_FILE"
+  echo "==> Cleared redeploy lock"
 }
 
 start_background() {
@@ -114,6 +142,7 @@ start_background() {
       echo "==> Redeploy already running (pid $old)"
       echo "    Watch:  tail -f $LOG_FILE"
       echo "    Status: bash $SCRIPT_PATH --status"
+      echo "    Force:  bash $SCRIPT_PATH --force   # only if stuck"
       exit 0
     fi
   fi
@@ -140,6 +169,11 @@ case "$MODE" in
     show_status
     exit 0
     ;;
+  --force)
+    kill_running_redeploy
+    start_background
+    exit 0
+    ;;
   --worker)
     run_deploy
     rm -f "$PID_FILE"
@@ -151,7 +185,7 @@ case "$MODE" in
     exit 0
     ;;
   --help|-h)
-    echo "Usage: bash deploy/scripts/vps-redeploy.sh [--foreground|--status]"
+    echo "Usage: bash deploy/scripts/vps-redeploy.sh [--foreground|--status|--force]"
     exit 0
     ;;
 esac

@@ -64,7 +64,12 @@ if [[ ! -f docker-compose.yml ]]; then
 fi
 
 if [[ ! -f .env ]]; then
-  cp .env.example .env
+  # Prefer production template on VPS (local Windows uses .env.example)
+  if [[ -f .env.production.example ]]; then
+    cp .env.production.example .env
+  else
+    cp .env.example .env
+  fi
   # Bind public URLs to this VPS IP (override after domain is ready)
   sed -i "s|^NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=http://${VPS_IP}:4800/api/v1|" .env
   sed -i "s|^NEXT_PUBLIC_SOCKET_URL=.*|NEXT_PUBLIC_SOCKET_URL=http://${VPS_IP}:4800|" .env
@@ -74,6 +79,8 @@ if [[ ! -f .env ]]; then
   sed -i "s|^API_GATEWAY_PORT=.*|API_GATEWAY_PORT=4800|" .env
   sed -i "s|^DASHBOARD_PORT=.*|DASHBOARD_PORT=3000|" .env
   echo "==> Created .env — review secrets before going public"
+  echo "    NOTE: Postgres password is baked into the volume on first start."
+  echo "    If you change POSTGRES_PASSWORD later, wipe volumes (see vps-reset-db.sh)."
 fi
 
 # Swap helps small Hostinger plans during image build

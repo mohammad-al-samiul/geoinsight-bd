@@ -5,6 +5,9 @@ import {
 } from "@prisma/client";
 import { env } from "../../core/config/env";
 import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
+import { redisCacheService } from "../../infrastructure/cache/redis-cache.service";
+
+const HEATMAP_TTL_SEC = 120;
 
 export interface IngestedArticlePayload {
   source_type: string;
@@ -289,12 +292,17 @@ export class IngestionService {
   }
 
   async buildHeatmap(level: "district" | "upazila" = "district", limit = 120): Promise<HeatmapDto> {
+    const cacheKey = `ingestion:heatmap:${level}:${limit}`;
+    const cached = await redisCacheService.get<HeatmapDto>(cacheKey);
+    if (cached) return cached;
+
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const mid = new Date(Date.now() - 3.5 * 24 * 60 * 60 * 1000);
+    // Cap for VPS: 250 recent articles is enough for district grievance ratios
     const articles = await prismaRead.externalArticle.findMany({
       where: { fetchedAt: { gte: since } },
       orderBy: { fetchedAt: "desc" },
-      take: 800,
+      take: 250,
       select: {
         title: true,
         summary: true,
@@ -408,7 +416,7 @@ export class IngestionService {
         ? `Highest dissatisfaction/distress signals from news: ${topNames.join(", ")}. Score blends grievance ratio + volume (AI + keywords).`
         : "Few strong district distress signals in the last 7 days — sync more news.";
 
-    return {
+    const result: HeatmapDto = {
       level,
       total_logs: analyzed,
       grievance_total: grievanceTotal,
@@ -419,6 +427,8 @@ export class IngestionService {
       narrative_en: narrativeEn,
       top_distressed: topNames,
     };
+    await redisCacheService.set(cacheKey, result, HEATMAP_TTL_SEC);
+    return result;
   }
 }
 

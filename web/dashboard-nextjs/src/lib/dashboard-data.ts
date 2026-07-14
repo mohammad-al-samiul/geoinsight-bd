@@ -97,27 +97,28 @@ export async function fetchRedFlagMarkers(
 
     if (!json.success || !Array.isArray(json.data)) return [];
 
-    const markers: RedFlagMarker[] = [];
-    for (const a of json.data) {
-      const coords = await getUnitCoords(a.project.adminUnitId);
-      markers.push({
-        id: a.id,
-        unitId: a.project.adminUnitId,
-        lat: coords?.[1] ?? 23.7,
-        lng: coords?.[0] ?? 90.4,
-        severity:
-          a.severity >= 4
-            ? "CRITICAL"
-            : a.severity >= 3
-              ? "HIGH"
-              : a.severity >= 2
-                ? "MEDIUM"
-                : "LOW",
-        flagType: a.flagType,
-        message: a.aiExplanation ?? a.flagType,
-        createdAt: a.createdAt,
-      });
-    }
+    const markers = await Promise.all(
+      json.data.map(async (a) => {
+        const coords = await getUnitCoords(a.project.adminUnitId);
+        return {
+          id: a.id,
+          unitId: a.project.adminUnitId,
+          lat: coords?.[1] ?? 23.7,
+          lng: coords?.[0] ?? 90.4,
+          severity:
+            a.severity >= 4
+              ? ("CRITICAL" as const)
+              : a.severity >= 3
+                ? ("HIGH" as const)
+                : a.severity >= 2
+                  ? ("MEDIUM" as const)
+                  : ("LOW" as const),
+          flagType: a.flagType,
+          message: a.aiExplanation ?? a.flagType,
+          createdAt: a.createdAt,
+        };
+      }),
+    );
     return markers;
   } catch {
     return [];
