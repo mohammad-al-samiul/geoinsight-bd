@@ -13,6 +13,7 @@ import {
 import { apiClient } from "@/lib/api-client";
 import type { AnomalyAlert, BlockchainVerificationStatus } from "@/types/alerts";
 import { cn } from "@/lib/utils";
+import { SourceLink } from "@/components/ui/source-link";
 import {
   CheckCircle2,
   Clock,
@@ -147,15 +148,14 @@ export function AlertDetailModal({
                   {alert.sourceName ? ` (${alert.sourceName})` : ""}.
                 </p>
                 {alert.sourceUrl && (
-                  <a
-                    href={alert.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-flex items-center gap-2 text-sm text-primary hover:underline"
-                  >
-                    <Link2 className="h-3.5 w-3.5" />
-                    View original article
-                  </a>
+                  <div className="mt-3">
+                    <SourceLink
+                      href={alert.sourceUrl}
+                      title="View original article"
+                      meta={alert.sourceName ?? undefined}
+                      clamp={1}
+                    />
+                  </div>
                 )}
               </>
             ) : (

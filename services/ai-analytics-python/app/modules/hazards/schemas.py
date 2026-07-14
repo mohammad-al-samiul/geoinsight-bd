@@ -11,6 +11,13 @@ class HazardZoneInput(BaseModel):
     lat: float
     lng: float
     radius_km: float = Field(default=25, gt=0)
+    district: str | None = None
+    locality: str | None = None
+    locality_bn: str | None = None
+    water_note_bn: str | None = None
+    water_note_en: str | None = None
+    scale: str | None = None
+    source: str | None = None
 
 
 class ProjectGeoInput(BaseModel):

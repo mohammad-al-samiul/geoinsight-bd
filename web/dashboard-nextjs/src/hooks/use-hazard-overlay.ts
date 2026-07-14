@@ -30,6 +30,14 @@ export interface HazardOverlay {
     lat?: number;
     lng?: number;
     radius_km?: number;
+    division?: string;
+    district?: string;
+    locality?: string;
+    locality_bn?: string;
+    water_note_bn?: string;
+    water_note_en?: string;
+    scale?: string;
+    source?: string;
   }>;
   projects_mapped: number;
 }

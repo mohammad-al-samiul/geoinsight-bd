@@ -13,9 +13,9 @@
 ## Table of Contents
 
 - [Overview](#overview)
+- [Documentation](#documentation)
 - [Quick Start (Bangla)](#quick-start-bangla)
 - [Features](#features)
-- [Documentation](#documentation)
 - [Quick Start](#quick-start)
 - [How Frontend Connects to Backend](#how-frontend-connects-to-backend)
 - [Environment Variables](#environment-variables)
@@ -47,12 +47,36 @@ GeoInsight BD is a **monorepo** that gives the Government of Bangladesh a single
 - **Sovereign Bangla LLM** — on-prem Ollama; verified DB context only
 - **Blockchain audit trail** — Hyperledger Fabric milestone anchoring
 
-| Service | Stack | Port | Role |
-|---------|-------|------|------|
+| Service | Stack | Port (host) | Role |
+|---------|-------|-------------|------|
 | **Dashboard** | Next.js 15, Tailwind, Leaflet, Recharts, next-intl | `3000` | Web UI, BFF auth proxy, Socket.io client |
-| **API Gateway** | Node.js 20, Express, Prisma, Socket.io | `4000` | REST API, JWT / RBAC, RabbitMQ, Fabric |
-| **AI Analytics** | Python 3.12, FastAPI, Bangla-BERT, Ollama | `8000` | NLP, briefing, predictive scoring, arbitrage |
+| **API Gateway** | Node.js 20, Express, Prisma, Socket.io | `4800` (default; see `.env`) | REST API, JWT / RBAC, RabbitMQ, Fabric |
+| **AI Analytics** | Python 3.12, FastAPI, Bangla-BERT, Ollama client | internal `8000` | NLP, briefing, predictive scoring |
 | **Infrastructure** | Docker Compose | — | TimescaleDB, PgBouncer, Redis, RabbitMQ, MinIO |
+
+Architecture, CI/CD, and Ollama details live under **[docs/](docs/README.md)** — এই README শুধু quick start ও feature index।
+
+---
+
+## Documentation
+
+System design, CI/CD, VPS, এবং Ollama **`docs/`**-এ আলাদা page — README শুধু integrate করে link দেয়।
+
+| Document | কী পাবেন |
+|----------|----------|
+| **[Docs hub](docs/README.md)** | সব docs-এর index + nav map |
+| **[System Design](docs/SYSTEM_DESIGN.md)** | HLD, LLD, ERD, tech stack rationale, ADR |
+| **[CI/CD · VPS · Ops](docs/DEPLOYMENT_AND_OPS.md)** | Deploy pipeline, slim VPS, performance, day-to-day ops |
+| **[Ollama Production](docs/OLLAMA_PRODUCTION.md)** | আলাদা AI server + `OLLAMA_URL` setup |
+| **[`.env.example`](.env.example)** | Local Windows / Docker Desktop |
+| **[`.env.production.example`](.env.production.example)** | Hostinger / production VPS |
+
+```
+README  ──►  docs/README.md
+               ├─ SYSTEM_DESIGN.md
+               ├─ DEPLOYMENT_AND_OPS.md
+               └─ OLLAMA_PRODUCTION.md
+```
 
 ---
 
@@ -68,18 +92,20 @@ cp .env.example .env          # প্রথমবার
 
 | URL | Service |
 |-----|---------|
-| http://localhost:3000 | Dashboard |
-| http://localhost:4000/api/v1/health | API Gateway |
-| http://localhost:8000/api/v1/health | AI Analytics |
+| http://localhost:3600 | Dashboard (host port; container still listens on 3000) |
+| http://localhost:4800/api/v1/health | API Gateway (default host port) |
+| AI Analytics | Docker অভ্যন্তরে `ai-analytics:8000` (API দিয়ে proxy) |
 
 **Login:** `pmo@geoinsight.gov.bd` / `ChangeMe@123`
 
 `db-init` automatically চলে — divisions, projects, KPIs, red flags seed হয়।
 
+বিস্তারিত architecture → [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) · deploy → [docs/DEPLOYMENT_AND_OPS.md](docs/DEPLOYMENT_AND_OPS.md)
+
 ### Option B — Manual local development (৪টা terminal)
 
 1. **Infrastructure:** `docker compose up -d`
-2. **API Gateway:** `cd services/api-gateway-node && npm run dev` → `:4000`
+2. **API Gateway:** `cd services/api-gateway-node && npm run dev` → `:4000` (service port; Docker host often `4800`)
 3. **AI Analytics:** `cd services/ai-analytics-python && uvicorn app.main:app --reload --port 8000`
 4. **Dashboard:** `cd web/dashboard-nextjs && npm run dev` → `:3000`
 
@@ -101,6 +127,9 @@ cp .env.example .env          # প্রথমবার
 | Citizen Sentiment | `/sentiment` | 333/999 grievance heatmap (Bangla-BERT) |
 | Impact Simulator | `/simulator` | Geopolitical shock → Remittance / RMG impact |
 | Procurement Advisor | `/procurement` | Commodity landed cost + lead time |
+| Anti-Phishing Shield | `/anti-phishing` | Official site fingerprints vs lookalike URLs (`RED_FLAG`) |
+| Proximity Alert Map | `/proximity` | Shapely geo-fence around PMO / VIP campuses |
+| Face Intel | `/face-intel` | OpenCV VIP match + 6-month Ethical Report Overlay |
 
 ### Governance & Operations (Tier 2)
 
@@ -132,22 +161,6 @@ cp .env.example .env          # প্রথমবার
 
 ---
 
-## Documentation
-
-System design, CI/CD, VPS deploy, এবং Ollama setup **আলাদা docs page**-এ রাখা হয়েছে — README শুধু link দেয়।
-
-| Document | কী পাবেন |
-|----------|----------|
-| **[System Design](docs/SYSTEM_DESIGN.md)** | HLD, LLD, ERD, tech stack rationale, ADR |
-| **[CI/CD · VPS · Ollama](docs/DEPLOYMENT_AND_OPS.md)** | Deploy pipeline, কেন কোন approach, day-to-day ops |
-| **[Ollama Production](docs/OLLAMA_PRODUCTION.md)** | আলাদা AI server + `OLLAMA_URL` setup |
-| **[`.env.example`](.env.example)** | Local env template |
-| **[`.env.production.example`](.env.production.example)** | VPS env template |
-
-GitHub-এ `docs/SYSTEM_DESIGN.md` খুললে full architecture diagrams ও ব্যাখ্যা দেখা যাবে।
-
----
-
 ## Quick Start
 
 ### Option A — Docker full stack (recommended)
@@ -161,7 +174,7 @@ cp .env.example .env
 .\deploy\scripts\docker-up.ps1
 ```
 
-Open **http://localhost:3000** — login: `pmo@geoinsight.gov.bd` / `ChangeMe@123`
+Open **http://localhost:3600** — login: `pmo@geoinsight.gov.bd` / `ChangeMe@123`
 
 ### Option B — Manual local development
 
@@ -176,7 +189,7 @@ docker compose ps   # wait for healthy postgres, rabbitmq, minio
 | UI | URL |
 |----|-----|
 | RabbitMQ Management | http://localhost:15672 |
-| MinIO Console | http://localhost:9001 |
+| MinIO Console | http://localhost:19001 |
 
 #### 2. API Gateway
 
@@ -286,23 +299,27 @@ See [`.env.example`](.env.example). Key groups:
 
 ## Service Ports
 
-| Service | Port | Protocol |
-|---------|------|----------|
-| Dashboard (Next.js) | 3000 | HTTP |
-| API Gateway | 4000 | HTTP + WebSocket |
-| AI Analytics | 8000 | HTTP |
-| PostgreSQL | 55432 (local) / 5432 (docker internal) | TCP |
-| PgBouncer | 6432 | TCP |
-| Redis | 6379 | TCP |
-| RabbitMQ AMQP | 5672 | TCP |
-| RabbitMQ Management | 15672 | HTTP |
-| MinIO API | 9000 | HTTP |
-| MinIO Console | 9001 | HTTP |
-| Ollama | 11434 | HTTP |
-| Prometheus | 9090 | HTTP |
-| Grafana | 3002 | HTTP |
+Defaults follow [`.env.example`](.env.example) (Windows-friendly host mappings).
 
-**Windows note:** Port `5672` may be reserved by Hyper-V — use `RABBITMQ_PORT=35672`. Port `5432` may conflict — default local mapping is `55432`.
+| Service | Host port (local) | Protocol | Notes |
+|---------|-------------------|----------|-------|
+| Dashboard (Next.js) | 3000 | HTTP | |
+| API Gateway | **4800** | HTTP + WebSocket | Container listens on 4000 |
+| AI Analytics | — (internal) | HTTP | `ai-analytics:8000` inside Docker |
+| PostgreSQL | 55432 | TCP | Internal 5432 |
+| PgBouncer | 6432 | TCP | |
+| Redis | 6379 | TCP | |
+| RabbitMQ AMQP | 5672 | TCP | Use `35672` if Hyper-V blocks |
+| RabbitMQ Management | 15672 | HTTP | |
+| MinIO API | **19000** | HTTP | Avoid Hyper-V block on 9000 |
+| MinIO Console | **19001** | HTTP | |
+| Ollama | 11434 | HTTP | Host or dedicated AI server |
+| Prometheus | 9090 | HTTP | observability overlay |
+| Grafana | 3002 | HTTP | observability overlay |
+
+**Windows note:** Ports `5432`, `4000`, `8000`, `9000` often Hyper-V reserved — prefer values in `.env.example`.
+
+More port rationale → [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) (service ports section).
 
 ---
 
@@ -400,23 +417,27 @@ cd load-tests && locust -f locustfile.py --host=http://localhost:4000
 
 ## Production Deployment
 
-Everyday Hostinger flow: push `main` → GitHub Actions SSH → `vps-redeploy.sh` (slim compose).
+এই README-তে শুধু entry points — full guide docs-এ।
+
+| Topic | Document |
+|-------|----------|
+| CI/CD + VPS + slim stack + **কেন** | **[docs/DEPLOYMENT_AND_OPS.md](docs/DEPLOYMENT_AND_OPS.md)** |
+| Remote Ollama (step-by-step) | **[docs/OLLAMA_PRODUCTION.md](docs/OLLAMA_PRODUCTION.md)** |
+| Architecture | **[docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md)** |
+| Docs index | **[docs/README.md](docs/README.md)** |
+
+Everyday Hostinger: `git push origin main` → GitHub Actions → `vps-redeploy.sh`.
 
 ```bash
-# On VPS
+# Manual on VPS
 cd /opt/geoinsight-bd
 bash deploy/scripts/vps-redeploy.sh --force
 ```
 
-Full guide (CI/CD, slim VPS profile, remote Ollama, **কেন কোন approach**):
-
-→ **[docs/DEPLOYMENT_AND_OPS.md](docs/DEPLOYMENT_AND_OPS.md)**
-
-Optional GHCR path: [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) (manual).  
-Auto VPS path: [`.github/workflows/deploy-vps.yml`](.github/workflows/deploy-vps.yml).
-
-**Secrets:** `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`  
-**Env template:** [`.env.production.example`](.env.production.example)
+- Auto workflow: [`.github/workflows/deploy-vps.yml`](.github/workflows/deploy-vps.yml)  
+- Optional GHCR: [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)  
+- Secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`  
+- Env: [`.env.production.example`](.env.production.example)
 
 ---
 
@@ -438,8 +459,12 @@ docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up
 
 ```
 geoinsight-bd/
-├── docs/                           # System Design, Deploy & Ops, Ollama
-├── .github/workflows/              # CI/CD
+├── docs/
+│   ├── README.md                   # Docs hub (start here)
+│   ├── SYSTEM_DESIGN.md            # HLD / LLD / ERD / ADR
+│   ├── DEPLOYMENT_AND_OPS.md       # CI/CD, VPS, performance
+│   └── OLLAMA_PRODUCTION.md        # Dedicated Ollama server
+├── .github/workflows/              # deploy-vps.yml, deploy.yml
 ├── deploy/                         # nginx, init, scripts, observability
 ├── services/
 │   ├── api-gateway-node/           # Express API + Prisma + Socket.io
@@ -450,6 +475,8 @@ geoinsight-bd/
 ├── docker-compose.vps.yml          # Slim Hostinger profile
 └── docker-compose.ollama.yml       # Dedicated AI server
 ```
+
+Full monorepo map → [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md#১১-monorepo-structure).
 
 ---
 

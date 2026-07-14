@@ -18,6 +18,9 @@ from app.modules.ingestion.router import router as ingestion_router
 from app.modules.outlook.router import router as outlook_router
 from app.modules.weather.router import router as weather_router
 from app.modules.simulator.router import router as simulator_router
+from app.modules.phishing.router import router as phishing_router
+from app.modules.proximity.router import router as proximity_router
+from app.modules.face_intel.router import router as face_intel_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
@@ -38,3 +41,6 @@ api_router.include_router(sovereign_llm_router)
 api_router.include_router(sovereign_compat_router)
 api_router.include_router(twin_router)
 api_router.include_router(citizen_router)
+api_router.include_router(phishing_router)
+api_router.include_router(proximity_router)
+api_router.include_router(face_intel_router)

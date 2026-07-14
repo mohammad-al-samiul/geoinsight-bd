@@ -19,6 +19,7 @@ const PAGES: SearchResult[] = [
   { type: "page", id: "twin", title: "KPI Digital Twin", href: "/digital-twin" },
   { type: "page", id: "sentiment", title: "Citizen Sentiment", href: "/sentiment" },
   { type: "page", id: "unrest", title: "Protest & Public Unrest", href: "/unrest" },
+  { type: "page", id: "anti-phishing", title: "Anti-Phishing Shield", href: "/anti-phishing" },
   { type: "page", id: "simulator", title: "Impact Simulator", href: "/simulator" },
   { type: "page", id: "procurement", title: "Procurement Advisor", href: "/procurement" },
   { type: "page", id: "kpis", title: "Representative KPIs", href: "/kpis" },
@@ -28,6 +29,9 @@ const PAGES: SearchResult[] = [
   { type: "page", id: "audit", title: "AI Audit Trail", href: "/audit-trail" },
   { type: "page", id: "citizen", title: "Citizen Chatbot", href: "/citizen-chat" },
   { type: "page", id: "hazards", title: "Flood & Cyclone Risk", href: "/hazards" },
+  { type: "page", id: "proximity", title: "Proximity Alert Map", href: "/proximity" },
+  { type: "page", id: "face-intel", title: "Face Intel / Ethical Card", href: "/face-intel" },
+  { type: "page", id: "agro", title: "Agri Markets", href: "/agro" },
   { type: "page", id: "reps", title: "Representatives", href: "/representatives" },
 ];
 

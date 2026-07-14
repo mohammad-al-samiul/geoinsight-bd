@@ -16,11 +16,26 @@ import {
   extractNewsImpact,
   type SegmentedNewsImpact,
 } from "../../shared/impact/news-impact";
+import { resolveImpactPlaces } from "../../shared/geo/news-place-matcher";
 
-const WEATHER_CACHE_KEY = "weather:live:v4";
+const WEATHER_CACHE_KEY = "weather:live:v6";
 const WEATHER_CACHE_TTL_SEC = 900;
 
-const FLOOD_KEYWORDS = ["বন্যা", "flood", "inundat", "water level", "পানি বৃদ্ধি", "landslide"];
+const HAZARD_IMPACT_KEYWORDS = [
+  "বন্যা",
+  "flood",
+  "inundat",
+  "water level",
+  "পানি বৃদ্ধি",
+  "landslide",
+  "ঘূর্ণিঝড়",
+  "ঘুর্নিঝড়",
+  "cyclone",
+  "storm surge",
+  "জলোচ্ছ্বাস",
+  "typhoon",
+];
+const FLOOD_KEYWORDS = HAZARD_IMPACT_KEYWORDS;
 const COASTAL_DIVISIONS = new Set(["Chattogram", "Barishal", "Khulna"]);
 
 interface AiWeatherObservation {
@@ -435,24 +450,40 @@ export class WeatherService {
 
   private async buildFloodImpactFromNews() {
     const disclaimers = {
-      bn: "বন্যা: আনুমানিক = জেলা/দিনে সর্বোচ্চ (যোগ নয়)। অফিসিয়াল হিসাব নয়।",
-      en: "Flood: estimate = max per district/day (not summed). Not an official tally.",
+      bn: "বন্যা/ঘূর্ণিঝড়: খবরে নাম থাকা প্রতিটি উপজেলা/জেলায় নিহত·আহত·ঘর·পশু (দিনে সর্বোচ্চ)। বাঁশখালী ইত্যাদি শুধু উদাহরণ নয় — সব স্থান। অফিসিয়াল নয়।",
+      en: "Flood/cyclone: every named upazila/district from news — deaths, injuries, homes, livestock (max/day). Not official.",
     };
     const since = new Date(Date.now() - 30 * 86400 * 1000);
     const articles = await prismaRead.externalArticle.findMany({
       where: { fetchedAt: { gte: since } },
       select: { title: true, summary: true, district: true, publishedAt: true, fetchedAt: true, url: true },
-      take: 600,
+      take: 1200,
+      orderBy: { fetchedAt: "desc" },
     });
 
     const items = [];
     for (const article of articles) {
-      const text = `${article.title} ${article.summary ?? ""}`.toLowerCase();
-      if (!FLOOD_KEYWORDS.some((k) => text.includes(k.toLowerCase()))) continue;
+      const blob = `${article.title} ${article.summary ?? ""}`;
+      const text = blob.toLowerCase();
+      if (!HAZARD_IMPACT_KEYWORDS.some((k) => text.includes(k.toLowerCase()))) continue;
+      const impact = extractNewsImpact(article.title, article.summary);
+      // Keep any article with tangible loss OR a clear named place + damage language
+      const hasLoss =
+        impact.deaths > 0 ||
+        impact.injuries > 0 ||
+        impact.homes_damaged > 0 ||
+        impact.livestock_lost > 0 ||
+        impact.damage_mentions > 0;
+      if (!hasLoss) continue;
+
+      const places = resolveImpactPlaces(article.title, article.summary, article.district);
+      if (places.length === 0) continue;
+
       items.push({
-        district: article.district,
+        district: places[0] ?? article.district,
+        places,
         publishedAt: article.publishedAt ?? article.fetchedAt,
-        impact: extractNewsImpact(article.title, article.summary),
+        impact,
         title: article.title,
         url: article.url,
       });
@@ -465,6 +496,7 @@ export class WeatherService {
       ...primary,
       default_window: 7,
       windows,
+      place_count: primary.by_district?.length ?? 0,
     };
   }
 

@@ -32,6 +32,7 @@ const PAGE_HREF_TO_NAV: Record<string, string> = {
   "/digital-twin": "digitalTwin",
   "/sentiment": "sentiment",
   "/unrest": "unrest",
+  "/anti-phishing": "antiPhishing",
   "/simulator": "simulator",
   "/procurement": "procurement",
   "/kpis": "kpis",
@@ -41,6 +42,8 @@ const PAGE_HREF_TO_NAV: Record<string, string> = {
   "/audit-trail": "auditTrail",
   "/citizen-chat": "citizenChat",
   "/hazards": "hazards",
+  "/proximity": "proximity",
+  "/face-intel": "faceIntel",
   "/representatives": "representatives",
   "/agro": "agro",
 };

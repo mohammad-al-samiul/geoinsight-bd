@@ -1,5 +1,7 @@
 # Ollama in Production (GeoInsight BD)
 
+**Related:** [Docs hub](./README.md) · [CI/CD & VPS (approach)](./DEPLOYMENT_AND_OPS.md#4-ollama--ai-approach) · [System Design](./SYSTEM_DESIGN.md) · [README](../README.md)
+
 ## Recommended architecture
 
 ```
@@ -94,3 +96,14 @@ In `docker-compose.ollama.yml`, uncomment the NVIDIA `deploy.resources` block an
 ## 6. Fallback behaviour
 
 If Ollama is down, Sovereign LLM falls back to template replies (`sovereign_template`). The rest of the dashboard keeps working.
+
+---
+
+## Related
+
+| Topic | Link |
+|-------|------|
+| Docs index | [docs/README.md](./README.md) |
+| Why remote Ollama / CI-CD context | [DEPLOYMENT_AND_OPS.md §4](./DEPLOYMENT_AND_OPS.md#4-ollama--ai-approach) |
+| Local Windows Docker tip | Host Ollama + `OLLAMA_URL=http://host.docker.internal:11434` in `.env` |
+| Env templates | [`.env.example`](../.env.example), [`.env.production.example`](../.env.production.example) |

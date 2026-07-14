@@ -11,6 +11,7 @@ import {
   normalizeDivisionName,
   resolveScopeContext,
 } from "../../shared/scope/scope-context";
+import { allStaticHazardZones } from "./flood-hotspots.data";
 
 export interface PredictiveScore {
   project_id: string;
@@ -27,6 +28,29 @@ function scopeUnitId(query: DashboardScopeQuery): string | undefined {
   return query.unionId ?? query.upazilaId ?? query.districtId ?? query.divisionId;
 }
 
+interface FaceMatchPayload {
+  matched: boolean;
+  confidence: number;
+  face_detected: boolean;
+  face_boxes?: number[][];
+  vip_id?: string | null;
+  nid?: string | null;
+  representative_id?: string | null;
+  engine?: string;
+}
+
+function roleLabelBn(role: string): string {
+  const map: Record<string, string> = {
+    MINISTER: "মন্ত্রী",
+    MP: "সংসদ সদস্য",
+    DC: "জেলা প্রশাসক",
+    UNION_CHAIRMAN: "ইউনিয়ন চেয়ারম্যান",
+    UPAZILA_CHAIRMAN: "উপজেলা চেয়ারম্যান",
+    MAYOR: "মেয়র",
+  };
+  return map[role] ?? role.replace(/_/g, " ");
+}
+
 interface HazardZoneRecord {
   zone_id: string;
   name: string;
@@ -38,6 +62,11 @@ interface HazardZoneRecord {
   lng: number;
   radius_km: number;
   district?: string;
+  locality?: string;
+  locality_bn?: string;
+  water_note_bn?: string;
+  water_note_en?: string;
+  scale?: "local" | "regional";
   source?: string;
   [key: string]: unknown;
 }
@@ -334,66 +363,364 @@ export class IntelligenceService {
     return res.json();
   }
 
+  async scanPhishing(body: {
+    url: string;
+    similarity_threshold?: number;
+    timeout_seconds?: number;
+    official_urls?: string[];
+  }) {
+    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/phishing/scan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: body.url,
+        similarity_threshold: body.similarity_threshold ?? 0.9,
+        timeout_seconds: body.timeout_seconds ?? 12,
+        official_urls: body.official_urls,
+      }),
+    });
+    if (!res.ok) throw new Error("Phishing scan unavailable");
+    return res.json();
+  }
+
+  async registerPhishingOfficials(body: { urls: string[]; timeout_seconds?: number }) {
+    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/phishing/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        urls: body.urls,
+        timeout_seconds: body.timeout_seconds ?? 12,
+      }),
+    });
+    if (!res.ok) throw new Error("Phishing signature registration unavailable");
+    return res.json();
+  }
+
+  async registerPhishingDefaults(timeoutSeconds?: number) {
+    const q =
+      timeoutSeconds != null ? `?timeout_seconds=${encodeURIComponent(String(timeoutSeconds))}` : "";
+    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/phishing/register/defaults${q}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) throw new Error("Default phishing registration unavailable");
+    return res.json();
+  }
+
+  async listPhishingOfficialDomains() {
+    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/phishing/official-domains`);
+    if (!res.ok) throw new Error("Official domain list unavailable");
+    return res.json();
+  }
+
+  async getProximityLive(includeDemoVips = true) {
+    const q = `?include_demo_vips=${includeDemoVips ? "true" : "false"}`;
+    try {
+      const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/proximity/live${q}`);
+      if (!res.ok) throw new Error(`Proximity live feed unavailable (${res.status})`);
+      return res.json();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Proximity live feed unavailable";
+      throw new Error(message);
+    }
+  }
+
+  async checkProximity(body: {
+    points: Array<{
+      lat: number;
+      lng: number;
+      label?: string;
+      source?: string;
+      recorded_at?: string;
+      track_id?: string;
+    }>;
+    zone_ids?: string[];
+  }) {
+    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/proximity/check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error("Proximity geofence check unavailable");
+    return res.json();
+  }
+
+  async listProximityZones() {
+    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/proximity/zones`);
+    if (!res.ok) throw new Error("Proximity zones unavailable");
+    return res.json();
+  }
+
+  async matchFaceIntel(body: {
+    image_base64?: string;
+    nid?: string;
+    threshold?: number;
+    demo_fallback?: boolean;
+  }) {
+    if (body.nid) {
+      const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/face-intel/match/nid`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nid: body.nid, lang: "bn" }),
+      });
+      if (!res.ok) throw new Error("Face NID match unavailable");
+      return res.json() as Promise<{ match: FaceMatchPayload; gallery_size: number }>;
+    }
+    if (!body.image_base64) throw new Error("image_base64 or nid required");
+    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/face-intel/match`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image_base64: body.image_base64,
+        threshold: body.threshold ?? 0.72,
+        demo_fallback: body.demo_fallback ?? true,
+      }),
+    });
+    if (!res.ok) throw new Error("Face match unavailable");
+    return res.json() as Promise<{ match: FaceMatchPayload; gallery_size: number }>;
+  }
+
+  async listFaceGallery() {
+    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/face-intel/gallery`);
+    if (!res.ok) throw new Error("Face gallery unavailable");
+    return res.json();
+  }
+
+  /**
+   * Decision-support Ethical Report Card — last 6 months Prisma window
+   * (activities / financial red flags / grievance proxies) for a VIP.
+   */
+  async buildEthicalReportCard(opts: {
+    representativeId?: string;
+    nid?: string;
+    lang?: "bn" | "en";
+    match?: FaceMatchPayload | null;
+  }) {
+    const lang = opts.lang ?? "bn";
+    const since = new Date();
+    since.setMonth(since.getMonth() - 6);
+
+    const rep = await prismaRead.representative.findFirst({
+      where: opts.representativeId
+        ? { id: opts.representativeId }
+        : opts.nid
+          ? { nid: opts.nid }
+          : undefined,
+      include: {
+        adminUnit: { select: { id: true, name: true, nameBn: true } },
+        kpiRecords: {
+          where: { recordedAt: { gte: since } },
+          orderBy: { recordedAt: "desc" },
+          take: 40,
+          include: { kpiDef: { select: { code: true, name: true, nameBn: true } } },
+        },
+      },
+    });
+
+    if (!rep) {
+      return null;
+    }
+
+    const [alerts, overrunProjects, liveSignals, grievanceArticles] = await Promise.all([
+      prismaRead.redFlagAlert.findMany({
+        where: {
+          createdAt: { gte: since },
+          project: { adminUnitId: rep.adminUnitId },
+        },
+        orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
+        take: 25,
+        include: { project: { select: { title: true, budgetAllocated: true, budgetSpent: true } } },
+      }),
+      prismaRead.project.findMany({
+        where: {
+          adminUnitId: rep.adminUnitId,
+          updatedAt: { gte: since },
+        },
+        take: 40,
+        select: {
+          id: true,
+          title: true,
+          budgetAllocated: true,
+          budgetSpent: true,
+          status: true,
+        },
+      }),
+      prismaRead.liveSignal.findMany({
+        where: {
+          OR: [
+            { adminUnitId: rep.adminUnitId },
+            { signalType: "REPRESENTATIVE" },
+          ],
+          createdAt: { gte: since },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: {
+          id: true,
+          title: true,
+          signalType: true,
+          severity: true,
+          flagType: true,
+          url: true,
+          createdAt: true,
+        },
+      }),
+      prismaRead.externalArticle.findMany({
+        where: {
+          sentimentCategory: "Grievance",
+          fetchedAt: { gte: since },
+        },
+        orderBy: { fetchedAt: "desc" },
+        take: 15,
+        select: { id: true, title: true, url: true, district: true, fetchedAt: true },
+      }),
+    ]);
+
+    const openAlerts = alerts.filter((a) => !a.resolvedAt);
+    const financialFlags = alerts.filter((a) =>
+      ["BUDGET_OVERRUN", "CORRUPTION_RISK", "CONTRACTOR_FRAUD"].includes(a.flagType),
+    );
+
+    const overruns = overrunProjects.filter((p) => {
+      const allocated = Number(p.budgetAllocated);
+      const spent = Number(p.budgetSpent);
+      return allocated > 0 && spent > allocated * 1.05;
+    });
+
+    const grievanceKpis = rep.kpiRecords.filter((k) =>
+      k.kpiDef.code.toLowerCase().includes("grievance"),
+    );
+    const completionKpis = rep.kpiRecords.filter((k) =>
+      /completion|project/i.test(k.kpiDef.code),
+    );
+    const latestGrievance =
+      grievanceKpis.length > 0 ? Number(grievanceKpis[0]!.value) : 70;
+    const latestCompletion =
+      completionKpis.length > 0 ? Number(completionKpis[0]!.value) : 65;
+
+    let ethical = 55;
+    ethical += Math.min(20, (latestGrievance / 100) * 18);
+    ethical += Math.min(15, (latestCompletion / 100) * 14);
+    ethical -= openAlerts.length * 5;
+    ethical -= financialFlags.length * 3;
+    ethical -= overruns.length * 4;
+    ethical = Math.max(5, Math.min(98, Math.round(ethical)));
+
+    const allegations: string[] = [];
+    for (const a of alerts.slice(0, 8)) {
+      const text =
+        a.aiExplanation?.trim() ||
+        `${a.flagType} · ${a.project.title} (severity ${a.severity})`;
+      if (text && !allegations.includes(text)) allegations.push(text);
+    }
+    for (const p of overruns.slice(0, 3)) {
+      const allocated = Number(p.budgetAllocated);
+      const spent = Number(p.budgetSpent);
+      const pct = Math.round(((spent - allocated) / allocated) * 100);
+      allegations.push(`Budget overrun ${pct}% — ${p.title}`);
+    }
+    for (const g of grievanceArticles.slice(0, 3)) {
+      allegations.push(`News grievance: ${g.title}`);
+    }
+
+    const designation = lang === "bn" ? roleLabelBn(rep.role) : rep.role.replace(/_/g, " ");
+
+    return {
+      vip_name: rep.name,
+      designation,
+      ethical_score: ethical,
+      red_flags_count: openAlerts.length,
+      key_allegations: allegations.slice(0, 10),
+      representative_id: rep.id,
+      nid: rep.nid,
+      designation_bn: roleLabelBn(rep.role),
+      party: rep.party,
+      window_days: 180,
+      public_activity_count: liveSignals.length,
+      complaint_proxy_count: grievanceArticles.length + grievanceKpis.length,
+      match: opts.match ?? null,
+      explanation:
+        lang === "en"
+          ? `${rep.name}: ethical score ${ethical}/100 over 6 months — ${openAlerts.length} open red flags, ${overruns.length} budget overruns, ${liveSignals.length} public signals.`
+          : `${rep.name}: গত ৬ মাসের ethical স্কোর ${ethical}/১০০ — ${openAlerts.length}টি উন্মুক্ত রেড ফ্ল্যাগ, ${overruns.length}টি বাজেট overrun, ${liveSignals.length}টি পাবলিক সিগন্যাল।`,
+      explanation_bn: `${rep.name}: গত ৬ মাসের ethical স্কোর ${ethical}/১০০ — ${openAlerts.length}টি উন্মুক্ত রেড ফ্ল্যাগ।`,
+    };
+  }
+
+  async identifyFaceIntel(body: {
+    image_base64?: string;
+    nid?: string;
+    threshold?: number;
+    demo_fallback?: boolean;
+    lang?: "bn" | "en";
+  }) {
+    const matched = await this.matchFaceIntel(body);
+    const m = matched.match;
+    if (!m?.matched || (!m.representative_id && !m.nid)) {
+      return {
+        matched: false,
+        match: m,
+        gallery_size: matched.gallery_size,
+        vip_name: null,
+        designation: null,
+        ethical_score: null,
+        red_flags_count: null,
+        key_allegations: [] as string[],
+        message: "No VIP match — enroll face or try sample portrait / NID lookup.",
+      };
+    }
+
+    const card = await this.buildEthicalReportCard({
+      representativeId: m.representative_id ?? undefined,
+      nid: m.nid ?? undefined,
+      lang: body.lang ?? "bn",
+      match: m,
+    });
+
+    if (!card) {
+      // Gallery hit but DB rep missing — still return structured skeleton
+      return {
+        matched: true,
+        match: m,
+        gallery_size: matched.gallery_size,
+        vip_name: m.nid ?? "VIP",
+        designation: "Representative",
+        ethical_score: 50,
+        red_flags_count: 0,
+        key_allegations: ["Representative profile not found in SQL — seed data required"],
+        message: "Matched gallery VIP but Prisma representative missing",
+      };
+    }
+
+    return {
+      matched: true,
+      gallery_size: matched.gallery_size,
+      ...card,
+    };
+  }
+
   async getHazardOverlay(query: DashboardScopeQuery = {}, season = "monsoon") {
     const unitId = scopeUnitId(query);
 
-    const STATIC_ZONES: HazardZoneRecord[] = [
-      {
-        zone_id: "flood-barishal",
-        name: "Barishal Coastal Flood Plain",
-        name_bn: "বরিশাল উপকূলীয় বন্যা অঞ্চল",
-        hazard_type: "flood",
-        risk_level: 4,
-        division: "Barishal",
-        lat: 22.7,
-        lng: 90.35,
-        radius_km: 80,
-      },
-      {
-        zone_id: "cyclone-chattogram",
-        name: "Chattogram Cyclone Corridor",
-        name_bn: "চট্টগ্রাম ঘূর্ণিঝড় করিডোর",
-        hazard_type: "cyclone",
-        risk_level: 5,
-        division: "Chattogram",
-        lat: 22.35,
-        lng: 91.78,
-        radius_km: 100,
-      },
-      {
-        zone_id: "flood-chattogram",
-        name: "Chattogram Coastal & Low-Lying Flood Zone",
-        name_bn: "চট্টগ্রাম উপকূলীয় ও নিম্নাঞ্চল বন্যা অঞ্চল",
-        hazard_type: "flood",
-        risk_level: 4,
-        division: "Chattogram",
-        lat: 22.335,
-        lng: 91.834,
-        radius_km: 65,
-      },
-      {
-        zone_id: "flood-sylhet",
-        name: "Sylhet Haor Flood Zone",
-        name_bn: "সিলেট হাওর বন্যা অঞ্চল",
-        hazard_type: "flood",
-        risk_level: 4,
-        division: "Sylhet",
-        lat: 24.9,
-        lng: 91.87,
-        radius_km: 70,
-      },
-      {
-        zone_id: "flood-dhaka",
-        name: "Dhaka Peripheral Flood Risk",
-        name_bn: "ঢাকা পেরিফেরাল বন্যা ঝুঁকি",
-        hazard_type: "flood",
-        risk_level: 3,
-        division: "Dhaka",
-        lat: 23.85,
-        lng: 90.25,
-        radius_km: 45,
-      },
-    ];
+    const STATIC_ZONES: HazardZoneRecord[] = allStaticHazardZones().map((z) => ({
+      zone_id: z.zone_id,
+      name: z.name,
+      name_bn: z.name_bn,
+      hazard_type: z.hazard_type,
+      risk_level: z.risk_level,
+      division: z.division,
+      district: z.district,
+      locality: z.locality,
+      locality_bn: z.locality_bn,
+      lat: z.lat,
+      lng: z.lng,
+      radius_km: z.radius_km,
+      water_note_bn: z.water_note_bn,
+      water_note_en: z.water_note_en,
+      scale: z.radius_km <= 12 ? "local" : "regional",
+      source: "static_local_hotspot",
+    }));
 
     const projects = await prismaRead.project.findMany({
       where: {
@@ -454,9 +781,28 @@ export class IntelligenceService {
             hazard_type: s.hazard_type,
             risk_level: s.risk_level,
             division: s.division,
-            lat: STATIC_ZONES.find((z) => normalizeDivisionName(z.division) === normalizeDivisionName(s.division))?.lat ?? 23.68,
-            lng: STATIC_ZONES.find((z) => normalizeDivisionName(z.division) === normalizeDivisionName(s.division))?.lng ?? 90.35,
-            radius_km: 60 + s.article_count * 10,
+            lat:
+              STATIC_ZONES.find(
+                (z) =>
+                  normalizeDivisionName(z.division) === normalizeDivisionName(s.division) &&
+                  z.scale === "regional",
+              )?.lat ??
+              STATIC_ZONES.find(
+                (z) => normalizeDivisionName(z.division) === normalizeDivisionName(s.division),
+              )?.lat ??
+              23.68,
+            lng:
+              STATIC_ZONES.find(
+                (z) =>
+                  normalizeDivisionName(z.division) === normalizeDivisionName(s.division) &&
+                  z.scale === "regional",
+              )?.lng ??
+              STATIC_ZONES.find(
+                (z) => normalizeDivisionName(z.division) === normalizeDivisionName(s.division),
+              )?.lng ??
+              90.35,
+            radius_km: Math.min(28, 18 + s.article_count * 4),
+            scale: "regional",
             source: "news_pipeline",
           }))
         : [];
@@ -509,12 +855,17 @@ export class IntelligenceService {
             hazard_type: "flood",
             risk_level: o.flood_risk,
             division: o.division,
+            district: o.district ?? undefined,
             lat: o.lat,
             lng: o.lng,
-            radius_km: 40 + o.flood_risk * 15,
+            // District/live rain: keep compact so local named hotspots stay visible
+            radius_km: o.district ? 10 + o.flood_risk * 3 : 18 + o.flood_risk * 4,
+            scale: o.district ? "local" : "regional",
             source: "open-meteo",
             precipitation_mm: o.precipitation_mm,
             population_at_risk: o.population_at_risk,
+            water_note_bn: `২৪ ঘণ্টায় ~${o.rain_24h_mm ?? o.precipitation_mm} mm বৃষ্টি — পানি বৃদ্ধির সংকেত`,
+            water_note_en: `~${o.rain_24h_mm ?? o.precipitation_mm} mm rain/24h — rising water signal`,
           });
         }
         if (o.cyclone_risk >= 3) {
@@ -527,7 +878,8 @@ export class IntelligenceService {
             division: o.division,
             lat: o.lat,
             lng: o.lng,
-            radius_km: 50 + o.cyclone_risk * 20,
+            radius_km: 22 + o.cyclone_risk * 6,
+            scale: "regional",
             source: "open-meteo",
             wind_speed_kmh: o.wind_speed_kmh,
             population_at_risk: o.population_at_risk,

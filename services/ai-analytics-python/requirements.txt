@@ -10,7 +10,8 @@ redis[hiredis]==5.2.1
 prometheus-client==0.21.1
 prometheus-fastapi-instrumentator==7.1.0
 
-# ML (CPU inference)
+# ML (CPU inference — Docker installs torch from https://download.pytorch.org/whl/cpu
+# so builds do NOT pull multi‑GB NVIDIA CUDA packages from default PyPI)
 torch==2.6.0
 transformers==4.51.3
 sentencepiece==0.2.0
@@ -21,3 +22,17 @@ pytest-asyncio==0.26.0
 
 # News ingestion
 feedparser==6.0.11
+
+# Anti-Phishing Shield (HTML fingerprints + similarity indexing)
+beautifulsoup4==4.13.4
+scikit-learn==1.6.1
+
+# Proximity geo-fencing (polygon containment)
+shapely==2.0.7
+
+# Face Intel (detect / match VIP gallery)
+opencv-python-headless==4.11.0.86
+Pillow==11.1.0
+python-multipart==0.0.20
+
+# Optional: pip install celery  (see app/modules/phishing/celery_tasks.py mockup)

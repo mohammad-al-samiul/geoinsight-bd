@@ -4,6 +4,8 @@
 
 ভাষা: বাংলা ব্যাখ্যা + English tech terms (CI/CD, VPS, Redis, Ollama…)।
 
+**Related:** [Docs hub](./README.md) · [README](../README.md) · [System Design](./SYSTEM_DESIGN.md) · [Ollama Production (step-by-step)](./OLLAMA_PRODUCTION.md)
+
 ---
 
 ## Table of Contents
@@ -334,17 +336,18 @@ grep -E 'PIPELINE_RUN_ON_START|SENTIMENT_USE_MOCK|OLLAMA_URL' .env
 
 | Topic | Path |
 |-------|------|
-| Auto VPS deploy workflow | `.github/workflows/deploy-vps.yml` |
-| GHCR + tests workflow | `.github/workflows/deploy.yml` |
+| Docs index | [`docs/README.md`](./README.md) |
+| Auto VPS deploy workflow | [`.github/workflows/deploy-vps.yml`](../.github/workflows/deploy-vps.yml) |
+| GHCR + tests workflow | [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) |
 | Redeploy script | `deploy/scripts/vps-redeploy.sh` |
 | Env optimize | `deploy/scripts/vps-optimize-env.sh` |
 | Slim compose | `docker-compose.vps.yml` |
 | Ollama compose | `docker-compose.ollama.yml` |
 | Ollama server setup | `deploy/scripts/ollama-server-setup.sh` |
 | Point app → Ollama | `deploy/scripts/vps-point-ollama.sh` |
-| Ollama guide | `docs/OLLAMA_PRODUCTION.md` |
-| System design | `docs/SYSTEM_DESIGN.md` |
-| Production env template | `.env.production.example` |
+| Ollama step-by-step | [`docs/OLLAMA_PRODUCTION.md`](./OLLAMA_PRODUCTION.md) |
+| System design | [`docs/SYSTEM_DESIGN.md`](./SYSTEM_DESIGN.md) |
+| Production env template | [`.env.production.example`](../.env.production.example) |
 
 ---
 

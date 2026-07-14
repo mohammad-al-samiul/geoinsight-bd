@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoInsight BD — System Design Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Noto+Serif+Bengali:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F5F1E6;
+  --paper-2:#ECE5D2;
+  --card:#FFFCF6;
+  --ink:#16241F;
+  --ink-soft:#4C5C53;
+  --teal:#0E5C57;
+  --teal-deep:#0A3A38;
+  --green:#1C7A43;
+  --red:#B8433A;
+  --gold:#B9873C;
+  --line:#DAD2B8;
+  --line-soft:#E6DFC9;
+  --mono:'IBM Plex Mono',monospace;
+  --serif-en:'Fraunces',serif;
+  --serif-bn:'Noto Serif Bengali',serif;
+  --sans-en:'Inter',sans-serif;
+  --sans-bn:'Noto Sans Bengali',sans-serif;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans-bn),var(--sans-en),sans-serif;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{
+  font-family:var(--serif-bn),var(--serif-en),serif;
+  color:var(--teal-deep);
+  line-height:1.28;
+  margin:0 0 .5em 0;
+  font-weight:600;
+}
+a{color:var(--teal);}
+p{margin:0 0 1em 0;}
+code,.mono{font-family:var(--mono);}
+
+/* ---------- background texture: contour lines like a topo/GIS map ---------- */
+.contours{
+  position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.35;
+}
+
+/* ---------- layout shell ---------- */
+.shell{
+  position:relative; z-index:1;
+  display:grid;
+  grid-template-columns:272px minmax(0,860px);
+  justify-content:center;
+  gap:64px;
+  max-width:1240px;
+  margin:0 auto;
+  padding:0 32px 100px;
+}
+@media (max-width: 900px){
+  .shell{grid-template-columns:1fr; gap:0; padding:0 18px 70px;}
+}
+
+/* ---------- hero ---------- */
+.hero{
+  position:relative; z-index:1;
+  padding:88px 32px 64px;
+  border-bottom:1px solid var(--line);
+  background:
+    radial-gradient(ellipse at 78% 15%, rgba(14,92,87,.10), transparent 60%),
+    var(--paper);
+}
+.hero-inner{
+  max-width:1240px; margin:0 auto;
+  display:grid; grid-template-columns:1.1fr .9fr; align-items:center; gap:40px;
+}
+@media (max-width: 900px){ .hero-inner{grid-template-columns:1fr;} }
+.eyebrow{
+  display:inline-flex; align-items:center; gap:10px;
+  font-family:var(--mono); font-size:.72rem; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--teal); border:1px solid var(--teal); border-radius:999px;
+  padding:5px 14px; margin-bottom:22px; background:rgba(14,92,87,.05);
+}
+.eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--red);}
+.hero h1{
+  font-size:clamp(2.4rem, 5vw, 3.6rem);
+  letter-spacing:-.01em;
+}
+.hero .bn-lead{
+  font-family:var(--serif-bn); font-size:1.18rem; color:var(--ink); margin-top:14px; max-width:56ch;
+}
+.hero .sub{
+  color:var(--ink-soft); font-size:.98rem; margin-top:14px; max-width:60ch;
+}
+.hero-chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:26px;}
+.chip{
+  font-family:var(--mono); font-size:.72rem; letter-spacing:.02em;
+  border:1px solid var(--line); background:var(--card); color:var(--ink-soft);
+  padding:6px 12px; border-radius:6px;
+}
+.chip b{color:var(--teal-deep); font-weight:600;}
+
+/* signature ring diagram */
+.rings-wrap{display:flex; justify-content:center;}
+.ring-caption{
+  text-align:center; font-family:var(--mono); font-size:.68rem; letter-spacing:.1em;
+  color:var(--ink-soft); text-transform:uppercase; margin-top:8px;
+}
+
+/* ---------- TOC sidebar ---------- */
+.toc{
+  position:sticky; top:28px; align-self:start;
+  max-height:calc(100vh - 56px); overflow-y:auto;
+  padding-top:48px;
+}
+.toc-label{
+  font-family:var(--mono); font-size:.68rem; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-soft); margin-bottom:14px; padding-left:2px;
+}
+.toc ol{list-style:none; margin:0; padding:0; border-left:1px solid var(--line);}
+.toc li{margin:0;}
+.toc a{
+  display:block; text-decoration:none; color:var(--ink-soft);
+  font-size:.86rem; padding:7px 0 7px 16px; border-left:2px solid transparent; margin-left:-1px;
+  transition:color .15s, border-color .15s;
+}
+.toc a:hover{color:var(--teal-deep); border-left-color:var(--gold);}
+.toc a b{color:var(--teal); font-family:var(--mono); font-weight:500; margin-right:6px;}
+@media (max-width:900px){
+  .toc{position:static; max-height:none; overflow:visible; padding:24px 0 8px;}
+  .toc ol{display:flex; flex-wrap:wrap; gap:2px 14px; border-left:none;}
+  .toc a{padding:4px 0; border-left:none;}
+}
+
+/* ---------- main content ---------- */
+main{min-width:0; padding-top:48px;}
+section{margin-bottom:76px; scroll-margin-top:24px;}
+.sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:8px;}
+.sec-num{font-family:var(--mono); color:var(--red); font-size:1rem; font-weight:600;}
+.sec-intro{color:var(--ink-soft); font-size:.98rem; max-width:68ch; margin-bottom:28px;}
+h3.sub-head{font-size:1.14rem; margin-top:34px; color:var(--teal-deep); display:flex; align-items:center; gap:10px;}
+h3.sub-head .tag{
+  font-family:var(--mono); font-size:.68rem; background:var(--teal); color:#fff; padding:2px 8px; border-radius:4px;
+}
+hr.rule{border:none; border-top:1px solid var(--line); margin:56px 0;}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:10px; margin:18px 0 8px;}
+table.dtable{border-collapse:collapse; width:100%; font-size:.9rem; background:var(--card);}
+table.dtable th{
+  background:var(--teal-deep); color:#F5F1E6; text-align:left; font-weight:600;
+  padding:11px 16px; font-family:var(--sans-bn),var(--sans-en); font-size:.82rem; letter-spacing:.01em;
+}
+table.dtable td{padding:11px 16px; border-top:1px solid var(--line-soft); vertical-align:top;}
+table.dtable tr:hover td{background:var(--paper-2);}
+table.dtable td.k{font-weight:600; color:var(--teal-deep); white-space:nowrap;}
+
+/* ---------- cards / grids ---------- */
+.card-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; margin:18px 0;}
+.fcard{
+  background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px;
+  position:relative;
+}
+.fcard .fnum{font-family:var(--mono); color:var(--red); font-size:.78rem; font-weight:600; display:block; margin-bottom:6px;}
+.fcard h4{font-size:1rem; margin-bottom:8px; color:var(--teal-deep);}
+.fcard ul{margin:0; padding-left:18px; font-size:.87rem; color:var(--ink-soft);}
+.fcard ul li{margin-bottom:4px;}
+.fcard p{font-size:.87rem; color:var(--ink-soft); margin:0;}
+
+/* ---------- code blocks ---------- */
+.code-block{
+  background:var(--teal-deep); border-radius:10px; overflow:hidden; margin:16px 0; color:#EFEADA;
+}
+.code-block .cb-bar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:8px 16px; background:rgba(0,0,0,.18); font-family:var(--mono); font-size:.7rem;
+  letter-spacing:.06em; color:#B9E0D4; text-transform:uppercase;
+}
+.code-block pre{margin:0; padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:.82rem; line-height:1.65; white-space:pre;}
+.code-block .dots{display:flex; gap:5px;}
+.code-block .dots span{width:8px;height:8px;border-radius:50%; background:#3E655F;}
+
+/* ---------- timeline (numbered flows) ---------- */
+.timeline{border-left:2px solid var(--line); margin:20px 0 20px 10px; padding-left:26px;}
+.tl-step{position:relative; padding-bottom:22px;}
+.tl-step:last-child{padding-bottom:0;}
+.tl-step::before{
+  content:attr(data-n); position:absolute; left:-38px; top:-2px;
+  width:26px; height:26px; border-radius:50%; background:var(--teal); color:#fff;
+  font-family:var(--mono); font-size:.72rem; font-weight:600; display:flex; align-items:center; justify-content:center;
+}
+.tl-step .tl-body{font-size:.9rem; color:var(--ink-soft); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px;}
+.tl-body b{color:var(--teal-deep);}
+.tl-body .mono{font-size:.82rem;}
+
+/* ---------- diagram frames ---------- */
+.diagram{
+  background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px;
+  margin:18px 0; overflow-x:auto;
+}
+.diagram svg{display:block; margin:0 auto; max-width:100%; height:auto;}
+.diagram-caption{text-align:center; font-family:var(--mono); font-size:.7rem; color:var(--ink-soft); letter-spacing:.05em; margin-top:10px; text-transform:uppercase;}
+
+/* ---------- redis/rabbitmq use-case cards ---------- */
+.uc-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; margin:18px 0;}
+.uc-card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px; border-top:3px solid var(--teal);}
+.uc-card.rmq{border-top-color:var(--gold);}
+.uc-card .uc-title{font-weight:600; color:var(--teal-deep); font-size:.94rem; margin-bottom:8px; display:flex; gap:8px; align-items:center;}
+.uc-card .uc-title .ucn{font-family:var(--mono); background:var(--teal); color:#fff; font-size:.68rem; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; flex:none;}
+.uc-card.rmq .uc-title .ucn{background:var(--gold);}
+.uc-card p{font-size:.85rem; color:var(--ink-soft); margin:0 0 6px;}
+.uc-card .lbl{font-family:var(--mono); font-size:.66rem; letter-spacing:.08em; text-transform:uppercase; color:var(--red);}
+
+/* ---------- entity cards for ERD ---------- */
+.erd-domain{margin-bottom:28px;}
+.erd-domain .dom-label{
+  font-family:var(--mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--gold);
+  margin-bottom:12px; display:flex; align-items:center; gap:10px;
+}
+.erd-domain .dom-label::after{content:""; flex:1; height:1px; background:var(--line);}
+.erd-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px;}
+.ent{background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden;}
+.ent .ent-head{background:var(--teal-deep); color:#F5F1E6; padding:8px 14px; font-family:var(--mono); font-size:.8rem; font-weight:600;}
+.ent .ent-body{padding:10px 14px;}
+.ent .fld{display:flex; justify-content:space-between; font-family:var(--mono); font-size:.74rem; padding:3px 0; color:var(--ink-soft); border-bottom:1px dashed var(--line-soft);}
+.ent .fld:last-child{border-bottom:none;}
+.ent .fld .fk{color:var(--red);}
+.ent .fld .pk{color:var(--teal);}
+.rel-list{font-size:.86rem; color:var(--ink-soft); margin-top:16px;}
+.rel-list li{margin-bottom:5px;}
+.rel-list b{color:var(--teal-deep); font-family:var(--mono); font-weight:600;}
+
+/* ---------- ADR / decision table variant ---------- */
+.adr td.dec{font-weight:600; color:var(--teal-deep);}
+.adr td.alt{color:var(--ink-soft); text-decoration:line-through; text-decoration-color:var(--line); opacity:.8;}
+
+/* ---------- footer ---------- */
+footer{
+  border-top:1px solid var(--line); margin-top:40px; padding-top:32px;
+  font-size:.85rem; color:var(--ink-soft); display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px;
+}
+footer .mono{color:var(--teal);}
+
+::-webkit-scrollbar{height:8px; width:8px;}
+::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
+</style>
+</head>
+<body>
+
+<svg class="contours" viewBox="0 0 1440 1600" preserveAspectRatio="xMidYMin slice" xmlns="http://www.w3.org/2000/svg">
+  <g fill="none" stroke="#0E5C57" stroke-width="1">
+    <path d="M-100,120 C 300,40 700,220 1100,90 S 1700,160 1900,60" opacity=".18"/>
+    <path d="M-100,220 C 320,150 720,320 1120,190 S 1700,260 1900,160" opacity=".14"/>
+    <path d="M-100,340 C 340,270 740,440 1140,310 S 1700,380 1900,300" opacity=".10"/>
+    <path d="M-100,900 C 300,830 760,1000 1140,860 S 1700,930 1900,840" opacity=".10"/>
+    <path d="M-100,1020 C 320,950 780,1120 1160,980 S 1700,1050 1900,960" opacity=".08"/>
+    <path d="M-100,1420 C 300,1350 760,1520 1140,1380 S 1700,1450 1900,1360" opacity=".08"/>
+  </g>
+</svg>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div>
+      <span class="eyebrow">System Design Documentation</span>
+      <h1>GeoInsight BD</h1>
+      <p class="bn-lead">বাংলাদেশের জন্য তৈরি একটি National Governance Intelligence Platform — Division → District → Upazila → Union hierarchy ধরে KPI, project tracking, red-flag alert, agro-market data আর AI analytics এক জায়গায়।</p>
+      <p class="sub">এই ডকুমেন্টে আছে HLD, LLD, functional ও non-functional requirements, ERD এবং tech-stack rationale — সব একসাথে, এক জায়গায়।</p>
+      <div class="hero-chips">
+        <span class="chip"><b>Users</b> · PMO / Minister / DC / Union Chairman</span>
+        <span class="chip"><b>Architecture</b> · Monorepo microservices</span>
+        <span class="chip"><b>Services</b> · 3 app + shared infra</span>
+        <span class="chip"><b>Sovereignty</b> · Tier-4 NDC on-prem</span>
+      </div>
+    </div>
+    <div class="rings-wrap">
+      <div>
+        <svg viewBox="0 0 360 360" width="340" height="340">
+          <circle cx="180" cy="180" r="160" fill="none" stroke="#DAD2B8" stroke-width="1"/>
+          <circle cx="180" cy="180" r="122" fill="none" stroke="#0E5C57" stroke-width="1" opacity=".35"/>
+          <circle cx="180" cy="180" r="84"  fill="none" stroke="#0E5C57" stroke-width="1" opacity=".5"/>
+          <circle cx="180" cy="180" r="46"  fill="none" stroke="#0E5C57" stroke-width="1.4" opacity=".8"/>
+          <circle cx="180" cy="180" r="8" fill="#B8433A"/>
+          <!-- ring labels -->
+          <text x="180" y="26" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#4C5C53" letter-spacing="1">DIVISION</text>
+          <text x="180" y="64" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#4C5C53" letter-spacing="1">DISTRICT</text>
+          <text x="180" y="102" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#4C5C53" letter-spacing="1">UPAZILA</text>
+          <text x="180" y="140" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#0A3A38" letter-spacing="1">UNION</text>
+          <!-- orbit dots -->
+          <circle cx="180" cy="20" r="4" fill="#0E5C57"/>
+          <circle cx="180" cy="58" r="4" fill="#0E5C57"/>
+          <circle cx="180" cy="96" r="4" fill="#0E5C57"/>
+          <circle cx="340" cy="180" r="4" fill="#B9873C"/>
+          <circle cx="20" cy="180" r="4" fill="#B9873C"/>
+        </svg>
+        <div class="ring-caption">Admin Hierarchy · Nested Scope Model</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="toc">
+    <div class="toc-label">Table of Contents</div>
+    <ol>
+      <li><a href="#s1"><b>০১</b>Project Context ও Goal</a></li>
+      <li><a href="#s2"><b>০২</b>Functional Requirements</a></li>
+      <li><a href="#s3"><b>০৩</b>Non-Functional Requirements</a></li>
+      <li><a href="#s4"><b>০৪</b>High Level Design</a></li>
+      <li><a href="#s5"><b>০৫</b>Low Level Design</a></li>
+      <li><a href="#s6"><b>০৬</b>ERD</a></li>
+      <li><a href="#s7"><b>০৭</b>Tech Stack Rationale</a></li>
+      <li><a href="#s8"><b>০৮</b>Security Architecture</a></li>
+      <li><a href="#s9"><b>০৯</b>Observability</a></li>
+      <li><a href="#s10"><b>১০</b>Data Flow Example</a></li>
+      <li><a href="#s11"><b>১১</b>Monorepo Structure</a></li>
+      <li><a href="#s12"><b>১২</b>Service Ports</a></li>
+      <li><a href="#s13"><b>১৩</b>Architecture Decisions</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ============ 1 ============ -->
+    <section id="s1">
+      <div class="sec-head"><span class="sec-num">০১</span><h2>Project Context ও Goal</h2></div>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><td class="k">Name</td><td>GeoInsight BD</td></tr>
+          <tr><td class="k">Goal</td><td>Division → District → Upazila → Union hierarchy অনুযায়ী KPI, project, alert, agro market আর AI analytics এক platform-এ দেখানো</td></tr>
+          <tr><td class="k">Users</td><td><b>PMO</b> (national), <b>Minister</b> (division), <b>DC</b> (district), <b>Union Chairman</b></td></tr>
+          <tr><td class="k">Architecture style</td><td>Monorepo microservices — ৩টা app service + shared infrastructure</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 2 ============ -->
+    <section id="s2">
+      <div class="sec-head"><span class="sec-num">০২</span><h2>Functional Requirements</h2></div>
+      <div class="card-grid">
+        <div class="fcard"><span class="fnum">২.১ · Auth & Authorization</span><h4>Identity ও Access</h4>
+          <ul>
+            <li>Email/password login</li>
+            <li>JWT access (১৫ মিনিট) + refresh (৭ দিন), rotation সহ</li>
+            <li>Role-based access: PMO, MINISTER, DC, UNION_CHAIRMAN</li>
+            <li>প্রতিটি role নির্দিষ্ট admin_unit_id scope-এ সীমাবদ্ধ</li>
+            <li>Session revoke / JWT denylist</li>
+            <li>Registration শুধু PMO করতে পারে</li>
+          </ul>
+        </div>
+        <div class="fcard"><span class="fnum">২.২ · Admin Hierarchy</span><h4>Hierarchy Management</h4>
+          <ul>
+            <li>DIVISION → DISTRICT → UPAZILA → UNION</li>
+            <li>GeoJSON boundary সহ admin unit management</li>
+            <li>Denormalized division/district/upazila_id দিয়ে hierarchy filtering</li>
+          </ul>
+        </div>
+        <div class="fcard"><span class="fnum">২.৩ · Representative & KPI</span><h4>KPI Lifecycle</h4>
+          <ul>
+            <li>Representative CRUD (MP, Minister, DC, Union Chairman)</li>
+            <li>KPI status flow: DRAFT → SUBMITTED → VERIFIED → REJECTED</li>
+            <li>Representative / project / admin unit / national level KPI</li>
+            <li>Optional Hyperledger blockchain hash anchoring</li>
+          </ul>
+        </div>
+        <div class="fcard"><span class="fnum">২.৪ · Project & Red Flags</span><h4>Project Tracking</h4>
+          <ul>
+            <li>Budget, status, contractor tracking</li>
+            <li>AI red-flag: overrun, delay, corruption risk, quality, fraud</li>
+            <li>Alert resolve workflow + audit trail</li>
+          </ul>
+        </div>
+        <div class="fcard"><span class="fnum">২.৫ · Dashboard & Real-time</span><h4>Live Intelligence</h4>
+          <ul>
+            <li>Choropleth map (Bangladesh districts/divisions)</li>
+            <li>KPI scorecards, budget variance, completion charts</li>
+            <li>Socket.io live update: kpi:update, alert:created</li>
+            <li>Role-scoped hierarchical rooms</li>
+          </ul>
+        </div>
+        <div class="fcard"><span class="fnum">২.৬ · Agro-Economic Intel</span><h4>Market Intelligence</h4>
+          <ul>
+            <li>Agro market (wholesale, retail, haat, mandi) mapping</li>
+            <li>Global commodity price time-series (TimescaleDB)</li>
+            <li>Arbitrage heatmap — landed cost comparison</li>
+            <li>Background scraper — ৫ মিনিট interval</li>
+          </ul>
+        </div>
+        <div class="fcard"><span class="fnum">২.৮ · Public Feeds</span><h4>Unauthenticated Access</h4>
+          <ul>
+            <li>National helpline 333 ও emergency 999 feed stream</li>
+            <li>Sovereign IP guard + strict rate limiting</li>
+            <li>Bangla sentiment overlay</li>
+          </ul>
+        </div>
+        <div class="fcard"><span class="fnum">২.৯ · Blockchain</span><h4>Immutable Anchoring</h4>
+          <ul>
+            <li>Hyperledger Fabric milestone anchoring</li>
+            <li>Retry queue + dead-letter handling</li>
+            <li>Default: FABRIC_ENABLED=false</li>
+          </ul>
+        </div>
+        <div class="fcard"><span class="fnum">২.১০ · Audit & Search</span><h4>Traceability</h4>
+          <ul>
+            <li>Critical action audit log (user, IP, old/new value)</li>
+            <li>Cross-module search</li>
+          </ul>
+        </div>
+        <div class="fcard"><span class="fnum">২.১১ · Document Storage</span><h4>Object Storage</h4>
+          <ul>
+            <li>MinIO-তে national intelligence documents</li>
+            <li>Bucket: <span class="mono">national-intelligence-docs</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">২.৭</span> AI & NLP Modules — Python Service</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Module</th><th>কাজ</th></tr>
+          <tr><td class="k">Sentiment</td><td>Bangla-BERT দিয়ে 333/999 public feed sentiment</td></tr>
+          <tr><td class="k">Briefing</td><td>Ollama LLM দিয়ে executive briefing</td></tr>
+          <tr><td class="k">Sovereign LLM</td><td>On-prem generative AI (data sovereignty)</td></tr>
+          <tr><td class="k">Documents</td><td>Document intelligence / analysis</td></tr>
+          <tr><td class="k">Procurement</td><td>Procurement risk analysis</td></tr>
+          <tr><td class="k">Predictive</td><td>Predictive analytics</td></tr>
+          <tr><td class="k">Accountability</td><td>Accountability scoring</td></tr>
+          <tr><td class="k">Hazards</td><td>Hazard / risk assessment</td></tr>
+          <tr><td class="k">Simulator</td><td>Policy / budget simulator</td></tr>
+          <tr><td class="k">Twin</td><td>Digital twin scenarios</td></tr>
+          <tr><td class="k">Citizen</td><td>Citizen-facing chatbot</td></tr>
+          <tr><td class="k">Risk</td><td>Risk scoring</td></tr>
+          <tr><td class="k">Phishing</td><td>Anti-Phishing Shield — HTML digital signatures + similarity RED_FLAG</td></tr>
+          <tr><td class="k">Proximity</td><td>Shapely geo-fence VIP/critical polygons — INSIDE / APPROACHING</td></tr>
+          <tr><td class="k">Face Intel</td><td>OpenCV VIP match → 6-month Ethical Report Card</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">২.১২–২.১৪</span> New DSS modules</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Module</th><th>UI</th><th>Contract</th></tr>
+          <tr><td class="k">Anti-Phishing</td><td class="mono">/anti-phishing</td><td>status RED_FLAG · similarity_score · domain_details</td></tr>
+          <tr><td class="k">Proximity Map</td><td class="mono">/proximity</td><td>lat/lng ∩ polygon · live VIP tracks</td></tr>
+          <tr><td class="k">Face Intel</td><td class="mono">/face-intel</td><td>vip_name · ethical_score · red_flags_count · key_allegations[]</td></tr>
+        </table>
+      </div>
+      <p class="muted">Full detail → <span class="mono">docs/SYSTEM_DESIGN.md</span> §২.১২–২.১৪ · §১০ data flows.</p>
+    </section>
+
+    <!-- ============ 3 ============ -->
+    <section id="s3">
+      <div class="sec-head"><span class="sec-num">০৩</span><h2>Non-Functional Requirements</h2></div>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Category</th><th>Requirement</th><th>Implementation</th></tr>
+          <tr><td class="k">Performance</td><td>Dashboard query &lt; 500ms; fast commodity aggregation</td><td>TimescaleDB hypertable, read replica, PgBouncer, Redis cache</td></tr>
+          <tr><td class="k">Scalability</td><td>Horizontal gateway scaling</td><td>Socket.io Redis adapter, stateless API, RabbitMQ async</td></tr>
+          <tr><td class="k">Availability</td><td>Production 99.5%+ uptime</td><td>Docker healthchecks, retry workers, dead-letter queues</td></tr>
+          <tr><td class="k">Security</td><td>JWT in HTTP-only cookies; no localStorage token</td><td>Next.js BFF, Helmet, CORS, bcrypt (12 rounds)</td></tr>
+          <tr><td class="k">Data Sovereignty</td><td>Tier-4 NDC deployment — external telemetry বন্ধ</td><td>Ollama on-prem, SOVEREIGN_MODE, HF offline, MinIO self-hosted</td></tr>
+          <tr><td class="k">Rate Limiting</td><td>Public feed DDoS protection</td><td>Redis-backed rate limiter, nginx edge limits</td></tr>
+          <tr><td class="k">Observability</td><td>Metrics, alerts, dashboards</td><td>Prometheus, Grafana, Alertmanager</td></tr>
+          <tr><td class="k">i18n</td><td>Bangla + English UI</td><td>next-intl (bn.json, en.json)</td></tr>
+          <tr><td class="k">Auditability</td><td>Immutable action trail</td><td>audit_logs table + optional Fabric</td></tr>
+          <tr><td class="k">Maintainability</td><td>Modular monorepo</td><td>Express modules, FastAPI routers, Prisma ORM</td></tr>
+          <tr><td class="k">Testability</td><td>CI pipeline tests</td><td>Jest (gateway), pytest (AI), Next.js build</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 4 ============ -->
+    <section id="s4">
+      <div class="sec-head"><span class="sec-num">০৪</span><h2>High Level Design (HLD)</h2></div>
+
+      <h3 class="sub-head"><span class="tag">৪.১</span> System Context Diagram</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 900 520" width="100%">
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#4C5C53"/>
+            </marker>
+          </defs>
+          <!-- Users column -->
+          <g font-family="IBM Plex Mono" font-size="11" fill="#16241F">
+            <rect x="20" y="20" width="180" height="470" rx="10" fill="#EFEADA" stroke="#DAD2B8"/>
+            <text x="110" y="42" text-anchor="middle" font-weight="600" fill="#0A3A38">USERS</text>
+            <g>
+              <rect x="38" y="60" width="144" height="34" rx="6" fill="#fff" stroke="#0E5C57"/>
+              <text x="110" y="81" text-anchor="middle">PMO / National</text>
+              <rect x="38" y="106" width="144" height="34" rx="6" fill="#fff" stroke="#0E5C57"/>
+              <text x="110" y="127" text-anchor="middle">Minister / Division</text>
+              <rect x="38" y="152" width="144" height="34" rx="6" fill="#fff" stroke="#0E5C57"/>
+              <text x="110" y="173" text-anchor="middle">DC / District</text>
+              <rect x="38" y="198" width="144" height="34" rx="6" fill="#fff" stroke="#0E5C57"/>
+              <text x="110" y="219" text-anchor="middle">Union Chairman</text>
+              <rect x="38" y="256" width="144" height="34" rx="6" fill="#fff" stroke="#B8433A"/>
+              <text x="110" y="277" text-anchor="middle" fill="#B8433A">Public Citizen</text>
+            </g>
+          </g>
+          <!-- Platform column -->
+          <g font-family="IBM Plex Mono" font-size="11">
+            <rect x="360" y="20" width="200" height="300" rx="10" fill="#EFEADA" stroke="#DAD2B8"/>
+            <text x="460" y="42" text-anchor="middle" font-weight="600" fill="#0A3A38">GEOINSIGHT BD PLATFORM</text>
+            <rect x="380" y="60" width="160" height="40" rx="6" fill="#0E5C57"/>
+            <text x="460" y="85" text-anchor="middle" fill="#fff">Next.js Dashboard :3000</text>
+            <rect x="380" y="140" width="160" height="40" rx="6" fill="#0A3A38"/>
+            <text x="460" y="165" text-anchor="middle" fill="#fff">API Gateway :4000</text>
+            <rect x="380" y="240" width="160" height="40" rx="6" fill="#B9873C"/>
+            <text x="460" y="265" text-anchor="middle" fill="#fff">AI Analytics :8000</text>
+          </g>
+          <!-- Data column -->
+          <g font-family="IBM Plex Mono" font-size="10.5">
+            <rect x="680" y="20" width="200" height="470" rx="10" fill="#EFEADA" stroke="#DAD2B8"/>
+            <text x="780" y="42" text-anchor="middle" font-weight="600" fill="#0A3A38">DATA LAYER</text>
+            <rect x="700" y="60" width="160" height="36" rx="6" fill="#fff" stroke="#0E5C57"/><text x="780" y="82" text-anchor="middle">TimescaleDB + Replica</text>
+            <rect x="700" y="106" width="160" height="36" rx="6" fill="#fff" stroke="#0E5C57"/><text x="780" y="128" text-anchor="middle">Redis</text>
+            <rect x="700" y="152" width="160" height="36" rx="6" fill="#fff" stroke="#0E5C57"/><text x="780" y="174" text-anchor="middle">RabbitMQ</text>
+            <rect x="700" y="198" width="160" height="36" rx="6" fill="#fff" stroke="#0E5C57"/><text x="780" y="220" text-anchor="middle">MinIO</text>
+            <rect x="700" y="244" width="160" height="36" rx="6" fill="#fff" stroke="#B8433A"/><text x="780" y="266" text-anchor="middle" fill="#B8433A">Fabric Ledger</text>
+          </g>
+          <!-- arrows: users -> web -->
+          <path d="M182,80 C 280,80 280,80 378,80" stroke="#4C5C53" fill="none" marker-end="url(#arrow)"/>
+          <path d="M182,127 C 280,127 280,80 378,80" stroke="#4C5C53" fill="none" marker-end="url(#arrow)"/>
+          <path d="M182,173 C 280,173 280,80 378,80" stroke="#4C5C53" fill="none" marker-end="url(#arrow)"/>
+          <path d="M182,219 C 280,219 280,80 378,80" stroke="#4C5C53" fill="none" marker-end="url(#arrow)"/>
+          <path d="M182,273 C 260,273 260,160 378,160" stroke="#B8433A" fill="none" marker-end="url(#arrow)"/>
+          <text x="230" y="255" font-family="IBM Plex Mono" font-size="9.5" fill="#B8433A">333 / 999 feeds</text>
+          <!-- web -> gateway -->
+          <path d="M460,100 L460,138" stroke="#4C5C53" fill="none" marker-end="url(#arrow)"/>
+          <text x="470" y="122" font-family="IBM Plex Mono" font-size="9.5" fill="#4C5C53">BFF proxy + WS</text>
+          <!-- gateway -> ai -->
+          <path d="M460,180 L460,238" stroke="#4C5C53" fill="none" marker-end="url(#arrow)"/>
+          <!-- gateway -> data -->
+          <path d="M540,150 C 620,150 620,78 698,78" stroke="#4C5C53" fill="none" marker-end="url(#arrow)"/>
+          <path d="M540,158 C 620,158 620,124 698,124" stroke="#4C5C53" fill="none" marker-end="url(#arrow)"/>
+          <path d="M540,166 C 620,166 620,170 698,170" stroke="#4C5C53" fill="none" marker-end="url(#arrow)"/>
+          <path d="M540,174 C 620,174 620,216 698,216" stroke="#4C5C53" fill="none" marker-end="url(#arrow)"/>
+          <path d="M540,182 C 620,182 620,262 698,262" stroke="#B8433A" fill="none" marker-end="url(#arrow)"/>
+          <!-- ai -> mq/redis -->
+          <path d="M540,254 C 620,254 620,142 698,142" stroke="#B9873C" fill="none" marker-end="url(#arrow)"/>
+          <path d="M540,262 C 640,262 640,168 698,168" stroke="#B9873C" fill="none" marker-end="url(#arrow)"/>
+        </svg>
+        <div class="diagram-caption">Users → Platform (Web / Gateway / AI) → Data Layer</div>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৪.২</span> Service Responsibilities</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Service</th><th>Responsibility</th><th>কেন আলাদা রাখা হয়েছে?</th></tr>
+          <tr><td class="k">Next.js Dashboard</td><td>UI, BFF auth, cookie management, map/charts</td><td>Frontend আলাদা রাখা; token browser-এ যায় না</td></tr>
+          <tr><td class="k">API Gateway</td><td>REST, RBAC, DB, Socket.io, Fabric, MQ consumer</td><td>Single entry point + business logic orchestration</td></tr>
+          <tr><td class="k">AI Analytics</td><td>ML / NLP / LLM heavy compute</td><td>Python ecosystem (PyTorch, Transformers); GPU-friendly; async worker</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৪.৩</span> Communication Patterns</h3>
+      <div class="timeline">
+        <div class="tl-step" data-n="1"><div class="tl-body"><b>Sync HTTP</b> — Gateway → AI<br><span class="mono">Dashboard → BFF → Gateway → fetch(AI_SERVICE_URL) → response</span></div></div>
+        <div class="tl-step" data-n="2"><div class="tl-body"><b>Async Message Queue</b> — RabbitMQ<br><span class="mono">Gateway/AI → geoinsight_exchange → gov_core_queue | ai_analytics_queue</span></div></div>
+        <div class="tl-step" data-n="3"><div class="tl-body"><b>Real-time Push</b> — Socket.io<br><span class="mono">RabbitMQ consumer → broadcastToHierarchy() → scoped WebSocket rooms</span></div></div>
+        <div class="tl-step" data-n="4"><div class="tl-body"><b>BFF</b> — Browser → Next.js → Gateway<br>Cookie-based auth, same-origin — CORS সহজ ও secure</div></div>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৪.৪</span> RabbitMQ Topology</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>deploy/init/rabbitmq/definitions.json</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>Exchange: geoinsight_exchange (topic, durable)
+
+Routing Keys:
+  gov.*   → gov_core_queue      (Gateway consumes)
+  agro.*  → ai_analytics_queue  (AI consumes)
+  ai.*    → ai_analytics_queue  (AI consumes)
+
+Message Types (Gateway):
+  kpi_update | metadata_update | dashboard_refresh | alert_created
+
+Message Types (AI):
+  arbitrage_request | sentiment_batch | risk_score_request</pre>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৪.৫</span> Deployment Views</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>local dev · infra only</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>docker compose up -d</pre>
+      </div>
+      <div class="code-block">
+        <div class="cb-bar"><span>local dev · full stack</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>docker compose -f docker-compose.yml -f docker-compose.apps.yml up -d --build</pre>
+      </div>
+      <div class="code-block">
+        <div class="cb-bar"><span>production</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d</pre>
+      </div>
+      <p class="sec-intro" style="margin-top:10px;">Images: <span class="mono">ghcr.io/${GHCR_OWNER}/geoinsight-{api-gateway,ai-analytics,dashboard}:${IMAGE_TAG}</span></p>
+    </section>
+
+    <!-- ============ 5 ============ -->
+    <section id="s5">
+      <div class="sec-head"><span class="sec-num">০৫</span><h2>Low Level Design (LLD)</h2></div>
+
+      <h3 class="sub-head"><span class="tag">৫.১</span> API Gateway Module Structure</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>services/api-gateway-node/src/</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>services/api-gateway-node/src/
+├── create-app.ts          # Express app, Helmet, CORS, rate limit
+├── modules/
+│   ├── auth/              # login, refresh, register
+│   ├── admin-unit/        # hierarchy CRUD
+│   ├── kpi/               # KPI definitions + records
+│   ├── project/           # projects + milestones
+│   ├── alert/              # red flag alerts
+│   ├── dashboard/          # aggregated dashboard data
+│   ├── intelligence/       # proxy to AI (heatmap, predictive...)
+│   ├── sovereign/          # sovereign LLM proxy
+│   ├── blockchain/         # Fabric client + retry worker
+│   ├── public-feed/        # 333/999 streams
+│   └── ...
+├── core/
+│   ├── database/prisma.client.ts   # write + read split
+│   ├── cache/redis-cache.service.ts
+│   ├── auth/jwt-session.service.ts
+│   └── messaging/gov-queue.consumer.ts
+└── socket/socket.server.ts         # Redis adapter</pre>
+      </div>
+      <p class="sec-intro">Registered modules: <span class="mono">services/api-gateway-node/src/modules/register-modules.ts</span></p>
+
+      <h3 class="sub-head"><span class="tag">৫.২</span> AI Service Module Structure</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>services/ai-analytics-python/app/</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>services/ai-analytics-python/app/
+├── main.py                # FastAPI lifespan, worker startup
+├── api/router.py          # all module routers
+├── modules/
+│   ├── sentiment/          # Bangla-BERT inference
+│   ├── arbitrage/           # scrape + cache + worker
+│   ├── sovereign_llm/       # Ollama client
+│   ├── documents/            # document intelligence
+│   └── ...
+├── ml/ollama_client.py    # local LLM calls
+└── infrastructure/messaging/consumer.py  # RabbitMQ worker</pre>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৫.৩</span> Database Read / Write Split</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>core/database/prisma.client.ts</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>DATABASE_URL        → PgBouncer geoinsight_write → Primary PostgreSQL
+DATABASE_READ_URL   → PgBouncer geoinsight_read  → Read Replica
+DIRECT_DATABASE_URL → Primary (Prisma migrations only)
+
+prismaWrite  → mutations (INSERT / UPDATE / DELETE)
+prismaRead   → analytics, dashboards, heavy SELECT</pre>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৫.৪</span> Auth Flow</h3>
+      <div class="timeline">
+        <div class="tl-step" data-n="1"><div class="tl-body"><b>Login</b> — <span class="mono">POST /api/auth/login</span> (Next.js) → <span class="mono">POST /api/v1/auth/login</span> (Gateway) → bcrypt verify → issue accessToken + refreshToken → set HTTP-only cookies <span class="mono">gi_access_token</span>, <span class="mono">gi_refresh_token</span></div></div>
+        <div class="tl-step" data-n="2"><div class="tl-body"><b>Authenticated call</b> — <span class="mono">GET /api/proxy/kpis/definitions</span> (Next.js) → read cookie → <span class="mono">Authorization: Bearer &lt;token&gt;</span> → Gateway <span class="mono">authenticate()</span> → <span class="mono">rbac.authorize()</span> → Prisma query</div></div>
+        <div class="tl-step" data-n="3"><div class="tl-body"><b>Token refresh</b> — <span class="mono">POST /api/auth/refresh</span> → hash verify <span class="mono">refresh_tokens</span> table → rotate → new cookies</div></div>
+        <div class="tl-step" data-n="4"><div class="tl-body"><b>Logout / Revoke</b> — JWT <span class="mono">jti</span> → Redis denylist; <span class="mono">refresh_tokens.revoked_at = now()</span></div></div>
+      </div>
+      <p class="sec-intro">BFF routes: <span class="mono">web/dashboard-nextjs/src/app/api/auth/</span>, <span class="mono">web/dashboard-nextjs/src/app/api/proxy/</span></p>
+
+      <h3 class="sub-head"><span class="tag">৫.৫</span> RBAC Scope Logic</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>rbac.authorize()</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>PMO            → admin_unit_id = NULL → সব unit access
+MINISTER       → DIVISION level unit
+DC             → DISTRICT level unit
+UNION_CHAIRMAN → UNION level unit
+
+authorize(targetAdminUnitId):
+  userScopeChain = Redis cache (admin hierarchy)
+  target must be descendant of user's unit</pre>
+      </div>
+      <p class="sec-intro">Schema: <span class="mono">services/api-gateway-node/prisma/schema.prisma</span> — <span class="mono">UserRole</span>, <span class="mono">RolePermission</span></p>
+
+      <h3 class="sub-head"><span class="tag">৫.৬</span> Real-time Event Pipeline</h3>
+      <div class="timeline">
+        <div class="tl-step" data-n="1"><div class="tl-body">KPI update হয় DB-তে</div></div>
+        <div class="tl-step" data-n="2"><div class="tl-body">Gateway publish করে <span class="mono">{ type: "kpi_update", adminUnitId, payload }</span> → <span class="mono">geoinsight_exchange</span> (routing: <span class="mono">gov.kpi.update</span>)</div></div>
+        <div class="tl-step" data-n="3"><div class="tl-body"><span class="mono">gov_core_queue</span> consumer receive করে</div></div>
+        <div class="tl-step" data-n="4"><div class="tl-body"><span class="mono">broadcastToHierarchy(adminUnitId, event)</span> চলে</div></div>
+        <div class="tl-step" data-n="5"><div class="tl-body">Socket.io rooms: <span class="mono">unit:{id}</span>, <span class="mono">division:{id}</span>, <span class="mono">national</span></div></div>
+        <div class="tl-step" data-n="6"><div class="tl-body">Dashboard hooks re-fetch করে (<span class="mono">use-anomaly-feed</span>, <span class="mono">use-module-data</span>)</div></div>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৫.৭</span> Frontend BFF Routes</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Route</th><th>Purpose</th></tr>
+          <tr><td class="k mono">/api/auth/login</td><td>Gateway auth</td></tr>
+          <tr><td class="k mono">/api/auth/refresh</td><td>Token rotation</td></tr>
+          <tr><td class="k mono">/api/auth/logout</td><td>Revoke + clear cookies</td></tr>
+          <tr><td class="k mono">/api/auth/socket-token</td><td>WebSocket JWT</td></tr>
+          <tr><td class="k mono">/api/proxy/[...path]</td><td>Gateway /api/v1/*</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 6 ============ -->
+    <section id="s6">
+      <div class="sec-head"><span class="sec-num">০৬</span><h2>ERD — Entity Relationship Diagram</h2></div>
+      <p class="sec-intro">Source of truth: <span class="mono">services/api-gateway-node/prisma/schema.prisma</span></p>
+
+      <div class="erd-domain">
+        <div class="dom-label">Admin & Identity</div>
+        <div class="erd-grid">
+          <div class="ent"><div class="ent-head">AdminUnit</div><div class="ent-body">
+            <div class="fld"><span class="pk">id</span><span>uuid PK</span></div>
+            <div class="fld"><span>code</span><span>varchar</span></div>
+            <div class="fld"><span>name</span><span>varchar</span></div>
+            <div class="fld"><span>type</span><span>enum</span></div>
+            <div class="fld"><span class="fk">parent_id</span><span>uuid FK</span></div>
+            <div class="fld"><span>division_id / district_id / upazila_id</span><span>uuid</span></div>
+            <div class="fld"><span>geo_json</span><span>json</span></div>
+          </div></div>
+          <div class="ent"><div class="ent-head">User</div><div class="ent-body">
+            <div class="fld"><span class="pk">id</span><span>uuid PK</span></div>
+            <div class="fld"><span>email</span><span>varchar UK</span></div>
+            <div class="fld"><span>password_hash</span><span>varchar</span></div>
+            <div class="fld"><span>role</span><span>enum</span></div>
+            <div class="fld"><span class="fk">admin_unit_id</span><span>uuid FK</span></div>
+          </div></div>
+          <div class="ent"><div class="ent-head">RolePermission</div><div class="ent-body">
+            <div class="fld"><span class="pk">id</span><span>uuid PK</span></div>
+            <div class="fld"><span>role</span><span>enum</span></div>
+            <div class="fld"><span>resource</span><span>varchar</span></div>
+            <div class="fld"><span>action</span><span>enum</span></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="erd-domain">
+        <div class="dom-label">Representatives & KPI</div>
+        <div class="erd-grid">
+          <div class="ent"><div class="ent-head">Representative</div><div class="ent-body">
+            <div class="fld"><span class="pk">id</span><span>uuid PK</span></div>
+            <div class="fld"><span>nid</span><span>varchar UK</span></div>
+            <div class="fld"><span>role</span><span>enum</span></div>
+            <div class="fld"><span class="fk">admin_unit_id</span><span>uuid FK</span></div>
+          </div></div>
+          <div class="ent"><div class="ent-head">KpiDefinition</div><div class="ent-body">
+            <div class="fld"><span class="pk">id</span><span>uuid PK</span></div>
+            <div class="fld"><span>code</span><span>varchar UK</span></div>
+            <div class="fld"><span>applies_to</span><span>enum</span></div>
+          </div></div>
+          <div class="ent"><div class="ent-head">KpiRecord</div><div class="ent-body">
+            <div class="fld"><span class="pk">id</span><span>uuid PK</span></div>
+            <div class="fld"><span>value</span><span>decimal</span></div>
+            <div class="fld"><span>status</span><span>enum</span></div>
+            <div class="fld"><span>blockchain_hash</span><span>varchar</span></div>
+            <div class="fld"><span class="fk">representative_id</span><span>uuid FK</span></div>
+            <div class="fld"><span class="fk">kpi_def_id</span><span>uuid FK</span></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="erd-domain">
+        <div class="dom-label">Projects, Alerts & Blockchain</div>
+        <div class="erd-grid">
+          <div class="ent"><div class="ent-head">Project</div><div class="ent-body">
+            <div class="fld"><span class="pk">id</span><span>uuid PK</span></div>
+            <div class="fld"><span>budget_allocated</span><span>decimal</span></div>
+            <div class="fld"><span>budget_spent</span><span>decimal</span></div>
+            <div class="fld"><span>status</span><span>enum</span></div>
+            <div class="fld"><span>blockchain_tx</span><span>varchar</span></div>
+            <div class="fld"><span class="fk">admin_unit_id</span><span>uuid FK</span></div>
+          </div></div>
+          <div class="ent"><div class="ent-head">RedFlagAlert</div><div class="ent-body">
+            <div class="fld"><span class="pk">id</span><span>uuid PK</span></div>
+            <div class="fld"><span>flag_type</span><span>enum</span></div>
+            <div class="fld"><span>severity</span><span>int</span></div>
+            <div class="fld"><span>ai_explanation</span><span>text</span></div>
+            <div class="fld"><span class="fk">project_id</span><span>uuid FK</span></div>
+            <div class="fld"><span class="fk">resolved_by</span><span>uuid FK</span></div>
+          </div></div>
+          <div class="ent"><div class="ent-head">BlockchainMilestoneQueue</div><div class="ent-body">
+            <div class="fld"><span class="pk">id</span><span>uuid PK</span></div>
+            <div class="fld"><span>status</span><span>enum</span></div>
+            <div class="fld"><span>payload_hash</span><span>varchar UK</span></div>
+            <div class="fld"><span class="fk">project_id</span><span>uuid FK</span></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="erd-domain">
+        <div class="dom-label">Agro-Economic & Audit</div>
+        <div class="erd-grid">
+          <div class="ent"><div class="ent-head">CommodityPriceLog</div><div class="ent-body">
+            <div class="fld"><span class="pk">id, created_at</span><span>composite PK</span></div>
+            <div class="fld"><span>commodity_code</span><span>varchar</span></div>
+            <div class="fld"><span>country_code</span><span>char</span></div>
+            <div class="fld"><span>unit_price_usd</span><span>decimal</span></div>
+            <div class="fld"><span>landed_cost_usd</span><span>decimal</span></div>
+          </div></div>
+          <div class="ent"><div class="ent-head">AgroMarket</div><div class="ent-body">
+            <div class="fld"><span class="pk">id</span><span>uuid PK</span></div>
+            <div class="fld"><span>lat / lng</span><span>float</span></div>
+            <div class="fld"><span>type</span><span>enum</span></div>
+            <div class="fld"><span class="fk">admin_unit_id</span><span>uuid FK</span></div>
+          </div></div>
+          <div class="ent"><div class="ent-head">AuditLog</div><div class="ent-body">
+            <div class="fld"><span class="pk">id</span><span>bigint PK</span></div>
+            <div class="fld"><span>action</span><span>varchar</span></div>
+            <div class="fld"><span>old_value / new_value</span><span>json</span></div>
+            <div class="fld"><span class="fk">user_id</span><span>uuid FK</span></div>
+          </div></div>
+        </div>
+      </div>
+
+      <ul class="rel-list">
+        <li><b>AdminUnit ↔ AdminUnit</b> — self-referencing parent-child hierarchy, denormalized ancestor IDs (trigger-maintained)</li>
+        <li><b>AdminUnit → User / Representative / Project / AgroMarket / CommodityPriceLog</b> — scoping ও location relations</li>
+        <li><b>Representative → KpiRecord</b> — measured by; <b>KpiDefinition → KpiRecord</b> — defines</li>
+        <li><b>Project → RedFlagAlert</b> — triggers; <b>Project → BlockchainMilestoneQueue</b> — queued for anchoring</li>
+        <li><b>CommodityPriceLog</b> — TimescaleDB hypertable (<span class="mono">prisma/migrations/20250627150000_timescale_commodity_perf/</span>)</li>
+        <li><b>RolePermission</b> — static RBAC matrix (role × resource × action)</li>
+        <li><b>RefreshToken</b> — hashed token storage, rotation support</li>
+      </ul>
+    </section>
+
+    <!-- ============ 7 ============ -->
+    <section id="s7">
+      <div class="sec-head"><span class="sec-num">০৭</span><h2>Tech Stack — কেন কোনটা? কোন সমস্যা সমাধান করে?</h2></div>
+
+      <h3 class="sub-head"><span class="tag">৭.১</span> Application Layer</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Technology</th><th>কেন ব্যবহার করছি</th><th>কোন সমস্যা সমাধান করে</th></tr>
+          <tr><td class="k">Next.js 15</td><td>React SSR/SSG, App Router, API routes</td><td>Fast dashboard, BFF pattern, SEO, i18n</td></tr>
+          <tr><td class="k">Express + TS</td><td>Mature REST ecosystem, team familiarity</td><td>Type-safe API gateway, modular routing</td></tr>
+          <tr><td class="k">FastAPI (Python)</td><td>Async, auto OpenAPI, ML ecosystem</td><td>AI/ML workloads Python-এ সহজ</td></tr>
+          <tr><td class="k">Prisma</td><td>Type-safe ORM, migrations</td><td>Schema versioning, read/write split support</td></tr>
+          <tr><td class="k">Tailwind + Radix UI</td><td>Utility CSS + accessible components</td><td>Consistent gov-grade UI</td></tr>
+          <tr><td class="k">Leaflet</td><td>Open-source maps</td><td>Bangladesh choropleth — Google Maps dependency ছাড়া</td></tr>
+          <tr><td class="k">Recharts</td><td>React charts</td><td>KPI / budget visualization</td></tr>
+          <tr><td class="k">next-intl</td><td>i18n</td><td>Bangla + English bilingual dashboard</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৭.২</span> Data & Storage</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Technology</th><th>কেন ব্যবহার করছি</th><th>কোন সমস্যা সমাধান করে</th></tr>
+          <tr><td class="k">PostgreSQL 16</td><td>ACID, JSON, mature</td><td>Relational governance data integrity</td></tr>
+          <tr><td class="k">TimescaleDB</td><td>PostgreSQL extension, hypertables</td><td>Commodity time-series — লাখো row-এও fast query/retention</td></tr>
+          <tr><td class="k">PgBouncer</td><td>Connection pooling (transaction mode)</td><td>Node.js short-connection → DB overload আটকানো</td></tr>
+          <tr><td class="k">Read Replica</td><td>Streaming replication</td><td>Dashboard analytics primary DB-কে block করে না</td></tr>
+          <tr><td class="k">Redis 7</td><td>In-memory, pub/sub, TTL</td><td>নিচে বিস্তারিত ৭.৩-এ</td></tr>
+          <tr><td class="k">MinIO</td><td>S3-compatible, self-hosted</td><td>Cloud S3 ছাড়াই storage — data sovereignty</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৭.৩</span> Redis — ৫টি Use Case</h3>
+      <div class="uc-grid">
+        <div class="uc-card"><div class="uc-title"><span class="ucn">1</span>JWT Denylist</div><p class="lbl">Problem</p><p>Stateless JWT logout করলেও token valid থাকে</p><p class="lbl">Solution</p><p>revoked jti → Redis TTL = token expiry</p></div>
+        <div class="uc-card"><div class="uc-title"><span class="ucn">2</span>Rate Limiting</div><p class="lbl">Problem</p><p>Public 333/999 feeds DDoS target</p><p class="lbl">Solution</p><p>rate-limit-redis → per-IP sliding window</p></div>
+        <div class="uc-card"><div class="uc-title"><span class="ucn">3</span>Admin Hierarchy Cache</div><p class="lbl">Problem</p><p>RBAC scope check = recursive tree walk</p><p class="lbl">Solution</p><p>Admin unit chain cached, O(1) lookup</p></div>
+        <div class="uc-card"><div class="uc-title"><span class="ucn">4</span>Socket.io Adapter</div><p class="lbl">Problem</p><p>Multiple gateway instances = rooms split</p><p class="lbl">Solution</p><p>Redis pub/sub → all instances same rooms</p></div>
+        <div class="uc-card"><div class="uc-title"><span class="ucn">5</span>Arbitrage Cache</div><p class="lbl">Problem</p><p>Global price scrape expensive (৫min cycle)</p><p class="lbl">Solution</p><p>TTL cache (3600s) → fast heatmap response</p></div>
+      </div>
+      <p class="sec-intro">Key files: <span class="mono">jwt-session.service.ts</span>, <span class="mono">rate-limiter.middleware.ts</span>, <span class="mono">admin-scope.service.ts</span>, <span class="mono">socket.server.ts</span></p>
+
+      <h3 class="sub-head"><span class="tag">৭.৪</span> RabbitMQ — কেন?</h3>
+      <div class="uc-grid">
+        <div class="uc-card rmq"><div class="uc-title"><span class="ucn">1</span>Async AI Jobs</div><p class="lbl">Problem</p><p>Sentiment / arbitrage / risk = seconds-long</p><p class="lbl">Solution</p><p>Queue → AI worker background-এ process করে</p></div>
+        <div class="uc-card rmq"><div class="uc-title"><span class="ucn">2</span>Service Decoupling</div><p class="lbl">Problem</p><p>Gateway সরাসরি AI call = tight coupling</p><p class="lbl">Solution</p><p>Topic exchange → routing by event type</p></div>
+        <div class="uc-card rmq"><div class="uc-title"><span class="ucn">3</span>Real-time Fan-out</div><p class="lbl">Problem</p><p>KPI update → many dashboard clients</p><p class="lbl">Solution</p><p>gov_core_queue → Socket.io broadcast</p></div>
+        <div class="uc-card rmq"><div class="uc-title"><span class="ucn">4</span>Durability & Retry</div><p class="lbl">Problem</p><p>AI service down = lost jobs</p><p class="lbl">Solution</p><p>Durable queues, message persistence</p></div>
+        <div class="uc-card rmq"><div class="uc-title"><span class="ucn">5</span>Load Leveling</div><p class="lbl">Problem</p><p>Spike in sentiment batches</p><p class="lbl">Solution</p><p>Queue buffers → worker pool (size: 4)</p></div>
+      </div>
+
+      <div class="diagram" style="text-align:center; padding:26px 22px;">
+        <div style="display:flex; justify-content:center; gap:0; align-items:center; flex-wrap:wrap;">
+          <div style="padding:14px 22px; border:1px solid var(--teal); border-radius:10px; font-family:var(--mono); font-size:.85rem; color:var(--teal-deep); background:rgba(14,92,87,.06);">Redis<br><span style="font-size:.7rem; color:var(--ink-soft);">fast cache + pub/sub</span></div>
+          <div style="width:60px; text-align:center; font-family:var(--mono); color:var(--ink-soft); font-size:.75rem;">vs</div>
+          <div style="padding:14px 22px; border:1px solid var(--gold); border-radius:10px; font-family:var(--mono); font-size:.85rem; color:var(--teal-deep); background:rgba(185,135,60,.08);">RabbitMQ<br><span style="font-size:.7rem; color:var(--ink-soft);">reliable delivery + durability</span></div>
+        </div>
+        <p class="diagram-caption" style="margin-top:16px;">ephemeral speed vs durable routing — আলাদা দায়িত্ব</p>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৭.৫</span> AI / ML Stack</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Technology</th><th>কেন</th><th>কোন সমস্যা সমাধান করে</th></tr>
+          <tr><td class="k">Bangla-BERT</td><td>Pre-trained Bangla NLP</td><td>English model Bangla 333/999 text বুঝে না</td></tr>
+          <tr><td class="k">Ollama + llama3.1:8b</td><td>Local LLM, no cloud API</td><td>Data sovereignty — citizen data বাইরে যায় না</td></tr>
+          <tr><td class="k">PyTorch + Transformers</td><td>Industry standard ML</td><td>Model loading, inference pipeline</td></tr>
+          <tr><td class="k">HuggingFace offline</td><td>Tier-4 air-gapped deploy</td><td>Production-এ internet ছাড়াই model serve</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৭.৬</span> Blockchain</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Technology</th><th>কেন</th><th>কোন সমস্যা সমাধান করে</th></tr>
+          <tr><td class="k">Hyperledger Fabric</td><td>Permissioned enterprise blockchain</td><td>Public chain-এ sensitive gov data যায় না; milestone immutability</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৭.৭</span> Infrastructure & Ops</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Technology</th><th>কেন</th><th>কোন সমস্যা সমাধান করে</th></tr>
+          <tr><td class="k">Docker Compose</td><td>Multi-service local + prod parity</td><td>"Works on my machine" problem eliminate করা</td></tr>
+          <tr><td class="k">nginx</td><td>Reverse proxy, TLS, CSP, rate limit</td><td>Production edge security (Tier-4 NDC)</td></tr>
+          <tr><td class="k">Prometheus + Grafana</td><td>Metrics collection + visualization</td><td>Gateway/AI /metrics endpoint monitor</td></tr>
+          <tr><td class="k">Alertmanager</td><td>Alert routing</td><td>DB down, high latency notification</td></tr>
+          <tr><td class="k">GitHub Actions + GHCR</td><td>CI/CD pipeline</td><td>Auto test → build → deploy VPS</td></tr>
+          <tr><td class="k">Locust</td><td>Load testing</td><td>Public feed / gateway capacity verify</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৭.৮</span> Security Stack</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Technology</th><th>কেন</th><th>কোন সমস্যা সমাধান করে</th></tr>
+          <tr><td class="k">HTTP-only cookies</td><td>XSS থেকে token চুরি রোধ</td><td>localStorage vulnerable</td></tr>
+          <tr><td class="k">bcrypt (12 rounds)</td><td>Password hashing</td><td>Plain text password store না করা</td></tr>
+          <tr><td class="k">Helmet</td><td>Security headers</td><td>XSS, clickjacking protection</td></tr>
+          <tr><td class="k">Zod validation</td><td>Runtime schema validation</td><td>Invalid input reject</td></tr>
+          <tr><td class="k">JWT short TTL + refresh</td><td>Compromised token window ছোট রাখা</td><td>15min access, 7day refresh</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 8 ============ -->
+    <section id="s8">
+      <div class="sec-head"><span class="sec-num">০৮</span><h2>Security Architecture</h2></div>
+      <div class="diagram">
+        <svg viewBox="0 0 900 260" width="100%">
+          <defs>
+            <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#4C5C53"/>
+            </marker>
+          </defs>
+          <!-- Edge -->
+          <rect x="20" y="90" width="140" height="70" rx="10" fill="#0A3A38"/>
+          <text x="90" y="120" text-anchor="middle" fill="#fff" font-family="IBM Plex Mono" font-size="11">nginx</text>
+          <text x="90" y="138" text-anchor="middle" fill="#B9E0D4" font-family="IBM Plex Mono" font-size="9">TLS + CSP + Rate Limit</text>
+
+          <!-- App security chain -->
+          <rect x="205" y="30" width="130" height="46" rx="8" fill="#fff" stroke="#0E5C57"/>
+          <text x="270" y="58" text-anchor="middle" font-family="IBM Plex Mono" font-size="10.5">BFF (Next.js)</text>
+          <rect x="205" y="90" width="130" height="46" rx="8" fill="#fff" stroke="#0E5C57"/>
+          <text x="270" y="118" text-anchor="middle" font-family="IBM Plex Mono" font-size="10.5">JWT 15m + Refresh 7d</text>
+          <rect x="205" y="150" width="130" height="46" rx="8" fill="#fff" stroke="#0E5C57"/>
+          <text x="270" y="178" text-anchor="middle" font-family="IBM Plex Mono" font-size="10.5">RBAC + Scope</text>
+          <rect x="380" y="90" width="130" height="46" rx="8" fill="#fff" stroke="#0E5C57"/>
+          <text x="445" y="118" text-anchor="middle" font-family="IBM Plex Mono" font-size="10.5">Audit Log</text>
+
+          <!-- data security -->
+          <rect x="560" y="20" width="150" height="44" rx="8" fill="#B8433A" opacity=".9"/>
+          <text x="635" y="47" text-anchor="middle" fill="#fff" font-family="IBM Plex Mono" font-size="10">JWT Denylist</text>
+          <rect x="560" y="76" width="150" height="44" rx="8" fill="#B9873C" opacity=".9"/>
+          <text x="635" y="103" text-anchor="middle" fill="#fff" font-family="IBM Plex Mono" font-size="10">bcrypt passwords</text>
+          <rect x="560" y="132" width="150" height="44" rx="8" fill="#0E5C57" opacity=".9"/>
+          <text x="635" y="159" text-anchor="middle" fill="#fff" font-family="IBM Plex Mono" font-size="10">Private MinIO bucket</text>
+          <rect x="560" y="188" width="150" height="44" rx="8" fill="#0A3A38" opacity=".95"/>
+          <text x="635" y="215" text-anchor="middle" fill="#fff" font-family="IBM Plex Mono" font-size="10">Ollama on-prem</text>
+
+          <path d="M160,125 L203,53" stroke="#4C5C53" fill="none" marker-end="url(#arrow2)"/>
+          <path d="M160,125 L203,113" stroke="#4C5C53" fill="none" marker-end="url(#arrow2)"/>
+          <path d="M270,76 L270,88" stroke="#4C5C53" fill="none" marker-end="url(#arrow2)"/>
+          <path d="M270,136 L270,148" stroke="#4C5C53" fill="none" marker-end="url(#arrow2)"/>
+          <path d="M335,113 L378,113" stroke="#4C5C53" fill="none" marker-end="url(#arrow2)"/>
+          <path d="M335,113 L558,42" stroke="#4C5C53" fill="none" marker-end="url(#arrow2)"/>
+          <path d="M270,26 L270,10 L636,10 L636,18" stroke="#4C5C53" fill="none" marker-end="url(#arrow2)"/>
+          <path d="M335,175 L558,150" stroke="#4C5C53" fill="none" marker-end="url(#arrow2)"/>
+          <path d="M270,150 L270,145 L636,208 L636,186" stroke="#4C5C53" fill="none" marker-end="url(#arrow2)" opacity=".5"/>
+        </svg>
+        <div class="diagram-caption">nginx → BFF → JWT → RBAC → Audit, branching into JWT Denylist / bcrypt / MinIO / Ollama on-prem</div>
+      </div>
+      <p class="sec-intro">Tier-4 sovereignty config: <span class="mono">deploy/security/tier4-sovereignty.env.example</span></p>
+    </section>
+
+    <!-- ============ 9 ============ -->
+    <section id="s9">
+      <div class="sec-head"><span class="sec-num">০৯</span><h2>Observability Architecture</h2></div>
+      <div class="code-block">
+        <div class="cb-bar"><span>prometheus scrape targets</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>Prometheus scrapes:
+  - api-gateway:4000/metrics
+  - ai-analytics:8000/metrics
+  - postgres-exporter, redis-exporter, node-exporter, cAdvisor
+
+Grafana dashboard: deploy/observability/grafana/dashboards/geoinsight-platform.json
+Alerts: deploy/observability/prometheus/alerts/geoinsight.rules.yml</pre>
+      </div>
+      <div class="code-block">
+        <div class="cb-bar"><span>start observability stack</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>docker compose -f docker-compose.observability.yml up -d</pre>
+      </div>
+    </section>
+
+    <!-- ============ 10 ============ -->
+    <section id="s10">
+      <div class="sec-head"><span class="sec-num">১০</span><h2>Data Flow — End-to-End Example (Arbitrage Heatmap)</h2></div>
+      <div class="timeline">
+        <div class="tl-step" data-n="1"><div class="tl-body">AI Worker (every 300s) scrapes global commodity prices</div></div>
+        <div class="tl-step" data-n="2"><div class="tl-body">Results → Redis cache (TTL 3600s) + TimescaleDB hypertable</div></div>
+        <div class="tl-step" data-n="3"><div class="tl-body">User opens Arbitrage Heatmap on Dashboard</div></div>
+        <div class="tl-step" data-n="4"><div class="tl-body">Browser → <span class="mono">/api/proxy/intelligence/arbitrage</span> → Gateway</div></div>
+        <div class="tl-step" data-n="5"><div class="tl-body">Gateway → HTTP GET <span class="mono">AI /api/v1/arbitrage/heatmap</span></div></div>
+        <div class="tl-step" data-n="6"><div class="tl-body">AI reads Redis cache (hit) → returns JSON</div></div>
+        <div class="tl-step" data-n="7"><div class="tl-body">Dashboard Leaflet choropleth renders landed cost overlay</div></div>
+      </div>
+    </section>
+
+    <!-- ============ 11 ============ -->
+    <section id="s11">
+      <div class="sec-head"><span class="sec-num">১১</span><h2>Monorepo Structure</h2></div>
+      <div class="code-block">
+        <div class="cb-bar"><span>geoinsight-bd/</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>geoinsight-bd/
+├── docs/
+│   ├── README.md               # Docs hub
+│   ├── SYSTEM_DESIGN.md        # এই ফাইল
+│   ├── DEPLOYMENT_AND_OPS.md   # CI/CD + VPS
+│   └── OLLAMA_PRODUCTION.md
+├── web/dashboard-nextjs/       # Frontend + BFF
+├── services/
+│   ├── api-gateway-node/       # Core API + DB + Socket.io
+│   └── ai-analytics-python/    # ML / NLP / LLM
+├── deploy/
+│   ├── init/                   # Postgres, RabbitMQ, MinIO init
+│   ├── nginx/                  # Production edge
+│   ├── observability/          # Prometheus, Grafana
+│   ├── hyperledger/            # Fabric connection profile
+│   ├── scripts/seed/           # National BD data seeds
+│   └── security/               # Tier-4 sovereignty config
+├── load-tests/                 # Locust scenarios
+├── docker-compose.yml          # Infra
+├── docker-compose.apps.yml     # Apps overlay
+├── docker-compose.vps.yml      # Slim Hostinger profile
+└── docker-compose.ollama.yml   # Dedicated Ollama server</pre>
+      </div>
+      <p class="muted" style="margin-top:12px;">Canonical markdown → <span class="mono">docs/SYSTEM_DESIGN.md</span> · hub → <span class="mono">docs/README.md</span></p>
+    </section>
+
+    <!-- ============ 12 ============ -->
+    <section id="s12">
+      <div class="sec-head"><span class="sec-num">১২</span><h2>Service Ports Reference</h2></div>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Service</th><th>Host (local .env.example)</th><th>Internal</th></tr>
+          <tr><td class="k">Dashboard</td><td class="mono">3000</td><td class="mono">3000</td></tr>
+          <tr><td class="k">API Gateway</td><td class="mono">4800</td><td class="mono">4000</td></tr>
+          <tr><td class="k">AI Analytics</td><td class="mono">(not published)</td><td class="mono">8000</td></tr>
+          <tr><td class="k">PostgreSQL</td><td class="mono">55432</td><td class="mono">5432</td></tr>
+          <tr><td class="k">PgBouncer</td><td class="mono">6432</td><td class="mono">6432</td></tr>
+          <tr><td class="k">Redis</td><td class="mono">6379</td><td class="mono">6379</td></tr>
+          <tr><td class="k">RabbitMQ AMQP / Mgmt</td><td class="mono">5672 / 15672</td><td class="mono">same</td></tr>
+          <tr><td class="k">MinIO API / Console</td><td class="mono">19000 / 19001</td><td class="mono">9000 / 9001</td></tr>
+          <tr><td class="k">Ollama</td><td class="mono">11434</td><td class="mono">11434</td></tr>
+          <tr><td class="k">Prometheus</td><td class="mono">9090</td><td class="mono">9090</td></tr>
+          <tr><td class="k">Grafana</td><td class="mono">3002</td><td class="mono">3002</td></tr>
+          <tr><td class="k">nginx</td><td class="mono">80 / 443</td><td class="mono">80 / 443</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 13 ============ -->
+    <section id="s13">
+      <div class="sec-head"><span class="sec-num">১৩</span><h2>Architecture Decision Summary (ADR)</h2></div>
+      <div class="tbl-wrap">
+        <table class="dtable adr">
+          <tr><th>Decision</th><th>Alternative</th><th>কেন এটা বেছে নেওয়া হয়েছে</th></tr>
+          <tr><td class="dec">Monorepo microservices</td><td class="alt">Single monolith</td><td>AI compute আলাদা scale করা যায়; Python + Node best-of-breed</td></tr>
+          <tr><td class="dec">BFF pattern</td><td class="alt">Direct browser → Gateway</td><td>JWT security; same-origin cookies</td></tr>
+          <tr><td class="dec">TimescaleDB</td><td class="alt">Plain PostgreSQL</td><td>Commodity time-series performance</td></tr>
+          <tr><td class="dec">Redis + RabbitMQ</td><td class="alt">শুধু Redis</td><td>Cache vs reliable async — আলাদা দায়িত্ব</td></tr>
+          <tr><td class="dec">Ollama on-prem</td><td class="alt">OpenAI API</td><td>Bangladesh data sovereignty (Tier-4 NDC)</td></tr>
+          <tr><td class="dec">PgBouncer + Replica</td><td class="alt">Direct DB</td><td>Connection exhaustion + read scaling</td></tr>
+          <tr><td class="dec">Socket.io</td><td class="alt">SSE / Polling</td><td>Bi-directional real-time + room-based scope</td></tr>
+          <tr><td class="dec">Hyperledger (optional)</td><td class="alt">Public blockchain</td><td>Permissioned gov data anchoring</td></tr>
+          <tr><td class="dec">OpenCV embeddings (not dlib)</td><td class="alt">face_recognition / dlib</td><td>Docker-friendly CPU; VIP gallery contract</td></tr>
+          <tr><td class="dec">Shapely geo-fence (+ pure fallback)</td><td class="alt">Haversine circles only</td><td>Campus polygons; Windows without GEOS still runs</td></tr>
+          <tr><td class="dec">Phishing HTML fingerprints</td><td class="alt">Blocklists only</td><td>Lookalike chrome on non-gov → RED_FLAG</td></tr>
+          <tr><td class="dec">Ethical card = Node Prisma + AI match</td><td class="alt">All-in Python DB</td><td>Accountability pattern; RBAC at gateway</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head" style="margin-top:44px;">Related Documentation</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Document</th><th>Location</th></tr>
+          <tr><td class="k">Docs index</td><td class="mono">docs/README.md</td></tr>
+          <tr><td class="k">Setup & quick start</td><td class="mono">README.md</td></tr>
+          <tr><td class="k">CI/CD, VPS deploy, Ollama approach</td><td class="mono">docs/DEPLOYMENT_AND_OPS.md</td></tr>
+          <tr><td class="k">Ollama production setup</td><td class="mono">docs/OLLAMA_PRODUCTION.md</td></tr>
+          <tr><td class="k">Environment variables</td><td class="mono">.env.example</td></tr>
+          <tr><td class="k">Tier-4 sovereignty</td><td class="mono">deploy/security/tier4-sovereignty.env.example</td></tr>
+          <tr><td class="k">Database schema</td><td class="mono">services/api-gateway-node/prisma/schema.prisma</td></tr>
+          <tr><td class="k">RabbitMQ topology</td><td class="mono">deploy/init/rabbitmq/definitions.json</td></tr>
+          <tr><td class="k">Nginx edge config</td><td class="mono">deploy/nginx/nginx.conf</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <span>GeoInsight BD — National Governance Intelligence Platform</span>
+      <span class="mono">System Design Documentation · v1</span>
+    </footer>
+
+  </main>
+</div>
+
+</body>
+</html>

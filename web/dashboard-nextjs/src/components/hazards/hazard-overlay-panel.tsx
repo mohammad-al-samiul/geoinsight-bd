@@ -213,20 +213,32 @@ export function HazardOverlayPanel() {
               {overlay.zones.map((z) => (
                 <li
                   key={z.zone_id}
-                  className="flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-sm"
+                  className="flex items-start gap-2 rounded-lg border border-border/50 px-3 py-2 text-sm"
                 >
                   {z.hazard_type === "cyclone" ? (
-                    <Wind className="h-4 w-4 text-sky-400" />
+                    <Wind className="mt-0.5 h-4 w-4 shrink-0 text-sky-400" />
                   ) : z.hazard_type === "heat" ? (
-                    <ThermometerSun className="h-4 w-4 text-orange-400" />
+                    <ThermometerSun className="mt-0.5 h-4 w-4 shrink-0 text-orange-400" />
                   ) : (
-                    <CloudRain className="h-4 w-4 text-blue-400" />
+                    <CloudRain className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium">{z.name}</p>
-                    <p className="font-bengali truncate text-xs text-muted-foreground">
-                      {z.name_bn}
+                    <p className="font-medium">
+                      {z.locality || z.name}
+                      {z.district ? (
+                        <span className="ml-1 font-normal text-muted-foreground">
+                          · {z.district}
+                        </span>
+                      ) : null}
                     </p>
+                    <p className="font-bengali truncate text-xs text-muted-foreground">
+                      {z.locality_bn || z.name_bn}
+                    </p>
+                    {z.water_note_bn ? (
+                      <p className="font-bengali mt-0.5 text-[11px] leading-snug text-sky-300/90">
+                        {z.water_note_bn}
+                      </p>
+                    ) : null}
                   </div>
                   <Badge variant="outline" className="shrink-0">
                     L{z.risk_level}

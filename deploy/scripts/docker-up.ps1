@@ -35,7 +35,7 @@ if ($pgPort -eq "5432") {
   Write-Host "NOTE: POSTGRES_PORT=5432 often fails on Windows Hyper-V. Prefer 55432." -ForegroundColor Yellow
 }
 
-$DashboardPort = [int](Get-EnvValue "DASHBOARD_PORT" "3000")
+$DashboardPort = [int](Get-EnvValue "DASHBOARD_PORT" "3600")
 $ApiPort = [int](Get-EnvValue "API_GATEWAY_PORT" "4800")
 
 function Test-DockerDaemon {
@@ -109,10 +109,43 @@ foreach ($port in @($DashboardPort, $ApiPort)) {
 }
 Start-Sleep -Seconds 2
 
+# Failed "recreate" leaves names like cda875fa563e_geoinsight-ai-analytics that block the next up.
+function Clear-GeoInsightContainerConflicts {
+  Write-Host "Clearing stuck/orphan GeoInsight containers (name conflicts)..." -ForegroundColor DarkGray
+  $null = Invoke-DockerCompose -Arguments @("down", "--remove-orphans")
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  $ids = @(docker ps -aq --filter "name=geoinsight" 2>$null)
+  if ($ids.Count -gt 0) {
+    docker rm -f @ids 2>$null | Out-Null
+  }
+  # Rename leftovers: hashprefix_geoinsight-*
+  $stuck = docker ps -a --format "{{.ID}} {{.Names}}" 2>$null |
+    Where-Object { $_ -match "geoinsight" }
+  foreach ($line in $stuck) {
+    $id = ($line -split "\s+")[0]
+    if ($id) { docker rm -f $id 2>$null | Out-Null }
+  }
+  $ErrorActionPreference = $prevEap
+}
+
+$env:DOCKER_BUILDKIT = "1"
+$env:COMPOSE_DOCKER_CLI_BUILD = "1"
+
+Clear-GeoInsightContainerConflicts
+
 Write-Host "Starting GeoInsight BD (Docker full stack)..." -ForegroundColor Cyan
 Write-Host "  Dashboard port: $DashboardPort | API port: $ApiPort" -ForegroundColor DarkGray
+Write-Host "  Tip: AI image uses CPU torch + BuildKit pip cache (no CUDA re-download)." -ForegroundColor DarkGray
+Write-Host "  Tip: Prefer MINIO_API_PORT=19000 in .env if port 9000 is Hyper-V blocked." -ForegroundColor DarkGray
 
 $composeExit = Invoke-DockerCompose -Arguments @("up", "-d", "--build")
+if ($composeExit -ne 0) {
+  Write-Host ""
+  Write-Host "Retrying after force-cleaning name conflicts..." -ForegroundColor Yellow
+  Clear-GeoInsightContainerConflicts
+  $composeExit = Invoke-DockerCompose -Arguments @("up", "-d", "--build")
+}
 if ($composeExit -ne 0) {
   Write-Host ""
   Write-Host "ERROR: docker compose failed (exit $composeExit). Check logs:" -ForegroundColor Red

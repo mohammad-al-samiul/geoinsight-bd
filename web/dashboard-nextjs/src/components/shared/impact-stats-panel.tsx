@@ -22,6 +22,7 @@ import {
   Users,
   HeartPulse,
 } from "lucide-react";
+import { SourceLink } from "@/components/ui/source-link";
 
 export interface DistrictImpactRow {
   district: string;
@@ -44,6 +45,8 @@ export interface EventImpactRow {
   deaths: number;
   injuries: number;
   civilian_deaths?: number;
+  homes_damaged?: number;
+  livestock_lost?: number;
   url?: string | null;
 }
 
@@ -69,6 +72,7 @@ export interface SegmentedImpactStats {
   disclaimer_en?: string;
   disclaimer?: string;
   default_window?: number;
+  place_count?: number;
   windows?: Record<string, Omit<SegmentedImpactStats, "windows" | "default_window">>;
 }
 
@@ -129,6 +133,26 @@ function StatTile({
   );
 }
 
+function hasPlaceLoss(d: DistrictImpactRow) {
+  return (
+    d.district !== "National" &&
+    d.district !== "জাতীয়" &&
+    ((d.deaths ?? 0) > 0 ||
+      (d.injuries ?? 0) > 0 ||
+      (d.homes_damaged ?? 0) > 0 ||
+      (d.livestock_lost ?? 0) > 0)
+  );
+}
+
+function placeSeverity(d: DistrictImpactRow) {
+  return (
+    (d.deaths ?? 0) * 1000 +
+    (d.injuries ?? 0) * 100 +
+    (d.homes_damaged ?? 0) * 10 +
+    Math.min(d.livestock_lost ?? 0, 200)
+  );
+}
+
 const tooltipStyle = {
   background: "#0f172a",
   border: "1px solid #334155",
@@ -157,6 +181,7 @@ export function ImpactStatsPanel({
   const [windowDays, setWindowDays] = useState(
     stats.default_window ?? stats.window_days ?? 7,
   );
+  const [showAllPlaces, setShowAllPlaces] = useState(false);
 
   const active = useMemo(() => {
     const fromWindow = stats.windows?.[String(windowDays)];
@@ -172,45 +197,31 @@ export function ImpactStatsPanel({
     (active.injury_mentions ?? 0) > 0 ||
     active.death_mentions !== undefined;
 
-  const eventChart = useMemo(() => {
-    const rows = active.by_event ?? [];
-    return rows
-      .filter((e) => e.deaths > 0 || e.injuries > 0)
-      .slice(0, 8)
-      .map((e) => ({
-        name: e.label,
-        fullTitle: e.title,
-        district: e.district,
-        day: e.day,
-        [labels.deaths]: e.deaths,
-        [labels.injuries]: e.injuries,
-        deaths: e.deaths,
-        injuries: e.injuries,
-      }))
-      .reverse();
-  }, [active.by_event, labels.deaths, labels.injuries]);
+  const placeRows = useMemo(() => {
+    return [...(active.by_district ?? [])]
+      .filter(hasPlaceLoss)
+      .sort((a, b) => placeSeverity(b) - placeSeverity(a));
+  }, [active.by_district]);
 
-  const districtChart = useMemo(() => {
-    const rows = active.by_district ?? [];
+  const placeChart = useMemo(() => {
+    const rows = showAllPlaces ? placeRows : placeRows.slice(0, 20);
     return rows
-      .filter((d) => d.deaths > 0 || d.injuries > 0)
-      .slice(0, 8)
       .map((d) => ({
-        name:
-          d.district === "National"
-            ? locale === "bn"
-              ? "জাতীয়"
-              : "National"
-            : d.district,
-        deaths: d.deaths,
-        injuries: d.injuries,
+        name: d.district.length > 18 ? `${d.district.slice(0, 16)}…` : d.district,
+        fullName: d.district,
         [labels.deaths]: d.deaths,
         [labels.injuries]: d.injuries,
+        [labels.homes]: d.homes_damaged ?? 0,
+        [labels.livestock]: d.livestock_lost ?? 0,
+        deaths: d.deaths,
+        injuries: d.injuries,
+        homes: d.homes_damaged ?? 0,
+        livestock: d.livestock_lost ?? 0,
       }))
       .reverse();
-  }, [active.by_district, labels.deaths, labels.injuries, locale]);
+  }, [placeRows, showAllPlaces, labels.deaths, labels.injuries, labels.homes, labels.livestock]);
 
-  const chartHeight = Math.max(220, eventChart.length * 42);
+  const chartHeight = Math.max(260, placeChart.length * 36);
 
   return (
     <IntelCard accent="danger" padding="lg" hoverLift={false} className={className}>
@@ -221,9 +232,16 @@ export function ImpactStatsPanel({
           <p className="mt-1.5 text-[10px] text-muted-foreground/90">
             {labels.methodHint ??
               (locale === "bn"
-                ? "পদ্ধতি: জেলা × দিনে সর্বোচ্চ (খবর যোগ নয়)"
-                : "Method: max per district × day (not summed across papers)")}
+                ? "খবরে নাম থাকা সব উপজেলা/জেলা — নিহত, আহত, ঘর, গবাদি পশু (দিনে সর্বোচ্চ)"
+                : "Every named upazila/district from news — deaths, injuries, homes, livestock")}
           </p>
+          {placeRows.length > 0 && (
+            <p className="mt-1 text-[11px] text-sky-300/90">
+              {locale === "bn"
+                ? `${placeRows.length}টি স্থানে ক্ষয়ক্ষতির খবর পাওয়া গেছে`
+                : `${placeRows.length} places with reported impact`}
+            </p>
+          )}
         </div>
 
         {windowKeys.length > 0 && (
@@ -259,7 +277,7 @@ export function ImpactStatsPanel({
       </div>
 
       <p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {labels.estimate ?? (locale === "bn" ? "আনুমানিক ক্ষয়ক্ষতি" : "Conservative estimate")}
+        {labels.estimate ?? (locale === "bn" ? "আনুমানিক মোট ক্ষয়ক্ষতি" : "Conservative estimate")}
       </p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatTile
@@ -300,21 +318,93 @@ export function ImpactStatsPanel({
         />
       </div>
 
-      {eventChart.length > 0 && (
+      {/* Primary: full place table — clearest view of every upazila/district */}
+      {placeRows.length > 0 && (
+        <div className="mt-5">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {labels.byDistrict ??
+                  (locale === "bn" ? "উপজেলা / জেলাভিত্তিক ক্ষয়ক্ষতি" : "Impact by upazila / district")}
+              </p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                {locale === "bn"
+                  ? "বাঁশখালী শুধু উদাহরণ — খবরে যেসব স্থান এসেছে সব এখানে"
+                  : "Banshkhali is only an example — every place named in news appears here"}
+              </p>
+            </div>
+            {placeRows.length > 20 && (
+              <button
+                type="button"
+                onClick={() => setShowAllPlaces((v) => !v)}
+                className="rounded-lg border border-border/60 px-2.5 py-1 text-[11px] text-sky-300 hover:border-sky-500/40"
+              >
+                {showAllPlaces
+                  ? locale === "bn"
+                    ? "কম দেখান"
+                    : "Show less"
+                  : locale === "bn"
+                    ? `সব ${placeRows.length} স্থান`
+                    : `All ${placeRows.length} places`}
+              </button>
+            )}
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-border/50">
+            <table className="w-full min-w-[520px] text-left text-xs">
+              <thead className="bg-background/50 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-semibold">
+                    {locale === "bn" ? "স্থান" : "Place"}
+                  </th>
+                  <th className="px-3 py-2 font-semibold tabular-nums text-red-300">
+                    {labels.deaths}
+                  </th>
+                  <th className="px-3 py-2 font-semibold tabular-nums text-amber-300">
+                    {labels.injuries}
+                  </th>
+                  <th className="px-3 py-2 font-semibold tabular-nums text-sky-300">
+                    {labels.homes}
+                  </th>
+                  <th className="px-3 py-2 font-semibold tabular-nums text-emerald-300">
+                    {labels.livestock}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(showAllPlaces ? placeRows : placeRows.slice(0, 20)).map((d) => (
+                  <tr
+                    key={d.district}
+                    className="border-t border-border/40 odd:bg-background/20"
+                  >
+                    <td className="max-w-[200px] truncate px-3 py-2 font-medium" title={d.district}>
+                      {d.district}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-red-300">{d.deaths}</td>
+                    <td className="px-3 py-2 tabular-nums text-amber-300">{d.injuries}</td>
+                    <td className="px-3 py-2 tabular-nums text-sky-300">
+                      {d.homes_damaged ?? 0}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-emerald-300">
+                      {d.livestock_lost ?? 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {placeChart.length > 0 && (
         <div className="mt-5">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {labels.byEvent ?? (locale === "bn" ? "ঘটনাভিত্তিক নিহত / আহত" : "Casualties by incident")}
-          </p>
-          <p className="mt-1 text-[10px] text-muted-foreground">
-            {labels.byEventHint ??
-              (locale === "bn"
-                ? "প্রতিটি বার = এক জেলা × এক দিনের ঘটনা (খবরের সর্বোচ্চ)"
-                : "Each bar = one district × day incident (max from headlines)")}
+            {locale === "bn" ? "তুলনামূলক চার্ট (৪ সূচক)" : "Comparison chart (4 metrics)"}
           </p>
           <div className="mt-3 rounded-xl border border-border/50 bg-background/30 p-2 sm:p-3">
             <ResponsiveContainer width="100%" height={chartHeight}>
               <BarChart
-                data={eventChart}
+                data={placeChart}
                 layout="vertical"
                 margin={{ left: 8, right: 16, top: 8, bottom: 8 }}
               >
@@ -323,54 +413,27 @@ export function ImpactStatsPanel({
                 <YAxis
                   type="category"
                   dataKey="name"
-                  width={148}
+                  width={110}
                   tick={{ fill: "#cbd5e1", fontSize: 10 }}
                 />
                 <Tooltip
                   contentStyle={tooltipStyle}
                   labelStyle={{ color: "#e2e8f0" }}
-                  formatter={(value, name) => [value, name]}
                   labelFormatter={(_, payload) => {
-                    const row = payload?.[0]?.payload as
-                      | { fullTitle?: string; district?: string; day?: string }
-                      | undefined;
-                    if (!row) return "";
-                    return `${row.fullTitle ?? ""}${row.district ? ` · ${row.district}` : ""}${row.day ? ` · ${row.day}` : ""}`;
+                    const row = payload?.[0]?.payload as { fullName?: string } | undefined;
+                    return row?.fullName ?? "";
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey={labels.deaths} fill="#f87171" radius={[0, 4, 4, 0]} maxBarSize={18} />
-                <Bar dataKey={labels.injuries} fill="#fbbf24" radius={[0, 4, 4, 0]} maxBarSize={18} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {districtChart.length > 0 && (
-        <div className="mt-5">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {labels.byDistrict ?? (locale === "bn" ? "জেলাভিত্তিক" : "By district")}
-          </p>
-          <div className="mt-3 rounded-xl border border-border/50 bg-background/30 p-2 sm:p-3">
-            <ResponsiveContainer width="100%" height={Math.max(200, districtChart.length * 40)}>
-              <BarChart
-                data={districtChart}
-                layout="vertical"
-                margin={{ left: 8, right: 16, top: 8, bottom: 8 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                <XAxis type="number" allowDecimals={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={90}
-                  tick={{ fill: "#cbd5e1", fontSize: 11 }}
+                <Bar dataKey={labels.deaths} fill="#ef4444" radius={[0, 3, 3, 0]} maxBarSize={12} />
+                <Bar dataKey={labels.injuries} fill="#f59e0b" radius={[0, 3, 3, 0]} maxBarSize={12} />
+                <Bar dataKey={labels.homes} fill="#38bdf8" radius={[0, 3, 3, 0]} maxBarSize={12} />
+                <Bar
+                  dataKey={labels.livestock}
+                  fill="#34d399"
+                  radius={[0, 3, 3, 0]}
+                  maxBarSize={12}
                 />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "#e2e8f0" }} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey={labels.deaths} fill="#ef4444" radius={[0, 4, 4, 0]} maxBarSize={16} />
-                <Bar dataKey={labels.injuries} fill="#f59e0b" radius={[0, 4, 4, 0]} maxBarSize={16} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -419,35 +482,35 @@ export function ImpactStatsPanel({
       {active.by_event && active.by_event.length > 0 && (
         <div className="mt-4">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {locale === "bn" ? "ঘটনার তালিকা" : "Incident list"}
+            {locale === "bn" ? "ঘটনা ও সোর্স খবর" : "Incidents & source articles"}
           </p>
-          <ul className="mt-2 max-h-48 space-y-1.5 overflow-y-auto">
-            {active.by_event.slice(0, 10).map((e) => (
+          <ul className="mt-2 max-h-56 space-y-1.5 overflow-y-auto">
+            {active.by_event.slice(0, 24).map((e) => (
               <li
                 key={e.id}
-                className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-border/40 px-2.5 py-1.5 text-xs"
+                className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-border/40 px-2.5 py-1.5 text-xs"
               >
-                <span className="min-w-0 flex-1 truncate text-foreground/90" title={e.title}>
-                  {e.url ? (
-                    <a
-                      href={e.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:text-primary hover:underline"
-                    >
-                      {e.title}
-                    </a>
-                  ) : (
-                    e.title
-                  )}
-                </span>
-                <span className="shrink-0 tabular-nums text-muted-foreground">
+                <SourceLink
+                  href={e.url}
+                  title={e.title}
+                  meta={`${e.district} · ${e.day}`}
+                  className="min-w-0 flex-1"
+                  clamp={1}
+                  openText={locale === "bn" ? "খবর" : "Open"}
+                  openLabel={locale === "bn" ? "সোর্স খবর খুলুন" : "Open source article"}
+                />
+                <span className="shrink-0 self-center space-x-1.5 tabular-nums text-[11px] text-muted-foreground">
                   <span className="text-red-300">
                     {labels.deaths} {e.deaths}
                   </span>
-                  {" · "}
                   <span className="text-amber-300">
                     {labels.injuries} {e.injuries}
+                  </span>
+                  <span className="text-sky-300">
+                    {labels.homes} {e.homes_damaged ?? 0}
+                  </span>
+                  <span className="text-emerald-300">
+                    {labels.livestock} {e.livestock_lost ?? 0}
                   </span>
                 </span>
               </li>
@@ -462,7 +525,7 @@ export function ImpactStatsPanel({
             {labels.evidence}
           </p>
           <ul className="mt-2 space-y-1">
-            {active.evidence.slice(0, 6).map((e) => (
+            {active.evidence.slice(0, 8).map((e) => (
               <li key={e} className="truncate text-xs text-muted-foreground">
                 • {e}
               </li>

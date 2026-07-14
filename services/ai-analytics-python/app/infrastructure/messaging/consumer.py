@@ -84,4 +84,17 @@ class AiQueueConsumer:
             )
             return
 
+        if task_type == "phishing_scan":
+            from app.modules.phishing.schemas import ScanRequest
+            from app.modules.phishing.service import AntiPhishingShield
+
+            shield = AntiPhishingShield()
+            scan_req = ScanRequest.model_validate(payload.get("data") or payload)
+            result = await shield.scan(scan_req)
+            await self._publisher.publish(
+                routing_key="ai.phishing",
+                payload=shield.to_alert_payload(result),
+            )
+            return
+
         logger.warning("Unknown task type: %s", task_type)

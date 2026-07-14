@@ -5,6 +5,8 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 
 এই ডকুমেন্টে আছে: **HLD**, **LLD**, functional/non-functional requirements, **ERD**, tech stack rationale — সব একসাথে।
 
+**Related:** [Docs hub](./README.md) · [README (quick start)](../README.md) · [CI/CD & VPS](./DEPLOYMENT_AND_OPS.md) · [Ollama production](./OLLAMA_PRODUCTION.md)
+
 ---
 
 ## Table of Contents
@@ -18,7 +20,7 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 - [৭. Tech Stack — কেন কোনটা?](#৭-tech-stack--কেন-কোনটা-কোন-সমস্যা-সমাধান-করে)
 - [৮. Security Architecture](#৮-security-architecture)
 - [৯. Observability Architecture](#৯-observability-architecture)
-- [১০. Data Flow Example](#১০-data-flow--end-to-end-example-arbitrage-heatmap)
+- [১০. Data Flow Examples](#১০-data-flow--end-to-end-examples)
 - [১১. Monorepo Structure](#১১-monorepo-structure)
 - [১২. Service Ports](#১২-service-ports-reference)
 - [১৩. Architecture Decision Summary](#১৩-summary--architecture-decision-record-adr)
@@ -96,6 +98,9 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 | **Twin** | Digital twin scenarios |
 | **Citizen** | Citizen-facing chatbot |
 | **Risk** | Risk scoring |
+| **Phishing** | Anti-Phishing Shield — official `.gov.bd` digital signatures + TF-IDF/Levenshtein lookalike RED_FLAG |
+| **Proximity** | Interactive geo-fence (Shapely) — VIP/critical polygon INSIDE / APPROACHING alerts |
+| **Face Intel** | OpenCV face match → VIP Ethical Report Card (6-month Prisma window) |
 
 ### ২.৮ Public Feeds (Unauthenticated)
 
@@ -117,6 +122,45 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 ### ২.১১ Document Storage
 
 - **MinIO**-তে national intelligence documents (`national-intelligence-docs` bucket)
+
+### ২.১২ Anti-Phishing Shield (Cyber DSS)
+
+**Goal:** Official government web chrome clone / phishing detection for PMO analysts.
+
+| Layer | Behavior |
+|-------|----------|
+| **AI** `POST /api/v1/phishing/scan` | Fetch HTML → BeautifulSoup digital signature (DOM skeleton + meta + visual tokens → SHA-256) → TF-IDF cosine + Levenshtein blend vs official gallery |
+| **Policy** | `similarity ≥ threshold` **and** domain **not** on verified allow-list → `status: RED_FLAG` |
+| **Seed** | Curated BD `.gov.bd` / ministry URLs (`official_domains.py`); `gov.bd` wildcard allow-list |
+| **Gateway** | `POST /intelligence/phishing/scan` · `register` · `register/defaults` (JWT + RBAC) |
+| **UI** | `/anti-phishing` — IntelCard + AnimatedSlider (same language as Impact Simulator) |
+| **Async** | Rabbit `type: phishing_scan` → `ai.phishing`; optional Celery mockup in-module |
+
+### ২.১৩ Interactive Proximity Alert Map (GIS DSS)
+
+**Goal:** Real-time lat/lng against sensitive polygons (PMO, Bangabhaban, Parliament, Secretariat, HSIA, Cantonment).
+
+| Layer | Behavior |
+|-------|----------|
+| **AI** | Shapely `Point` ∈ polygon / approach buffer → `INSIDE` \| `APPROACHING` \| `OUTSIDE` + distance_m |
+| **Fallback** | Pure-Python ray-casting if Shapely/GEOS unavailable (dev Windows) |
+| **Live feed** | `GET/POST /api/v1/proximity/live` — open-track / ADS-B-style demo VIP orbits (replaceable with public GPS APIs) |
+| **Gateway** | `/intelligence/proximity/live` · `/check` · `/zones` |
+| **UI** | `/proximity` — Leaflet (CARTO dark) polygons + track markers; map click = analyst pin |
+
+### ২.১৪ Face Intel — VIP Ethical Report Card (CV + DSS)
+
+**Goal:** Face detect/match from camera or upload → join Representative profile → last **6 months** ethical dossier.
+
+| Layer | Behavior |
+|-------|----------|
+| **AI** | OpenCV Haar detect + compact embedding gallery (no dlib); `POST /api/v1/face-intel/match` |
+| **Gateway** | `POST /intelligence/face-intel/identify` — match then Prisma aggregation |
+| **Ethical card** | `{ vip_name, designation, ethical_score (0–100), red_flags_count, key_allegations[] }` |
+| **Data (6 mo)** | `RedFlagAlert` / budget overrun projects (same `adminUnitId`), `KpiRecord` GRIEVANCE/COMPLETION, `LiveSignal`, `ExternalArticle` grievance proxies |
+| **UI** | `/face-intel` — webcam/upload + VIP gallery; **Real-time Alert Overlay Card** |
+
+**Split rationale:** CV in Python; SQL windowing + RBAC in Node (same pattern as Accountability).
 
 ---
 
@@ -186,7 +230,7 @@ flowchart TB
 |---------|----------------|------------------------|
 | **Next.js Dashboard** | UI, BFF auth, cookie management, map/charts | Frontend আলাদা রাখা; token browser-এ যায় না |
 | **API Gateway** | REST, RBAC, DB, Socket.io, Fabric, MQ consumer | Single entry point + business logic orchestration |
-| **AI Analytics** | ML / NLP / LLM heavy compute | Python ecosystem (PyTorch, Transformers); GPU-friendly; async worker |
+| **AI Analytics** | ML / NLP / LLM / CV / geo-fence / phishing fingerprints | Python ecosystem (PyTorch, OpenCV, Shapely); GPU-friendly; async worker |
 
 ### ৪.৩ Communication Patterns
 
@@ -218,10 +262,12 @@ Message Types (Gateway):
   kpi_update | metadata_update | dashboard_refresh | alert_created
 
 Message Types (AI):
-  arbitrage_request | sentiment_batch | risk_score_request
+  arbitrage_request | sentiment_batch | risk_score_request | phishing_scan
 ```
 
 **Config:** `deploy/init/rabbitmq/definitions.json`
+
+Routing results (examples): `ai.risk`, `ai.sentiment`, `ai.phishing`, `gov.arbitrage`.
 
 ### ৪.৫ Deployment Views
 
@@ -288,10 +334,18 @@ services/ai-analytics-python/app/
 │   ├── arbitrage/         # scrape + cache + worker
 │   ├── sovereign_llm/     # Ollama client
 │   ├── documents/         # document intelligence
+│   ├── accountability/    # peer KPI / alert formula scores
+│   ├── hazards/           # hazard overlay scoring
+│   ├── phishing/          # Anti-Phishing Shield (signatures + similarity)
+│   ├── proximity/         # Shapely geo-fence + live VIP tracks
+│   ├── face_intel/        # OpenCV face match + VIP gallery
 │   └── ...
 ├── ml/ollama_client.py    # local LLM calls
 └── infrastructure/messaging/consumer.py  # RabbitMQ worker
 ```
+
+**Dashboard routes (new DSS pages):** `/anti-phishing`, `/proximity`, `/face-intel`  
+**Gateway proxies:** `intelligence/phishing/*`, `intelligence/proximity/*`, `intelligence/face-intel/*`
 
 ### ৫.৩ Database Read/Write Split
 
@@ -681,7 +735,9 @@ docker compose -f docker-compose.observability.yml up -d
 
 ---
 
-## ১০. Data Flow — End-to-End Example (Arbitrage Heatmap)
+## ১০. Data Flow — End-to-End Examples
+
+### ১০.১ Arbitrage Heatmap
 
 ```
 1. AI Worker (every 300s) scrapes global commodity prices
@@ -693,6 +749,38 @@ docker compose -f docker-compose.observability.yml up -d
 7. Dashboard Leaflet choropleth renders landed cost overlay
 ```
 
+### ১০.২ Anti-Phishing RED_FLAG
+
+```
+1. Analyst pastes suspicious URL on /anti-phishing
+2. BFF → Gateway POST /intelligence/phishing/scan
+3. AI fetches HTML (timeout-safe) → digital signature
+4. Compare vs official gallery (cosine + Levenshtein)
+5. Domain not verified + score ≥ 0.90 → { status: RED_FLAG, similarity_score, domain_details }
+6. Optional: publish ai.phishing for ops fans-out
+```
+
+### ১০.৩ Proximity geo-fence alert
+
+```
+1. Dashboard polls GET /intelligence/proximity/live (~4s)
+2. AI synthesizes / ingests lat,lng tracks + evaluates Shapely polygons
+3. Track INSIDE PMO / APPROACHING buffer → alert payload
+4. Leaflet draws fence polygons + severity-colored markers
+5. Analyst map-click → POST /proximity/check for manual pin
+```
+
+### ১০.৪ Face Intel Ethical Report Card
+
+```
+1. Webcam frame / upload / VIP gallery click on /face-intel
+2. Gateway POST /intelligence/face-intel/identify
+3. AI OpenCV match → vip_id / nid / representative_id
+4. Gateway Prisma (6 months): red flags, overruns, KPI grievance, news grievance
+5. Response { vip_name, designation, ethical_score, red_flags_count, key_allegations[] }
+6. UI renders Real-time Alert Overlay Card
+```
+
 ---
 
 ## ১১. Monorepo Structure
@@ -700,11 +788,19 @@ docker compose -f docker-compose.observability.yml up -d
 ```
 geoinsight-bd/
 ├── docs/
-│   └── SYSTEM_DESIGN.md        # এই ফাইল
+│   ├── README.md               # Docs hub
+│   ├── SYSTEM_DESIGN.md        # এই ফাইল
+│   ├── DEPLOYMENT_AND_OPS.md   # CI/CD + VPS
+│   └── OLLAMA_PRODUCTION.md
 ├── web/dashboard-nextjs/       # Frontend + BFF
+│   └── src/app/(dashboard)/
+│       ├── anti-phishing/      # Anti-Phishing Shield UI
+│       ├── proximity/          # Geo-fence map UI
+│       └── face-intel/         # Face match + Ethical Overlay
 ├── services/
-│   ├── api-gateway-node/       # Core API + DB + Socket.io
-│   └── ai-analytics-python/    # ML / NLP / LLM
+│   ├── api-gateway-node/       # Core API + DB + Socket.io + intelligence proxies
+│   └── ai-analytics-python/    # ML / NLP / LLM / CV / phishing / proximity
+│       └── app/modules/{phishing,proximity,face_intel}/
 ├── deploy/
 │   ├── init/                   # Postgres, RabbitMQ, MinIO init
 │   ├── nginx/                  # Production edge
@@ -715,24 +811,32 @@ geoinsight-bd/
 ├── load-tests/                 # Locust scenarios
 ├── docker-compose.yml          # Infra
 ├── docker-compose.apps.yml     # Apps overlay
-├── docker-compose.prod.yml     # Production
-└── .github/workflows/deploy.yml
+├── docker-compose.vps.yml      # Slim Hostinger profile
+└── docker-compose.ollama.yml   # Dedicated Ollama server
 ```
+
+Quick start → [`README.md`](../README.md) · Ops → [`DEPLOYMENT_AND_OPS.md`](./DEPLOYMENT_AND_OPS.md)।
 
 ---
 
 ## ১২. Service Ports Reference
 
-| Service | Port |
-|---------|------|
-| Dashboard | 3000 |
-| API Gateway | 4000 |
-| AI Analytics | 8000 |
-| PostgreSQL | 5432 (55432 local) |
-| PgBouncer | 6432 |
-| Redis | 6379 (internal) |
-| RabbitMQ | 5672 / 15672 (mgmt) |
-| MinIO | 9000 / 9001 |
+| Service | Typical host port (local `.env.example`) | Internal |
+|---------|------------------------------------------|----------|
+| Dashboard | 3000 | 3000 |
+| API Gateway | **4800** | 4000 |
+| AI Analytics | (not published by default) | 8000 |
+| PostgreSQL | 55432 | 5432 |
+| PgBouncer | 6432 | 6432 |
+| Redis | 6379 | 6379 |
+| RabbitMQ AMQP / Mgmt | 5672 / 15672 | same |
+| MinIO API / Console | **19000 / 19001** | 9000 / 9001 |
+| Ollama | 11434 | 11434 |
+
+Windows Hyper-V frequently blocks `5432`, `4000`, `8000`, `9000` — তাই local defaults উপরের মতো।
+
+| Service | Port (when enabled) |
+|---------|---------------------|
 | Prometheus | 9090 |
 | Grafana | 3002 |
 | nginx | 80 / 443 |
@@ -751,6 +855,10 @@ geoinsight-bd/
 | PgBouncer + Replica | Direct DB | Connection exhaustion + read scaling |
 | **Socket.io** | SSE / Polling | Bi-directional real-time + room-based scope |
 | Hyperledger (optional) | Public blockchain | Permissioned gov data anchoring |
+| **OpenCV embeddings** (not dlib) | `face_recognition` / dlib | Docker-friendly CPU wheels; same VIP gallery contract |
+| **Shapely geo-fence** (+ pure fallback) | Only haversine circles | Accurate campus polygons; Windows/dev without GEOS still runs |
+| **Phishing = HTML fingerprint** | Blocklists only | Catches lookalike *chrome* on non-gov domains (`RED_FLAG`) |
+| Ethical card = Node Prisma + AI match | All-in Python DB | Reuses Accountability pattern; RBAC stays at gateway |
 
 ---
 
@@ -758,10 +866,11 @@ geoinsight-bd/
 
 | Document | Location |
 |----------|----------|
-| Setup & quick start | `README.md` |
-| CI/CD, VPS deploy, Ollama approach | [`docs/DEPLOYMENT_AND_OPS.md`](./DEPLOYMENT_AND_OPS.md) |
-| Ollama production setup | [`docs/OLLAMA_PRODUCTION.md`](./OLLAMA_PRODUCTION.md) |
-| Environment variables | `.env.example` |
+| Docs index | [`docs/README.md`](./README.md) |
+| Setup & quick start | [`README.md`](../README.md) |
+| CI/CD, VPS deploy, Ollama approach | [`DEPLOYMENT_AND_OPS.md`](./DEPLOYMENT_AND_OPS.md) |
+| Ollama production setup | [`OLLAMA_PRODUCTION.md`](./OLLAMA_PRODUCTION.md) |
+| Environment variables | [`.env.example`](../.env.example) |
 | Tier-4 sovereignty | `deploy/security/tier4-sovereignty.env.example` |
 | Database schema | `services/api-gateway-node/prisma/schema.prisma` |
 | RabbitMQ topology | `deploy/init/rabbitmq/definitions.json` |

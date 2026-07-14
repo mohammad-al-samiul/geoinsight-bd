@@ -1,18 +1,27 @@
-# GeoInsight BD — AI Analytics (production)
+# syntax=docker/dockerfile:1
+# GeoInsight BD — AI Analytics (production / local Docker)
+# Uses CPU-only PyTorch (no multi‑GB NVIDIA CUDA wheels on every rebuild).
+
 FROM python:3.12-slim AS builder
 
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN grep -Ev '^(pytest|pytest-asyncio)' requirements.txt > requirements-prod.txt \
-    && pip install --no-cache-dir -r requirements-prod.txt
+
+# Torch first from the official CPU wheel index (cached by BuildKit across rebuilds).
+# Remaining deps from PyPI — also cache-mounted so interrupted builds resume without re-download.
+RUN --mount=type=cache,target=/root/.cache/pip \
+    grep -Ev '^(pytest|pytest-asyncio|torch==)' requirements.txt \
+      | grep -Ev '^[[:space:]]*$$' > requirements-prod.txt \
+    && pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu \
+    && pip install -r requirements-prod.txt
 
 FROM python:3.12-slim AS production
 

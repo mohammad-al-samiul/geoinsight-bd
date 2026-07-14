@@ -54,11 +54,20 @@ async function proxyRequest(
     );
   }
 
+  const contentType = upstream.headers.get("content-type") ?? "application/json";
+  if (contentType.includes("image/") || contentType.includes("octet-stream")) {
+    const buf = await upstream.arrayBuffer();
+    return new NextResponse(buf, {
+      status: upstream.status,
+      headers: { "Content-Type": contentType },
+    });
+  }
+
   const text = await upstream.text();
 
   return new NextResponse(text, {
     status: upstream.status,
-    headers: { "Content-Type": upstream.headers.get("content-type") ?? "application/json" },
+    headers: { "Content-Type": contentType },
   });
 }
 

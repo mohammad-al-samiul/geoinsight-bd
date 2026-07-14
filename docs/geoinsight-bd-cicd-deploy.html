@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoInsight BD — CI/CD, VPS Deploy & Ollama Approach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Noto+Serif+Bengali:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F5F1E6;
+  --paper-2:#ECE5D2;
+  --card:#FFFCF6;
+  --ink:#16241F;
+  --ink-soft:#4C5C53;
+  --teal:#0E5C57;
+  --teal-deep:#0A3A38;
+  --green:#1C7A43;
+  --red:#B8433A;
+  --gold:#B9873C;
+  --line:#DAD2B8;
+  --line-soft:#E6DFC9;
+  --mono:'IBM Plex Mono',monospace;
+  --serif-en:'Fraunces',serif;
+  --serif-bn:'Noto Serif Bengali',serif;
+  --sans-en:'Inter',sans-serif;
+  --sans-bn:'Noto Sans Bengali',sans-serif;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans-bn),var(--sans-en),sans-serif; line-height:1.75; -webkit-font-smoothing:antialiased;}
+h1,h2,h3,h4{font-family:var(--serif-bn),var(--serif-en),serif; color:var(--teal-deep); line-height:1.28; margin:0 0 .5em 0; font-weight:600;}
+a{color:var(--teal);}
+p{margin:0 0 1em 0;}
+code,.mono{font-family:var(--mono);}
+
+.contours{position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.35;}
+
+.shell{position:relative; z-index:1; display:grid; grid-template-columns:272px minmax(0,860px); justify-content:center; gap:64px; max-width:1240px; margin:0 auto; padding:0 32px 100px;}
+@media (max-width: 900px){ .shell{grid-template-columns:1fr; gap:0; padding:0 18px 70px;} }
+
+.hero{position:relative; z-index:1; padding:88px 32px 64px; border-bottom:1px solid var(--line); background:radial-gradient(ellipse at 78% 15%, rgba(14,92,87,.10), transparent 60%), var(--paper);}
+.hero-inner{max-width:1240px; margin:0 auto; display:grid; grid-template-columns:1.1fr .9fr; align-items:center; gap:40px;}
+@media (max-width: 900px){ .hero-inner{grid-template-columns:1fr;} }
+.eyebrow{display:inline-flex; align-items:center; gap:10px; font-family:var(--mono); font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--teal); border:1px solid var(--teal); border-radius:999px; padding:5px 14px; margin-bottom:22px; background:rgba(14,92,87,.05);}
+.eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--red);}
+.hero h1{font-size:clamp(2.2rem, 4.6vw, 3.3rem); letter-spacing:-.01em;}
+.hero .bn-lead{font-family:var(--serif-bn); font-size:1.14rem; color:var(--ink); margin-top:14px; max-width:56ch;}
+.hero .sub{color:var(--ink-soft); font-size:.96rem; margin-top:14px; max-width:60ch;}
+.hero-chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:26px;}
+.chip{font-family:var(--mono); font-size:.72rem; letter-spacing:.02em; border:1px solid var(--line); background:var(--card); color:var(--ink-soft); padding:6px 12px; border-radius:6px;}
+.chip b{color:var(--teal-deep); font-weight:600;}
+
+/* signature: pipeline node diagram (dev -> github -> vps -> ai) */
+.pipe-caption{text-align:center; font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; color:var(--ink-soft); text-transform:uppercase; margin-top:8px;}
+
+.toc{position:sticky; top:28px; align-self:start; max-height:calc(100vh - 56px); overflow-y:auto; padding-top:48px;}
+.toc-label{font-family:var(--mono); font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:14px; padding-left:2px;}
+.toc ol{list-style:none; margin:0; padding:0; border-left:1px solid var(--line);}
+.toc li{margin:0;}
+.toc a{display:block; text-decoration:none; color:var(--ink-soft); font-size:.86rem; padding:7px 0 7px 16px; border-left:2px solid transparent; margin-left:-1px; transition:color .15s, border-color .15s;}
+.toc a:hover{color:var(--teal-deep); border-left-color:var(--gold);}
+.toc a b{color:var(--teal); font-family:var(--mono); font-weight:500; margin-right:6px;}
+@media (max-width:900px){
+  .toc{position:static; max-height:none; overflow:visible; padding:24px 0 8px;}
+  .toc ol{display:flex; flex-wrap:wrap; gap:2px 14px; border-left:none;}
+  .toc a{padding:4px 0; border-left:none;}
+}
+
+main{min-width:0; padding-top:48px;}
+section{margin-bottom:76px; scroll-margin-top:24px;}
+.sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:8px;}
+.sec-num{font-family:var(--mono); color:var(--red); font-size:1rem; font-weight:600;}
+.sec-intro{color:var(--ink-soft); font-size:.98rem; max-width:68ch; margin-bottom:28px;}
+h3.sub-head{font-size:1.14rem; margin-top:34px; color:var(--teal-deep); display:flex; align-items:center; gap:10px;}
+h3.sub-head .tag{font-family:var(--mono); font-size:.68rem; background:var(--teal); color:#fff; padding:2px 8px; border-radius:4px;}
+hr.rule{border:none; border-top:1px solid var(--line); margin:56px 0;}
+
+.tbl-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:10px; margin:18px 0 8px;}
+table.dtable{border-collapse:collapse; width:100%; font-size:.9rem; background:var(--card);}
+table.dtable th{background:var(--teal-deep); color:#F5F1E6; text-align:left; font-weight:600; padding:11px 16px; font-family:var(--sans-bn),var(--sans-en); font-size:.82rem; letter-spacing:.01em;}
+table.dtable td{padding:11px 16px; border-top:1px solid var(--line-soft); vertical-align:top;}
+table.dtable tr:hover td{background:var(--paper-2);}
+table.dtable td.k{font-weight:600; color:var(--teal-deep); white-space:nowrap;}
+table.dtable td.dec{font-weight:600; color:var(--teal-deep);}
+table.dtable td.alt{color:var(--ink-soft); text-decoration:line-through; text-decoration-color:var(--line); opacity:.8;}
+
+.code-block{background:var(--teal-deep); border-radius:10px; overflow:hidden; margin:16px 0; color:#EFEADA;}
+.code-block .cb-bar{display:flex; align-items:center; justify-content:space-between; padding:8px 16px; background:rgba(0,0,0,.18); font-family:var(--mono); font-size:.7rem; letter-spacing:.06em; color:#B9E0D4; text-transform:uppercase;}
+.code-block pre{margin:0; padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:.82rem; line-height:1.65; white-space:pre;}
+.code-block .dots{display:flex; gap:5px;}
+.code-block .dots span{width:8px;height:8px;border-radius:50%; background:#3E655F;}
+
+.timeline{border-left:2px solid var(--line); margin:20px 0 20px 10px; padding-left:26px;}
+.tl-step{position:relative; padding-bottom:22px;}
+.tl-step:last-child{padding-bottom:0;}
+.tl-step::before{content:attr(data-n); position:absolute; left:-38px; top:-2px; width:26px; height:26px; border-radius:50%; background:var(--teal); color:#fff; font-family:var(--mono); font-size:.72rem; font-weight:600; display:flex; align-items:center; justify-content:center;}
+.tl-step .tl-body{font-size:.9rem; color:var(--ink-soft); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px;}
+.tl-body b{color:var(--teal-deep);}
+.tl-body .mono{font-size:.82rem;}
+
+.diagram{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; margin:18px 0; overflow-x:auto;}
+.diagram svg{display:block; margin:0 auto; max-width:100%; height:auto;}
+.diagram-caption{text-align:center; font-family:var(--mono); font-size:.7rem; color:var(--ink-soft); letter-spacing:.05em; margin-top:10px; text-transform:uppercase;}
+
+.card-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; margin:18px 0;}
+.fcard{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px; position:relative;}
+.fcard .fnum{font-family:var(--mono); color:var(--red); font-size:.78rem; font-weight:600; display:block; margin-bottom:6px;}
+.fcard h4{font-size:1rem; margin-bottom:8px; color:var(--teal-deep);}
+.fcard p{font-size:.87rem; color:var(--ink-soft); margin:0;}
+
+.badge-row{display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 6px;}
+.badge{font-family:var(--mono); font-size:.72rem; padding:5px 12px; border-radius:6px; border:1px solid var(--line); color:var(--ink-soft); background:var(--card);}
+.badge.on{border-color:var(--teal); color:var(--teal-deep); background:rgba(14,92,87,.06);}
+.badge.off{border-color:var(--red); color:var(--red); background:rgba(184,67,58,.06); text-decoration:line-through;}
+
+footer{border-top:1px solid var(--line); margin-top:40px; padding-top:32px; font-size:.85rem; color:var(--ink-soft); display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px;}
+footer .mono{color:var(--teal);}
+
+.pull-quote{border-left:3px solid var(--gold); padding:6px 0 6px 20px; margin:22px 0; font-family:var(--serif-bn); font-size:1.08rem; color:var(--teal-deep);}
+
+::-webkit-scrollbar{height:8px; width:8px;}
+::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
+</style>
+</head>
+<body>
+
+<svg class="contours" viewBox="0 0 1440 1400" preserveAspectRatio="xMidYMin slice" xmlns="http://www.w3.org/2000/svg">
+  <g fill="none" stroke="#0E5C57" stroke-width="1">
+    <path d="M-100,120 C 300,40 700,220 1100,90 S 1700,160 1900,60" opacity=".18"/>
+    <path d="M-100,220 C 320,150 720,320 1120,190 S 1700,260 1900,160" opacity=".14"/>
+    <path d="M-100,340 C 340,270 740,440 1140,310 S 1700,380 1900,300" opacity=".10"/>
+    <path d="M-100,900 C 300,830 760,1000 1140,860 S 1700,930 1900,840" opacity=".10"/>
+    <path d="M-100,1020 C 320,950 780,1120 1160,980 S 1700,1050 1900,960" opacity=".08"/>
+  </g>
+</svg>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div>
+      <span class="eyebrow">Operations Documentation</span>
+      <h1>CI/CD, VPS Deploy &amp; Ollama</h1>
+      <p class="bn-lead">কোড কীভাবে CI/CD দিয়ে যায়, VPS-এ কীভাবে live হয়, আর Ollama ও অন্য AI কোন approach-এ চলে — আর কেন এভাবে করা হয়েছে।</p>
+      <p class="sub">GeoInsight BD প্ল্যাটফর্মের deployment pipeline: Developer push থেকে শুরু করে lean Hostinger VPS-এ auto redeploy, আর sovereign AI-কে আলাদা সার্ভারে রাখার সিদ্ধান্ত।</p>
+      <div class="hero-chips">
+        <span class="chip"><b>Primary CI</b> · SSH git-pull deploy</span>
+        <span class="chip"><b>Runtime</b> · Slim Docker Compose</span>
+        <span class="chip"><b>LLM</b> · Remote Ollama server</span>
+        <span class="chip"><b>Cloud LLM</b> · Avoided by design</span>
+      </div>
+    </div>
+    <div>
+      <svg viewBox="0 0 360 300" width="100%" height="100%">
+        <defs>
+          <marker id="hpa" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4C5C53"/></marker>
+        </defs>
+        <rect x="8" y="24" width="96" height="58" rx="8" fill="#fff" stroke="#0E5C57"/>
+        <text x="56" y="48" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#16241F">Developer</text>
+        <text x="56" y="64" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#4C5C53">git push</text>
+
+        <rect x="132" y="24" width="96" height="58" rx="8" fill="#0A3A38"/>
+        <text x="180" y="48" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#fff">GitHub</text>
+        <text x="180" y="64" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#B9E0D4">Actions</text>
+
+        <rect x="70" y="130" width="220" height="58" rx="8" fill="#0E5C57"/>
+        <text x="180" y="154" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#fff">Hostinger App VPS</text>
+        <text x="180" y="170" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#CFE8E1">git pull · compose up (slim)</text>
+
+        <rect x="120" y="232" width="120" height="52" rx="8" fill="#B9873C"/>
+        <text x="180" y="254" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#fff">AI Server</text>
+        <text x="180" y="270" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#FCEFD8">Ollama :11434</text>
+
+        <path d="M104,53 L130,53" stroke="#4C5C53" fill="none" marker-end="url(#hpa)"/>
+        <path d="M180,82 L180,128" stroke="#4C5C53" fill="none" marker-end="url(#hpa)"/>
+        <path d="M180,188 L180,230" stroke="#4C5C53" fill="none" marker-end="url(#hpa)"/>
+        <text x="192" y="212" font-family="IBM Plex Mono" font-size="8.5" fill="#B8433A">OLLAMA_URL</text>
+      </svg>
+      <div class="pipe-caption">Push → Actions → App VPS → AI Server</div>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="toc">
+    <div class="toc-label">Table of Contents</div>
+    <ol>
+      <li><a href="#s1"><b>০১</b>Big Picture</a></li>
+      <li><a href="#s2"><b>০২</b>CI/CD Process</a></li>
+      <li><a href="#s3"><b>০৩</b>VPS Deploy</a></li>
+      <li><a href="#s4"><b>০৪</b>Ollama & AI Approach</a></li>
+      <li><a href="#s5"><b>০৫</b>Performance Approach</a></li>
+      <li><a href="#s6"><b>০৬</b>কেন কোনটা বেছে নেওয়া</a></li>
+      <li><a href="#s7"><b>০৭</b>Operator Guide</a></li>
+      <li><a href="#s8"><b>০৮</b>Related Files</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ============ 1 ============ -->
+    <section id="s1">
+      <div class="sec-head"><span class="sec-num">০১</span><h2>Big Picture</h2></div>
+      <div class="diagram">
+        <svg viewBox="0 0 900 260" width="100%">
+          <defs><marker id="a1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4C5C53"/></marker></defs>
+          <rect x="20" y="70" width="170" height="90" rx="10" fill="#fff" stroke="#0E5C57"/>
+          <text x="105" y="100" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#0A3A38">Developer PC</text>
+          <text x="105" y="120" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#4C5C53">git commit</text>
+          <text x="105" y="136" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#4C5C53">git push</text>
+
+          <rect x="250" y="70" width="170" height="90" rx="10" fill="#0A3A38"/>
+          <text x="335" y="100" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#fff">GitHub</text>
+          <text x="335" y="120" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#B9E0D4">main branch</text>
+          <text x="335" y="136" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#B9E0D4">Actions: deploy-vps</text>
+
+          <rect x="480" y="50" width="220" height="130" rx="10" fill="#0E5C57"/>
+          <text x="590" y="76" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#fff">Hostinger App VPS</text>
+          <text x="590" y="98" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#CFE8E1">/opt/geoinsight-bd</text>
+          <text x="590" y="116" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#CFE8E1">git pull</text>
+          <text x="590" y="134" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#CFE8E1">docker compose build</text>
+          <text x="590" y="152" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#CFE8E1">up -d (slim profile)</text>
+
+          <rect x="740" y="70" width="150" height="90" rx="10" fill="#B9873C"/>
+          <text x="815" y="100" text-anchor="middle" font-family="IBM Plex Mono" font-size="10.5" fill="#fff">AI Server</text>
+          <text x="815" y="120" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#FCEFD8">Ollama :11434</text>
+          <text x="815" y="136" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#FCEFD8">llama3.1:8b</text>
+
+          <path d="M190,115 L248,115" stroke="#4C5C53" fill="none" marker-end="url(#a1)"/>
+          <text x="200" y="105" font-family="IBM Plex Mono" font-size="8.5" fill="#4C5C53">git push</text>
+          <path d="M420,115 L478,115" stroke="#4C5C53" fill="none" marker-end="url(#a1)"/>
+          <text x="425" y="105" font-family="IBM Plex Mono" font-size="8.5" fill="#4C5C53">SSH deploy</text>
+          <path d="M700,115 L738,115" stroke="#B8433A" fill="none" marker-end="url(#a1)"/>
+          <text x="690" y="105" font-family="IBM Plex Mono" font-size="8.5" fill="#B8433A">OLLAMA_URL</text>
+        </svg>
+        <div class="diagram-caption">Developer PC → GitHub Actions → App VPS → AI Server</div>
+      </div>
+
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Layer</th><th>Role</th></tr>
+          <tr><td class="k">App VPS</td><td>Dashboard, API Gateway, Postgres, Redis, RabbitMQ, AI Analytics (service)</td></tr>
+          <tr><td class="k">AI Server</td><td>শুধু Ollama (heavy LLM) — আলাদা মেশিন</td></tr>
+          <tr><td class="k">GitHub Actions</td><td>Push to <span class="mono">main</span> → auto redeploy App VPS</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 2 ============ -->
+    <section id="s2">
+      <div class="sec-head"><span class="sec-num">০২</span><h2>CI/CD Process</h2></div>
+      <p class="sec-intro">প্রজেক্টে দুইটা workflow আছে। রোজকার Hostinger deploy-এর জন্য যেটা চলে সেটা হলো <b>Deploy VPS</b>।</p>
+
+      <h3 class="sub-head"><span class="tag">২.১</span> Daily path — deploy-vps.yml <span class="badge on" style="margin-left:6px;">automatic</span></h3>
+      <p class="sec-intro" style="margin-bottom:10px;">Trigger: <span class="mono">git push origin main</span> অথবা GitHub-এ Run workflow (manual)।</p>
+      <div class="timeline">
+        <div class="tl-step" data-n="1"><div class="tl-body">push <span class="mono">main</span></div></div>
+        <div class="tl-step" data-n="2"><div class="tl-body">GitHub Action (<span class="mono">ubuntu-latest</span>) শুরু হয়</div></div>
+        <div class="tl-step" data-n="3"><div class="tl-body">SSH into VPS (<span class="mono">appleboy/ssh-action</span>)</div></div>
+        <div class="tl-step" data-n="4"><div class="tl-body"><span class="mono">cd /opt/geoinsight-bd</span></div></div>
+        <div class="tl-step" data-n="5"><div class="tl-body"><span class="mono">git fetch + reset --hard origin/main</span></div></div>
+        <div class="tl-step" data-n="6"><div class="tl-body"><span class="mono">bash deploy/scripts/vps-redeploy.sh</span></div></div>
+        <div class="tl-step" data-n="7"><div class="tl-body">Docker build + slim compose up</div></div>
+        <div class="tl-step" data-n="8"><div class="tl-body">Health check</div></div>
+      </div>
+
+      <p class="sec-intro" style="margin-bottom:6px;"><b style="color:var(--teal-deep);">কেন এই path?</b></p>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Reason</th><th>বিস্তারিত</th></tr>
+          <tr><td class="k">Hostinger-friendly</td><td>VPS-এ সরাসরি git pull + compose build — GHCR login বাধ্যতামূলক নয়</td></tr>
+          <tr><td class="k">Simple ops</td><td>একটা .env VPS-এই থাকে; secret CI-তে কম</td></tr>
+          <tr><td class="k">Fast feedback</td><td>main-এ merge করলেই live update শুরু</td></tr>
+        </table>
+      </div>
+
+      <p class="sec-intro" style="margin-bottom:6px;"><b style="color:var(--teal-deep);">Required GitHub Secrets</b></p>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Secret</th><th>Example / meaning</th></tr>
+          <tr><td class="k mono">VPS_HOST</td><td>VPS public IP</td></tr>
+          <tr><td class="k mono">VPS_USER</td><td>root বা deploy user</td></tr>
+          <tr><td class="k mono">VPS_SSH_KEY</td><td>Private SSH key (full PEM)</td></tr>
+          <tr><td class="k mono">VPS_SSH_PORT</td><td>Optional, default 22</td></tr>
+          <tr><td class="k mono">VPS_DEPLOY_PATH</td><td>Optional, default /opt/geoinsight-bd</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">২.২</span> Optional path — deploy.yml <span class="badge off" style="margin-left:6px; text-decoration:none;">manual only</span></h3>
+      <p class="sec-intro" style="margin-bottom:10px;">Trigger: শুধু <span class="mono">workflow_dispatch</span> (manual) — automatic <span class="mono">main</span> push-এ চলে না।</p>
+      <div class="timeline">
+        <div class="tl-step" data-n="1"><div class="tl-body">Manual run</div></div>
+        <div class="tl-step" data-n="2"><div class="tl-body">Parallel tests (API / AI / Dashboard)</div></div>
+        <div class="tl-step" data-n="3"><div class="tl-body">Build images → push GHCR (<span class="mono">ghcr.io/…</span>)</div></div>
+        <div class="tl-step" data-n="4"><div class="tl-body">SSH VPS → docker login → compose pull → up</div></div>
+      </div>
+      <p class="sec-intro" style="margin-bottom:6px;"><b style="color:var(--teal-deep);">কেন রাখা হয়েছে?</b></p>
+      <div class="card-grid">
+        <div class="fcard"><h4>Future-ready</h4><p>Production-grade image registry flow</p></div>
+        <div class="fcard"><h4>Test gate</h4><p>Jest, pytest, Next.js build আলাদা রাখা যায়</p></div>
+        <div class="fcard"><h4>Optional</h4><p>এখনকার Hostinger everyday deploy deploy-vps.yml দিয়েই হয় — build VPS-এ হয়, GHCR ছাড়াও চলে</p></div>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">২.৩</span> CI/CD Principles</h3>
+      <div class="card-grid">
+        <div class="fcard"><span class="fnum">০১</span><h4>Production Source of Truth</h4><p><span class="mono">main</span> = production</p></div>
+        <div class="fcard"><span class="fnum">০২</span><h4>Concurrency Group</h4><p>একসাথে দুইটা deploy আটকে conflict কমানো</p></div>
+        <div class="fcard"><span class="fnum">০৩</span><h4>Secrets Isolation</h4><p>শুধু GitHub Secrets-এ — repo-তে password commit হয় না</p></div>
+        <div class="fcard"><span class="fnum">০৪</span><h4>Idempotent Redeploy</h4><p>একই script বারবার চালানো যায়</p></div>
+        <div class="fcard"><span class="fnum">০৫</span><h4>Background Redeploy</h4><p>Hostinger browser terminal disconnect হলেও build চলতে পারে (<span class="mono">vps-redeploy.sh</span>)</p></div>
+      </div>
+    </section>
+
+    <!-- ============ 3 ============ -->
+    <section id="s3">
+      <div class="sec-head"><span class="sec-num">০৩</span><h2>VPS Deploy</h2></div>
+
+      <h3 class="sub-head"><span class="tag">৩.১</span> প্রথমবার (bootstrap)</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>VPS এ · first run</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre># VPS এ
+git clone &lt;repo-url&gt; /opt/geoinsight-bd
+cd /opt/geoinsight-bd
+cp .env.production.example .env
+# .env সম্পাদনা: passwords, JWT, CORS, NEXT_PUBLIC_* = আপনার IP/domain
+
+bash deploy/scripts/hostinger-vps-setup.sh   # যদি ব্যবহার করেন
+# অথবা সরাসরি:
+bash deploy/scripts/vps-redeploy.sh --force</pre>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৩.২</span> প্রতিদিন / প্রতি push</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>local বা GitHub থেকে</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>git push origin main
+# → Actions automatically SSH + redeploy</pre>
+      </div>
+      <div class="code-block">
+        <div class="cb-bar"><span>VPS-এ manually</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>cd /opt/geoinsight-bd
+bash deploy/scripts/vps-redeploy.sh --force
+# progress: tail -f logs/redeploy.log</pre>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৩.৩</span> Compose Stack কী চালায়</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>compose layering</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.apps.yml \
+  -f docker-compose.vps.yml \
+  up -d</pre>
+      </div>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>File</th><th>কাজ</th></tr>
+          <tr><td class="k mono">docker-compose.yml</td><td>Infra: Postgres, Redis, RabbitMQ, MinIO, PgBouncer</td></tr>
+          <tr><td class="k mono">docker-compose.apps.yml</td><td>Apps: API Gateway, AI Analytics, Dashboard, db-init</td></tr>
+          <tr><td class="k mono">docker-compose.vps.yml</td><td>Slim profile — memory caps, pipeline-on-start off, AI mock default</td></tr>
+        </table>
+      </div>
+      <p class="sec-intro">Replica: <span class="mono">postgres-replica</span> এখন <span class="mono">profiles: ["with-replica"]</span> — ছোট VPS-এ default চালু হয় না (~2GB RAM বাঁচে)।</p>
+
+      <h3 class="sub-head"><span class="tag">৩.৪</span> Ports (typical Hostinger)</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Service</th><th>Host port</th></tr>
+          <tr><td class="k">Dashboard</td><td class="mono">3000</td></tr>
+          <tr><td class="k">API Gateway</td><td class="mono">4800 → container 4000</td></tr>
+          <tr><td class="k">Postgres</td><td class="mono">internal / optional mapped</td></tr>
+          <tr><td class="k">Ollama</td><td class="mono">অন্য সার্ভারে · 11434</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 4 ============ -->
+    <section id="s4">
+      <div class="sec-head"><span class="sec-num">০৪</span><h2>Ollama & AI Approach</h2></div>
+
+      <h3 class="sub-head"><span class="tag">৪.১</span> Architecture Decision</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 700 220" width="100%">
+          <defs><marker id="a2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4C5C53"/></marker></defs>
+          <rect x="40" y="50" width="260" height="120" rx="10" fill="#EFEADA" stroke="#DAD2B8"/>
+          <text x="170" y="72" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#0A3A38">App VPS</text>
+          <rect x="60" y="86" width="220" height="34" rx="6" fill="#0E5C57"/>
+          <text x="170" y="108" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" fill="#fff">ai-analytics:8000</text>
+          <rect x="60" y="128" width="220" height="30" rx="6" fill="#fff" stroke="#B8433A"/>
+          <text x="170" y="148" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#B8433A">SENTIMENT_USE_MOCK = true</text>
+
+          <rect x="420" y="60" width="240" height="90" rx="10" fill="#B9873C"/>
+          <text x="540" y="90" text-anchor="middle" font-family="IBM Plex Mono" font-size="11" fill="#fff">AI Server</text>
+          <text x="540" y="112" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#FCEFD8">Ollama :11434</text>
+          <text x="540" y="130" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#FCEFD8">llama3.1:8b</text>
+
+          <path d="M280,100 L418,100" stroke="#4C5C53" fill="none" marker-end="url(#a2)"/>
+          <text x="320" y="90" font-family="IBM Plex Mono" font-size="9" fill="#4C5C53">HTTP · OLLAMA_URL</text>
+        </svg>
+        <div class="diagram-caption">App VPS ↔ AI Server — heavy LLM আলাদা মেশিনে</div>
+      </div>
+
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>কাজ</th><th>কোথায় চলে</th><th>কেন</th></tr>
+          <tr><td class="k">Sovereign LLM, Briefing, Citizen chat</td><td>Remote Ollama</td><td>৫–৮GB model — app VPS-এ চালালে swap/slow</td></tr>
+          <tr><td class="k">Sentiment (Bangla-BERT)</td><td>Default mock on app VPS</td><td>Real BERT-ও RAM খেয়ে thrash করে</td></tr>
+          <tr><td class="k">Dashboard / API / DB</td><td>App VPS</td><td>User-facing latency কম রাখতে</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৪.২</span> Setup Steps</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>AI server · ≥16GB RAM, GPU optional</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>bash deploy/scripts/ollama-server-setup.sh --allow-from &lt;APP_VPS_IP&gt;</pre>
+      </div>
+      <div class="code-block">
+        <div class="cb-bar"><span>App VPS</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>bash deploy/scripts/vps-point-ollama.sh http://&lt;AI_SERVER_IP&gt;:11434</pre>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৪.৩</span> যেসব approach নেওয়া হয়নি</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Approach</th><th>কেন নেওয়া হয়নি</th></tr>
+          <tr><td class="k">App VPS-এই Ollama</td><td>৪–৮GB Hostinger-এ site + 8B model একসাথে = swap, সব slow</td></tr>
+          <tr><td class="k">OpenAI / cloud LLM API</td><td>Data sovereignty ভাঙে — national / citizen data বাইরে যায়</td></tr>
+          <tr><td class="k">Public :11434 open</td><td>Security risk — যে কেউ model hit করতে পারে</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৪.৪</span> Fallback</h3>
+      <p class="sec-intro">Ollama down হলে Sovereign chat <span class="mono">sovereign_template</span> mode-এ চলে। Dashboard বাকি অংশ চালু থাকে — full outage হয় না।</p>
+      <div class="pull-quote">বিস্তারিত: <span class="mono">docs/OLLAMA_PRODUCTION.md</span></div>
+    </section>
+
+    <!-- ============ 5 ============ -->
+    <section id="s5">
+      <div class="sec-head"><span class="sec-num">০৫</span><h2>Performance Approach (কেন Site Fast)</h2></div>
+      <p class="sec-intro">VPS-এ slow loading দেখে যে approach নেওয়া হয়েছে:</p>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Optimization</th><th>Approach</th><th>কেন</th></tr>
+          <tr><td class="k">Redis cache dashboard/national (~90s)</td><td>Cache-aside</td><td>প্রতি request-এ heavy DB/heatmap এড়াতে</td></tr>
+          <tr><td class="k">Heatmap cache + 250 article cap</td><td>Smaller compute</td><td>Node-এ ৮০০ row process বন্ধ</td></tr>
+          <tr><td class="k">Marker Promise.all</td><td>Parallel I/O</td><td>Sequential N+1 বন্ধ</td></tr>
+          <tr><td class="k">Slim compose (docker-compose.vps.yml)</td><td>Memory caps</td><td>Swap thrash কমানো</td></tr>
+          <tr><td class="k">Pipeline/ingestion run-on-start = false</td><td>Staggered load</td><td>Deploy পরপর CPU storm বন্ধ</td></tr>
+          <tr><td class="k">Replica off by default</td><td>Profile gate</td><td>Unused 2GB free</td></tr>
+          <tr><td class="k">PgBouncer smaller pools</td><td>Connection control</td><td>ছোট DB-কে overwhelm না করা</td></tr>
+          <tr><td class="k">nginx gzip + static cache</td><td>Edge assets</td><td>Frontend bytes কম (nginx থাকলে)</td></tr>
+        </table>
+      </div>
+      <div class="code-block">
+        <div class="cb-bar"><span>script shortcuts</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>bash deploy/scripts/vps-optimize-env.sh   # .env flags + recreate apps
+bash deploy/scripts/vps-redeploy.sh --force</pre>
+      </div>
+    </section>
+
+    <!-- ============ 6 ============ -->
+    <section id="s6">
+      <div class="sec-head"><span class="sec-num">০৬</span><h2>কেন কোনটা বেছে নেওয়া হয়েছে</h2></div>
+
+      <h3 class="sub-head"><span class="tag">৬.১</span> Monorepo + Docker Compose</h3>
+      <div class="tbl-wrap">
+        <table class="dtable adr">
+          <tr><th>Decision</th><th>Alternative</th><th>কেন এটা</th></tr>
+          <tr><td class="dec">Monorepo</td><td class="alt">আলাদা repo per service</td><td>এক PR-এ API + UI + AI একসাথে; Hostinger-এ এক clone</td></tr>
+          <tr><td class="dec">Compose (not K8s)</td><td class="alt">Kubernetes</td><td>ছোট VPS — Compose যথেষ্ট; ops সহজ</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৬.২</span> CI = SSH git pull (primary)</h3>
+      <div class="tbl-wrap">
+        <table class="dtable adr">
+          <tr><th>Decision</th><th>Alternative</th><th>কেন এটা</th></tr>
+          <tr><td class="dec">deploy-vps.yml auto on main</td><td class="alt">শুধু manual</td><td>প্রতি push-এ live আপডেট</td></tr>
+          <tr><td class="dec">Build on VPS</td><td class="alt">সবসময় GHCR pull</td><td>Hostinger-এ PAT/registry অপেক্ষা ছাড়াই কাজ করে</td></tr>
+          <tr><td class="dec">GHCR workflow manual</td><td class="alt">Auto সব build</td><td>Optional production path রাখা; daily cost/complexity কম</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৬.৩</span> App vs AI Split</h3>
+      <div class="tbl-wrap">
+        <table class="dtable adr">
+          <tr><th>Decision</th><th>Alternative</th><th>কেন এটা</th></tr>
+          <tr><td class="dec">Remote Ollama</td><td class="alt">Same VPS Ollama</td><td>Performance + RAM</td></tr>
+          <tr><td class="dec">On-prem Llama</td><td class="alt">Cloud GPT</td><td>Sovereignty (gov data)</td></tr>
+          <tr><td class="dec">Sentiment mock on small VPS</td><td class="alt">Always real BERT</td><td>Availability &gt; perfect NLP on 4GB</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৬.৪</span> Auth & Edge</h3>
+      <div class="tbl-wrap">
+        <table class="dtable adr">
+          <tr><th>Decision</th><th>Alternative</th><th>কেন এটা</th></tr>
+          <tr><td class="dec">Next.js BFF + HTTP-only cookies</td><td class="alt">Browser → JWT localStorage</td><td>XSS থেকে token চুরি কঠিন</td></tr>
+          <tr><td class="dec">Role + admin unit scope</td><td class="alt">Flat roles only</td><td>Bangladesh hierarchy drill-down</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৬.৫</span> Data Layer</h3>
+      <div class="tbl-wrap">
+        <table class="dtable adr">
+          <tr><th>Decision</th><th>Alternative</th><th>কেন এটা</th></tr>
+          <tr><td class="dec">TimescaleDB</td><td class="alt">Plain Postgres only</td><td>Commodity / time-series</td></tr>
+          <tr><td class="dec">Redis + RabbitMQ</td><td class="alt">শুধু Redis</td><td>Cache vs durable async আলাদা দায়িত্ব</td></tr>
+          <tr><td class="dec">PgBouncer</td><td class="alt">Direct Postgres</td><td>Node short-lived connections</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 7 ============ -->
+    <section id="s7">
+      <div class="sec-head"><span class="sec-num">০৭</span><h2>Day-to-day Operator Guide</h2></div>
+
+      <h3 class="sub-head"><span class="tag">৭.১</span> Deploy নতুন Feature</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>local</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>git add . && git commit -m "..." && git push origin main
+# → GitHub Actions → VPS</pre>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৭.২</span> Redeploy আটকে গেলে</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>troubleshoot</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>bash deploy/scripts/vps-redeploy.sh --status
+bash deploy/scripts/vps-redeploy.sh --force
+tail -f /opt/geoinsight-bd/logs/redeploy.log</pre>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৭.৩</span> Ollama Connect / Reconnect</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>ollama pointer</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>bash deploy/scripts/vps-point-ollama.sh http://AI_IP:11434
+# check: ollama_reachable true</pre>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৭.৪</span> Slow হলে দ্রুত চেক</h3>
+      <div class="code-block">
+        <div class="cb-bar"><span>quick diagnostics</span><span class="dots"><span></span><span></span><span></span></span></div>
+        <pre>docker stats --no-stream
+free -h
+docker ps | grep replica    # চললে বন্ধ করুন
+grep -E 'PIPELINE_RUN_ON_START|SENTIMENT_USE_MOCK|OLLAMA_URL' .env</pre>
+      </div>
+
+      <h3 class="sub-head"><span class="tag">৭.৫</span> Login (bootstrap)</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><td class="k">Dashboard</td><td class="mono">http://VPS_IP:3000</td></tr>
+          <tr><td class="k">Default PMO (seed)</td><td>README / db-init অনুযায়ী</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 8 ============ -->
+    <section id="s8">
+      <div class="sec-head"><span class="sec-num">০৮</span><h2>Related Files</h2></div>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>Topic</th><th>Path</th></tr>
+          <tr><td class="k">Auto VPS deploy workflow</td><td class="mono">.github/workflows/deploy-vps.yml</td></tr>
+          <tr><td class="k">GHCR + tests workflow</td><td class="mono">.github/workflows/deploy.yml</td></tr>
+          <tr><td class="k">Redeploy script</td><td class="mono">deploy/scripts/vps-redeploy.sh</td></tr>
+          <tr><td class="k">Env optimize</td><td class="mono">deploy/scripts/vps-optimize-env.sh</td></tr>
+          <tr><td class="k">Slim compose</td><td class="mono">docker-compose.vps.yml</td></tr>
+          <tr><td class="k">Ollama compose</td><td class="mono">docker-compose.ollama.yml</td></tr>
+          <tr><td class="k">Ollama server setup</td><td class="mono">deploy/scripts/ollama-server-setup.sh</td></tr>
+          <tr><td class="k">Point app → Ollama</td><td class="mono">deploy/scripts/vps-point-ollama.sh</td></tr>
+          <tr><td class="k">Docs hub</td><td class="mono">docs/README.md</td></tr>
+          <tr><td class="k">Ollama guide</td><td class="mono">docs/OLLAMA_PRODUCTION.md</td></tr>
+          <tr><td class="k">System design</td><td class="mono">docs/SYSTEM_DESIGN.md</td></tr>
+          <tr><td class="k">Ops markdown (canonical)</td><td class="mono">docs/DEPLOYMENT_AND_OPS.md</td></tr>
+          <tr><td class="k">Production env template</td><td class="mono">.env.production.example</td></tr>
+        </table>
+      </div>
+
+      <h3 class="sub-head" style="margin-top:44px;">এক নজরে — আমাদের Approach</h3>
+      <div class="tbl-wrap">
+        <table class="dtable">
+          <tr><th>বিষয়</th><th>Approach</th><th>সংক্ষিপ্ত "কেন"</th></tr>
+          <tr><td class="k">CI/CD</td><td>Push main → SSH → git pull → compose</td><td>Hostinger-এ সরল, deterministic</td></tr>
+          <tr><td class="k">App runtime</td><td>Slim Docker stack, no replica by default</td><td>RAM বাঁচানো, UI responsive</td></tr>
+          <tr><td class="k">LLM</td><td>আলাদা Ollama server + OLLAMA_URL</td><td>Fast app VPS + sovereign local model</td></tr>
+          <tr><td class="k">Cloud LLM</td><td>Avoid</td><td>National data sovereignty</td></tr>
+          <tr><td class="k">Speed</td><td>Redis cache + parallel front-end + no boot pipelines</td><td>Data তাড়াতাড়ি আসে</td></tr>
+        </table>
+      </div>
+
+      <div class="pull-quote">GeoInsight BD — evidence-based governance, deployable on a lean VPS, with AI kept sovereign and separate.</div>
+    </section>
+
+    <footer>
+      <span>GeoInsight BD — CI/CD, VPS Deploy &amp; Ollama Approach</span>
+      <span class="mono">Operations Documentation · v1</span>
+    </footer>
+
+  </main>
+</div>
+
+</body>
+</html>

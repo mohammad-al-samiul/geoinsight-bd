@@ -14,6 +14,7 @@ import {
 import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SourceLink } from "@/components/ui/source-link";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useStrategicOutlook } from "@/hooks/use-strategic-outlook";
 import { cn } from "@/lib/utils";
@@ -175,7 +176,7 @@ export function StrategicOutlookPanel() {
               <ul className="max-h-[320px] space-y-2 overflow-y-auto">
                 {(analystSources.length ? analystSources : allSources.slice(0, 8)).map((s) => (
                   <li key={s.url} className="rounded-lg border border-border/50 px-3 py-2 text-sm">
-                    <div className="mb-1 flex flex-wrap gap-1.5">
+                    <div className="mb-1.5 flex flex-wrap gap-1.5">
                       <Badge variant="outline" className="text-[10px]">
                         {s.source}
                       </Badge>
@@ -183,14 +184,12 @@ export function StrategicOutlookPanel() {
                         {s.domain}
                       </Badge>
                     </div>
-                    <a
+                    <SourceLink
                       href={s.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium hover:text-primary hover:underline"
-                    >
-                      {s.title}
-                    </a>
+                      title={s.title}
+                      openText="খবর"
+                      openLabel="মূল খবর নতুন ট্যাবে খুলুন"
+                    />
                   </li>
                 ))}
               </ul>
@@ -201,17 +200,13 @@ export function StrategicOutlookPanel() {
               <ul className="max-h-[360px] space-y-2 overflow-y-auto">
                 {allSources.map((s) => (
                   <li key={`${s.url}-all`} className="rounded-lg border border-border/40 px-3 py-2 text-sm">
-                    <p className="text-[11px] text-muted-foreground">
-                      {s.source} · {s.domain}
-                    </p>
-                    <a
+                    <SourceLink
                       href={s.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="line-clamp-2 hover:text-primary hover:underline"
-                    >
-                      {s.title}
-                    </a>
+                      title={s.title}
+                      meta={`${s.source} · ${s.domain}`}
+                      openText="খবর"
+                      openLabel="মূল খবর নতুন ট্যাবে খুলুন"
+                    />
                   </li>
                 ))}
               </ul>

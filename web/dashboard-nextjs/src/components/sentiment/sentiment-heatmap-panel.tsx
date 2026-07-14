@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
-  ExternalLink,
   MessageSquareWarning,
   Radio,
   RefreshCw,
@@ -18,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProgressMeter } from "@/components/ui/progress-meter";
 import { IntelCard } from "@/components/ui/intel-card";
+import { SourceLink } from "@/components/ui/source-link";
 import { cn } from "@/lib/utils";
 
 function sourceLabel(source: string, t: (key: string) => string): string {
@@ -313,15 +313,13 @@ export function SentimentHeatmapPanel() {
                           </span>
                         )}
                       </div>
-                      <a
+                      <SourceLink
                         href={article.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-1 flex items-start gap-1 font-medium leading-snug hover:text-primary"
-                      >
-                        <span className="line-clamp-2 min-w-0">{article.title}</span>
-                        <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 opacity-60" />
-                      </a>
+                        title={article.title}
+                        className="mt-1"
+                        openText={locale === "bn" ? "খবর" : "Open"}
+                        openLabel={locale === "bn" ? "সোর্স খবর খুলুন" : "Open source article"}
+                      />
                     </li>
                   ))
                 )}

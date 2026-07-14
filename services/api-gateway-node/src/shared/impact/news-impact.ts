@@ -31,6 +31,11 @@ export interface NewsImpactExtract {
 
 export interface ImpactArticleInput {
   district: string | null;
+  /**
+   * All chart places (upazila/locality/district) extracted from the article.
+   * When set, by_district / by_event fan out to each place; national totals still count once.
+   */
+  places?: string[];
   publishedAt: Date | string;
   impact: NewsImpactExtract;
   /** Headline used to label the incident in charts */
@@ -60,6 +65,8 @@ export interface EventImpactRow {
   deaths: number;
   injuries: number;
   civilian_deaths: number;
+  homes_damaged?: number;
+  livestock_lost?: number;
   url?: string | null;
 }
 
@@ -273,6 +280,8 @@ export function aggregateSegmentedImpact(
   };
 
   const buckets = new Map<string, Bucket>();
+  /** Totals use primary place only so multi-upazila fan-out does not inflate headline stats */
+  const primaryBuckets = new Map<string, Bucket>();
   const districtMentions = new Map<
     string,
     { death_mentions: number; injury_mentions: number }
@@ -297,16 +306,27 @@ export function aggregateSegmentedImpact(
     if (impact.deaths > 0) death_mentions += 1;
     if (impact.injuries > 0) injury_mentions += 1;
 
-    const district =
-      item.district && item.district !== "National" ? item.district : "National";
+    const placeList = (
+      item.places?.length
+        ? item.places
+        : item.district && item.district !== "National"
+          ? [item.district]
+          : []
+    )
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0 && p !== "National" && p !== "জাতীয়");
 
-    const mention = districtMentions.get(district) ?? {
-      death_mentions: 0,
-      injury_mentions: 0,
-    };
-    if (impact.deaths > 0) mention.death_mentions += 1;
-    if (impact.injuries > 0) mention.injury_mentions += 1;
-    districtMentions.set(district, mention);
+    // No usable place → skip chart buckets (do not dump into জাতীয়)
+    if (placeList.length === 0) {
+      if (isHistoricalTally(impact)) {
+        excluded_historical_articles += 1;
+        excluded_historical_peak = Math.max(excluded_historical_peak, impact.deaths);
+      }
+      for (const e of impact.evidence) {
+        if (evidence.length < 8 && !evidence.includes(e)) evidence.push(e);
+      }
+      continue;
+    }
 
     if (isHistoricalTally(impact)) {
       excluded_historical_articles += 1;
@@ -315,38 +335,64 @@ export function aggregateSegmentedImpact(
     }
 
     const day = dayKey(at);
-    const key = `${district}|${day}`;
-    const prev = buckets.get(key);
-    const score = impact.deaths * 10 + impact.injuries;
-    const prevScore = prev ? prev.deaths * 10 + prev.injuries : -1;
-    const title = (item.title ?? "").trim() || `${district} · ${day}`;
+    const title = (item.title ?? "").trim();
+    const score =
+      impact.deaths * 10 +
+      impact.injuries * 3 +
+      impact.homes_damaged +
+      Math.min(impact.livestock_lost, 500);
 
-    if (!prev) {
-      buckets.set(key, {
-        deaths: impact.deaths,
-        civilian_deaths: impact.civilian_deaths,
-        injuries: impact.injuries,
-        homes_damaged: impact.homes_damaged,
-        livestock_lost: impact.livestock_lost,
-        damage_mentions: impact.damage_mentions,
-        title,
-        url: item.url ?? null,
-        district,
-        day,
-      });
-    } else {
-      buckets.set(key, {
-        deaths: Math.max(prev.deaths, impact.deaths),
-        civilian_deaths: Math.max(prev.civilian_deaths, impact.civilian_deaths),
-        injuries: Math.max(prev.injuries, impact.injuries),
-        homes_damaged: Math.max(prev.homes_damaged, impact.homes_damaged),
-        livestock_lost: Math.max(prev.livestock_lost, impact.livestock_lost),
-        damage_mentions: Math.max(prev.damage_mentions, impact.damage_mentions),
-        title: score >= prevScore ? title : prev.title,
-        url: score >= prevScore ? (item.url ?? prev.url) : prev.url,
-        district,
-        day,
-      });
+    const upsert = (map: Map<string, Bucket>, district: string) => {
+      const key = `${district}|${day}`;
+      const prev = map.get(key);
+      const prevScore = prev
+        ? prev.deaths * 10 +
+          prev.injuries * 3 +
+          prev.homes_damaged +
+          Math.min(prev.livestock_lost, 500)
+        : -1;
+      const bucketTitle = title || `${district} · ${day}`;
+      const url = item.url ?? null;
+      if (!prev) {
+        map.set(key, {
+          deaths: impact.deaths,
+          civilian_deaths: impact.civilian_deaths,
+          injuries: impact.injuries,
+          homes_damaged: impact.homes_damaged,
+          livestock_lost: impact.livestock_lost,
+          damage_mentions: impact.damage_mentions,
+          title: bucketTitle,
+          url,
+          district,
+          day,
+        });
+      } else {
+        map.set(key, {
+          deaths: Math.max(prev.deaths, impact.deaths),
+          civilian_deaths: Math.max(prev.civilian_deaths, impact.civilian_deaths),
+          injuries: Math.max(prev.injuries, impact.injuries),
+          homes_damaged: Math.max(prev.homes_damaged, impact.homes_damaged),
+          livestock_lost: Math.max(prev.livestock_lost, impact.livestock_lost),
+          damage_mentions: Math.max(prev.damage_mentions, impact.damage_mentions),
+          title: score >= prevScore ? bucketTitle : prev.title,
+          url: score >= prevScore ? url : prev.url,
+          district,
+          day,
+        });
+      }
+    };
+
+    upsert(primaryBuckets, placeList[0]!);
+
+    for (const district of placeList) {
+      const mention = districtMentions.get(district) ?? {
+        death_mentions: 0,
+        injury_mentions: 0,
+      };
+      if (impact.deaths > 0) mention.death_mentions += 1;
+      if (impact.injuries > 0) mention.injury_mentions += 1;
+      districtMentions.set(district, mention);
+      upsert(buckets, district);
     }
 
     for (const e of impact.evidence) {
@@ -362,16 +408,18 @@ export function aggregateSegmentedImpact(
   let livestock_lost = 0;
   let damage_mentions = 0;
 
-  const by_event: EventImpactRow[] = [];
-
-  for (const [key, b] of buckets) {
+  for (const b of primaryBuckets.values()) {
     deaths += b.deaths;
     civilian_deaths += b.civilian_deaths;
     injuries += b.injuries;
     homes_damaged += b.homes_damaged;
     livestock_lost += b.livestock_lost;
     damage_mentions += b.damage_mentions;
+  }
 
+  const by_event: EventImpactRow[] = [];
+
+  for (const [key, b] of buckets) {
     const row = byDistrictMap.get(b.district) ?? emptyDistrictRow(b.district);
     row.deaths += b.deaths;
     row.civilian_deaths += b.civilian_deaths;
@@ -381,7 +429,12 @@ export function aggregateSegmentedImpact(
     row.damage_mentions += b.damage_mentions;
     byDistrictMap.set(b.district, row);
 
-    if (b.deaths > 0 || b.injuries > 0) {
+    if (
+      b.deaths > 0 ||
+      b.injuries > 0 ||
+      b.homes_damaged > 0 ||
+      b.livestock_lost > 0
+    ) {
       by_event.push({
         id: key,
         label: shortEventLabel(b.title, b.district, b.day),
@@ -391,6 +444,8 @@ export function aggregateSegmentedImpact(
         deaths: b.deaths,
         injuries: b.injuries,
         civilian_deaths: b.civilian_deaths,
+        homes_damaged: b.homes_damaged,
+        livestock_lost: b.livestock_lost,
         url: b.url,
       });
     }
@@ -403,12 +458,45 @@ export function aggregateSegmentedImpact(
     byDistrictMap.set(district, row);
   }
 
-  const by_district = [...byDistrictMap.values()]
-    .filter((r) => r.deaths > 0 || r.injuries > 0 || r.death_mentions > 0)
-    .sort((a, b) => b.deaths - a.deaths || b.injuries - a.injuries)
-    .slice(0, 12);
+  const severity = (r: {
+    deaths: number;
+    injuries: number;
+    homes_damaged: number;
+    livestock_lost: number;
+  }) =>
+    r.deaths * 1000 +
+    r.injuries * 100 +
+    r.homes_damaged * 10 +
+    Math.min(r.livestock_lost, 200);
 
-  by_event.sort((a, b) => b.deaths - a.deaths || b.injuries - a.injuries);
+  const by_district = [...byDistrictMap.values()]
+    .filter(
+      (r) =>
+        r.deaths > 0 ||
+        r.injuries > 0 ||
+        r.homes_damaged > 0 ||
+        r.livestock_lost > 0 ||
+        r.death_mentions > 0,
+    )
+    .sort((a, b) => severity(b) - severity(a) || a.district.localeCompare(b.district, "bn"))
+    .slice(0, 48);
+
+  by_event.sort(
+    (a, b) =>
+      severity({
+        deaths: b.deaths,
+        injuries: b.injuries,
+        homes_damaged: b.homes_damaged ?? 0,
+        livestock_lost: b.livestock_lost ?? 0,
+      }) -
+        severity({
+          deaths: a.deaths,
+          injuries: a.injuries,
+          homes_damaged: a.homes_damaged ?? 0,
+          livestock_lost: a.livestock_lost ?? 0,
+        }) ||
+      b.day.localeCompare(a.day),
+  );
 
   return {
     window_days: windowDays,
@@ -426,14 +514,14 @@ export function aggregateSegmentedImpact(
     excluded_historical_articles,
     excluded_historical_peak,
     by_district,
-    by_event: by_event.slice(0, 12),
+    by_event: by_event.slice(0, 48),
     evidence,
     disclaimer_bn:
       disclaimers?.bn ??
-      "আনুমানিক সংখ্যা = একই জেলা/দিনে খবরগুলোর সর্বোচ্চ (যোগ নয়)। একই ঘটনা একাধিক পত্রিকায় গুনে যায় না। অফিসিয়াল হিসাব নয়।",
+      "আনুমানিক = একই উপজেলা/জেলা × দিনে খবরের সর্বোচ্চ (যোগ নয়)। নিহত, আহত, ঘর, গবাদি পশু — খবরে যে স্থান নাম আছে সেখানেই। অফিসিয়াল হিসাব নয়।",
     disclaimer_en:
       disclaimers?.en ??
-      "Estimate = max per district/day across headlines (not a sum). Same incident is not counted once per paper. Not an official tally.",
+      "Estimate = max per upazila/district × day. Deaths, injuries, homes, livestock at each named place. Not an official tally.",
   };
 }
 

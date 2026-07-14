@@ -71,7 +71,7 @@ services:
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
       RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-geoinsight_exchange}
       RABBITMQ_GOV_QUEUE: ${RABBITMQ_GOV_QUEUE:-gov_core_queue}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3600}
       AI_SERVICE_URL: http://ai-analytics:8000
       INGESTION_ENABLED: ${INGESTION_ENABLED:-true}
       INGESTION_INTERVAL_MS: ${INGESTION_INTERVAL_MS:-900000}
@@ -133,7 +133,7 @@ services:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
       SOVEREIGN_MODE: ${SOVEREIGN_MODE:-true}
       AI_MODEL_CACHE_DIR: /tmp/ml_models/cache
-      CORS_ORIGINS: ${CORS_ORIGIN:-http://localhost:3000},http://api-gateway:4000
+      CORS_ORIGINS: ${CORS_ORIGIN:-http://localhost:3600},http://api-gateway:4000
       HF_HUB_DISABLE_TELEMETRY: "1"
       HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
     depends_on:
@@ -183,7 +183,7 @@ services:
     container_name: geoinsight-dashboard
     restart: unless-stopped
     ports:
-      - "${DASHBOARD_PORT:-3000}:3000"
+      - "${DASHBOARD_PORT:-3600}:3000"
     environment:
       NODE_ENV: production
       PORT: 3000

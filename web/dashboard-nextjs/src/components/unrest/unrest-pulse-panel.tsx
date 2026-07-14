@@ -19,6 +19,7 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useUnrestPulse, type UnrestCategory } from "@/hooks/use-unrest-pulse";
 import { ProgressMeter } from "@/components/ui/progress-meter";
 import { IntelCard } from "@/components/ui/intel-card";
+import { SourceLink } from "@/components/ui/source-link";
 import { ImpactStatsPanel } from "@/components/shared/impact-stats-panel";
 import { cn } from "@/lib/utils";
 
@@ -261,20 +262,15 @@ export function UnrestPulsePanel() {
                           <span className="text-[11px] text-muted-foreground">{s.district}</span>
                         )}
                       </div>
-                      <a
+                      <SourceLink
                         href={s.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium hover:text-primary hover:underline"
-                      >
-                        {s.title}
-                      </a>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {s.source_name}
-                        {s.published_at
-                          ? ` · ${new Date(s.published_at).toLocaleString()}`
-                          : ""}
-                      </p>
+                        title={s.title}
+                        meta={`${s.source_name}${
+                          s.published_at ? ` · ${new Date(s.published_at).toLocaleString()}` : ""
+                        }`}
+                        openText={locale === "bn" ? "খবর" : "Open"}
+                        openLabel={locale === "bn" ? "সোর্স খবর খুলুন" : "Open source article"}
+                      />
                     </li>
                   ))}
                 </ul>

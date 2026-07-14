@@ -24,6 +24,13 @@ interface HazardZone {
   lat?: number;
   lng?: number;
   radius_km?: number;
+  division?: string;
+  district?: string;
+  locality?: string;
+  locality_bn?: string;
+  water_note_bn?: string;
+  water_note_en?: string;
+  scale?: string;
 }
 
 interface HazardWeatherMapProps {
@@ -51,6 +58,10 @@ export function HazardWeatherMap({
         <span className="inline-flex items-center gap-1">
           <span className="h-2.5 w-2.5 rounded-full bg-blue-400/80" />
           Flood zone
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-red-500 ring-1 ring-white/80" />
+          Locality hotspot (upazila / area)
         </span>
         <span className="inline-flex items-center gap-1">
           <Wind className="h-3 w-3 text-sky-400" />
