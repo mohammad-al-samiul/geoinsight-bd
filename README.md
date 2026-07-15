@@ -277,8 +277,8 @@ See [`.env.example`](.env.example). Key groups:
 | Group | Variables |
 |-------|-----------|
 | PostgreSQL | `POSTGRES_*`, `DATABASE_URL`, `DATABASE_READ_URL`, `DIRECT_DATABASE_URL` |
-| Redis | `REDIS_*`, `REDIS_URL` |
-| RabbitMQ | `RABBITMQ_*`, `RABBITMQ_URL` |
+| RabbitMQ | `RABBITMQ_*`, `RABBITMQ_URL` — **async job bus** (gov / AI queues) |
+| Redis | `REDIS_*`, `REDIS_URL` — **cache + rate limit + Socket.io** (not BullMQ) |
 | MinIO | `MINIO_*` |
 | JWT | `JWT_SECRET`, `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_DAYS` |
 | AI / LLM | `AI_SERVICE_URL`, `OLLAMA_URL`, `OLLAMA_MODEL`, `SENTIMENT_USE_MOCK` |

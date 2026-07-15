@@ -1,8 +1,11 @@
 from functools import lru_cache
 from pathlib import Path
+import re
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_PLACEHOLDER = re.compile(r"change_me|changeme|example\.gov|YOUR_VPS", re.I)
 
 
 class Settings(BaseSettings):
@@ -62,6 +65,14 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.environment != "production":
+            return self
+        if _PLACEHOLDER.search(self.rabbitmq_url):
+            raise ValueError("RABBITMQ_URL must not use placeholder credentials in production")
+        return self
 
 
 @lru_cache

@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+import logging
 
 from app.api.router import api_router
 from app.core.config import get_settings
@@ -9,6 +10,7 @@ from app.core.lifespan import lifespan
 from app.core.metrics import setup_metrics
 from app.core.rate_limit import PublicFeedRateLimitMiddleware
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 app = FastAPI(
@@ -31,6 +33,18 @@ app.add_middleware(
 )
 
 app.add_exception_handler(AppError, app_error_handler)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled exception")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "message": "Internal server error" if settings.environment == "production" else str(exc),
+        },
+    )
 
 
 @app.get("/", include_in_schema=False)

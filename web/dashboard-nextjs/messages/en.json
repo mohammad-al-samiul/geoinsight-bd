@@ -469,7 +469,7 @@
       "title": "Proximity Alert Map",
       "description": "Real-time lat/lng → Shapely geofence — alert when tracks enter or approach PMO, Bangabhaban and other sensitive polygons.",
       "mapTitle": "Interactive geofence",
-      "mapHint": "Polygons = sensitive campuses. Live VIP tracks refresh ~every 4s. Click the map to drop an analyst pin.",
+      "mapHint": "Polygons = sensitive campuses. Live VIP tracks refresh ~every 10s. Click the map to drop an analyst pin.",
       "activeAlerts": "Active alerts",
       "zones": "Geofences",
       "tracks": "Tracks",
@@ -482,7 +482,7 @@
       "noAlerts": "No INSIDE / APPROACHING alerts right now.",
       "zoneList": "Sensitive zones",
       "noZones": "Zones not loaded.",
-      "pollHint": "Open-track simulation + ADS-B-style feed · 4s polling"
+      "pollHint": "Open-track simulation + ADS-B-style feed · 10s polling"
     },
     "faceIntel": {
       "title": "Face Intel — VIP Ethical Report Card",

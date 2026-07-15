@@ -51,7 +51,7 @@ export interface ProximityLiveSnapshot {
   feed: string;
 }
 
-const POLL_MS = 4000;
+const POLL_MS = 10_000;
 
 export function useProximityLive(enabled = true) {
   const [data, setData] = useState<ProximityLiveSnapshot | null>(null);

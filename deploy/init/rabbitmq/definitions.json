@@ -24,11 +24,24 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {
-        "x-queue-type": "classic"
+        "x-queue-type": "classic",
+        "x-dead-letter-exchange": "geoinsight_exchange",
+        "x-dead-letter-routing-key": "dead.gov"
       }
     },
     {
       "name": "ai_analytics_queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic",
+        "x-dead-letter-exchange": "geoinsight_exchange",
+        "x-dead-letter-routing-key": "dead.ai"
+      }
+    },
+    {
+      "name": "dead_letter_queue",
       "vhost": "/",
       "durable": true,
       "auto_delete": false,
@@ -71,6 +84,14 @@
       "destination": "ai_analytics_queue",
       "destination_type": "queue",
       "routing_key": "ai.*",
+      "arguments": {}
+    },
+    {
+      "source": "geoinsight_exchange",
+      "vhost": "/",
+      "destination": "dead_letter_queue",
+      "destination_type": "queue",
+      "routing_key": "dead.#",
       "arguments": {}
     }
   ]

@@ -1,5 +1,5 @@
-import { env } from "../../core/config/env";
 import { pipelineService } from "../pipeline/pipeline.service";
+import { fetchAi } from "../../shared/http/fetch-ai";
 
 export interface ProcurementAdviseParams {
   commodity: string;
@@ -46,7 +46,7 @@ export class ProcurementService {
   }
 
   private async callAi(payload: Record<string, unknown>) {
-    return fetch(`${env.AI_SERVICE_URL}/api/v1/procurement/advise`, {
+    return fetchAi(`/api/v1/procurement/advise`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
-import { env } from "../../core/config/env";
 import { prismaRead } from "../../core/database/prisma.client";
 import { dashboardService } from "../dashboard/dashboard.service";
+import { fetchAi } from "../../shared/http/fetch-ai";
 
 export interface TwinSimulateParams {
   targetDivisionId: string;
@@ -46,7 +46,7 @@ export class TwinService {
       }),
     );
 
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/twin/simulate`, {
+    const res = await fetchAi(`/api/v1/twin/simulate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

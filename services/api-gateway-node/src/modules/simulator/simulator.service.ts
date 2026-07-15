@@ -1,4 +1,4 @@
-import { env } from "../../core/config/env";
+import { fetchAi } from "../../shared/http/fetch-ai";
 
 export interface ScenarioParams {
   conflict_intensity: number;
@@ -15,7 +15,7 @@ export interface ScenarioParams {
 
 export class SimulatorService {
   async runScenario(params: ScenarioParams) {
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/simulator/run`, {
+    const res = await fetchAi(`/api/v1/simulator/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

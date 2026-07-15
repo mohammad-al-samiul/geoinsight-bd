@@ -24,6 +24,13 @@ async function proxyRequest(
   const headers = new Headers();
   headers.set("Authorization", `Bearer ${accessToken}`);
 
+  const clientIp =
+    request.headers.get("x-forwarded-for") ??
+    request.headers.get("x-real-ip");
+  if (clientIp) {
+    headers.set("X-Forwarded-For", clientIp);
+  }
+
   FORWARD_HEADERS.forEach((name) => {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);

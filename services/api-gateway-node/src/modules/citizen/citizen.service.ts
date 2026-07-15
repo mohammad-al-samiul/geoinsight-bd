@@ -1,4 +1,4 @@
-import { env } from "../../core/config/env";
+import { fetchAi } from "../../shared/http/fetch-ai";
 
 export interface CitizenChatParams {
   message: string;
@@ -10,7 +10,7 @@ export interface CitizenChatParams {
 
 export class CitizenChatService {
   async chat(params: CitizenChatParams) {
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/citizen/chat`, {
+    const res = await fetchAi(`/api/v1/citizen/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

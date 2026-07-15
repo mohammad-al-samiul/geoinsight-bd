@@ -1,3 +1,4 @@
+import type { Request } from "express";
 import rateLimit, { RateLimitRequestHandler } from "express-rate-limit";
 import { RedisStore, type RedisReply } from "rate-limit-redis";
 import { env } from "../config/env";
@@ -8,6 +9,22 @@ const rateLimitMessage = (message: string) => ({
   success: false,
   message,
 });
+
+function clientIp(req: Request): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.length > 0) {
+    return forwarded.split(",")[0]?.trim() || "unknown";
+  }
+  return req.ip ?? "unknown";
+}
+
+function hasBearerAuth(req: Request): boolean {
+  return Boolean(req.headers.authorization?.startsWith("Bearer "));
+}
+
+function isHealthProbe(req: Request): boolean {
+  return req.path.startsWith("/api/v1/health");
+}
 
 function redisStore(prefix: string): RedisStore | undefined {
   if (!isRedisEnabled()) return undefined;
@@ -24,6 +41,10 @@ function createLimiter(
   max: number,
   windowMs: number,
   message: string,
+  options?: {
+    skip?: (req: Request) => boolean;
+    keyGenerator?: (req: Request) => string;
+  },
 ): RateLimitRequestHandler {
   return rateLimit({
     windowMs,
@@ -33,15 +54,25 @@ function createLimiter(
     message: rateLimitMessage(message),
     statusCode: HTTP_STATUS.TOO_MANY_REQUESTS,
     store: redisStore(prefix),
+    keyGenerator: options?.keyGenerator ?? clientIp,
+    skip: options?.skip,
   });
 }
 
-/** Global authenticated API ceiling — Redis-backed across gateway replicas */
+/**
+ * Public / unauthenticated API ceiling.
+ * Authenticated dashboard traffic is excluded — Next.js proxy shares one container IP
+ * and live modules (proximity ~15 req/min) would exhaust 100/15min for all analysts.
+ */
 export const globalRateLimiter = createLimiter(
   "global",
   env.RATE_LIMIT_MAX,
   env.RATE_LIMIT_WINDOW_MS,
   "Too many requests, please try again later",
+  {
+    skip: (req) => isHealthProbe(req) || hasBearerAuth(req),
+    keyGenerator: clientIp,
+  },
 );
 
 /** Credential stuffing / brute-force protection */
@@ -50,6 +81,7 @@ export const authRateLimiter = createLimiter(
   20,
   15 * 60 * 1000,
   "Too many authentication attempts",
+  { keyGenerator: clientIp },
 );
 
 /**
@@ -60,6 +92,7 @@ export const publicFeed333RateLimiter = createLimiter(
   env.PUBLIC_FEED_333_RATE_MAX,
   env.PUBLIC_FEED_333_WINDOW_MS,
   "333 Upazila feed rate limit exceeded",
+  { keyGenerator: clientIp },
 );
 
 /**
@@ -70,6 +103,7 @@ export const publicFeed999RateLimiter = createLimiter(
   env.PUBLIC_FEED_999_RATE_MAX,
   env.PUBLIC_FEED_999_WINDOW_MS,
   "999 Union feed rate limit exceeded",
+  { keyGenerator: clientIp },
 );
 
 /** Burst protection for unauthenticated scrape endpoints */
@@ -78,4 +112,5 @@ export const publicFeedBurstLimiter = createLimiter(
   10,
   1000,
   "Feed burst limit exceeded — possible DDoS",
+  { keyGenerator: clientIp },
 );

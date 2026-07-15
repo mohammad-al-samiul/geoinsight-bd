@@ -3,9 +3,9 @@ import {
   IngestionSentiment,
   Prisma,
 } from "@prisma/client";
-import { env } from "../../core/config/env";
 import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
 import { redisCacheService } from "../../infrastructure/cache/redis-cache.service";
+import { fetchAi } from "../../shared/http/fetch-ai";
 
 const HEATMAP_TTL_SEC = 120;
 
@@ -113,7 +113,7 @@ function hardshipHint(text: string): string | null {
 
 export class IngestionService {
   async syncFromAi(maxPerFeed = 15): Promise<IngestionSyncResult> {
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/ingestion/fetch`, {
+    const res = await fetchAi(`/api/v1/ingestion/fetch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ max_per_feed: maxPerFeed, analyze_sentiment: true }),

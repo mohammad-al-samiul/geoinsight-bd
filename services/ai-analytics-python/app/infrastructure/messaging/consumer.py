@@ -29,7 +29,14 @@ class AiQueueConsumer:
         channel = await self._connection.channel()
         await channel.set_qos(prefetch_count=5)
 
-        queue = await channel.declare_queue(self._settings.rabbitmq_ai_queue, durable=True)
+        queue = await channel.declare_queue(
+            self._settings.rabbitmq_ai_queue,
+            durable=True,
+            arguments={
+                "x-dead-letter-exchange": self._settings.rabbitmq_exchange,
+                "x-dead-letter-routing-key": "dead.ai",
+            },
+        )
         await queue.consume(self._on_message)
         logger.info("Consuming queue: %s", self._settings.rabbitmq_ai_queue)
 

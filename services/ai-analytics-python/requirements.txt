@@ -35,4 +35,4 @@ opencv-python-headless==4.11.0.86
 Pillow==11.1.0
 python-multipart==0.0.20
 
-# Optional: pip install celery  (see app/modules/phishing/celery_tasks.py mockup)
+# Async jobs: RabbitMQ (aio-pika) — see app/infrastructure/messaging/

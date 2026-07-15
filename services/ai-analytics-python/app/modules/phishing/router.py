@@ -96,7 +96,7 @@ async def scan_async(
 
     Preferred production path in this monorepo: publish
     ``{"type": "phishing_scan", "data": {...}}`` to ``ai_analytics_queue``
-    (see consumer + ``celery_tasks.py`` mockup).
+    (see ``AiQueueConsumer`` — RabbitMQ is the single async bus; no Celery/BullMQ).
     """
 
     async def _run() -> None:

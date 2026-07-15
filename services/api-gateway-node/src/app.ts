@@ -9,13 +9,15 @@ import {
   closeRabbitMq,
   startGovQueueConsumer,
 } from "./infrastructure/messaging/gov-queue.consumer";
-import { initSocketServer } from "./infrastructure/socket/socket.server";
+import { closeSocketServer, initSocketServer } from "./infrastructure/socket/socket.server";
 import { container } from "./core/di/container";
 import { createApp } from "./create-app";
 import { pipelineOrchestrator } from "./modules/pipeline/pipeline.orchestrator";
+import type { IngestionBackgroundWorker } from "./modules/ingestion/ingestion.worker";
 
 const app = createApp();
 const httpServer = createServer(app);
+let ingestionWorker: IngestionBackgroundWorker | null = null;
 
 async function bootstrap(): Promise<void> {
   await connectDatabase();
@@ -29,16 +31,15 @@ async function bootstrap(): Promise<void> {
   if (env.PIPELINE_ENABLED && env.NODE_ENV !== "test") {
     pipelineOrchestrator.start();
   } else if (env.INGESTION_ENABLED && env.NODE_ENV !== "test") {
-    // Legacy fallback when pipeline disabled but ingestion alone is enabled
     const { ingestionService } = await import("./modules/ingestion/ingestion.service");
     const { IngestionBackgroundWorker } = await import("./modules/ingestion/ingestion.worker");
-    const worker = new IngestionBackgroundWorker(
+    ingestionWorker = new IngestionBackgroundWorker(
       () => ingestionService.syncFromAi(15),
       env.INGESTION_INTERVAL_MS,
       env.INGESTION_RUN_ON_START,
       env.INGESTION_STARTUP_DELAY_MS,
     );
-    worker.start();
+    ingestionWorker.start();
   }
 
   httpServer.listen(env.API_GATEWAY_PORT, () => {
@@ -49,9 +50,14 @@ async function bootstrap(): Promise<void> {
 async function shutdown(signal: string): Promise<void> {
   console.info(`[gateway] ${signal} — shutting down`);
   pipelineOrchestrator.stop();
+  ingestionWorker?.stop();
   container.blockchainRetryWorker.stop();
   await container.fabricClient.disconnect();
-  httpServer.close();
+
+  await new Promise<void>((resolve) => {
+    httpServer.close(() => resolve());
+  });
+  await closeSocketServer();
   await closeRabbitMq();
   await disconnectRedis();
   await disconnectDatabase();

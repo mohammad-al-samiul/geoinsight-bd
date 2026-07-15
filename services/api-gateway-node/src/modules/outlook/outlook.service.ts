@@ -8,6 +8,7 @@ import {
   mandateAnalysisSince,
   mandatePublicMeta,
 } from "../../shared/gov/current-mandate";
+import { AI_FETCH_LLM_MS, fetchAi } from "../../shared/http/fetch-ai";
 
 const OUTLOOK_CACHE_KEY = "outlook:strategic:v3";
 const OUTLOOK_TTL_SEC = 1800;
@@ -168,11 +169,15 @@ export class OutlookService {
 
     let aiResult: Record<string, unknown>;
     try {
-      const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/outlook/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(aiPayload),
-      });
+      const res = await fetchAi(
+        `/api/v1/outlook/generate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(aiPayload),
+        },
+        { timeoutMs: AI_FETCH_LLM_MS },
+      );
       if (!res.ok) throw new Error(`outlook AI ${res.status}`);
       aiResult = (await res.json()) as Record<string, unknown>;
     } catch (err) {

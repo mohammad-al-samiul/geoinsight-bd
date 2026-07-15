@@ -100,3 +100,16 @@ export async function broadcastToHierarchy(
     server.to(room).emit(event, payload);
   }
 }
+
+export function emitToNational(event: string, payload: unknown): void {
+  if (!io) return;
+  io.to(nationalRoom()).emit(event, payload);
+}
+
+export async function closeSocketServer(): Promise<void> {
+  if (!io) return;
+  await new Promise<void>((resolve) => {
+    io!.close(() => resolve());
+  });
+  io = null;
+}

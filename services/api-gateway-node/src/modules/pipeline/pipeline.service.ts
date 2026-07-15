@@ -13,6 +13,7 @@ import { publishToGovQueue } from "../../infrastructure/messaging/gov-queue.publ
 import { hashAiExplanation } from "../twin/twin.service";
 import { ingestionService } from "../ingestion/ingestion.service";
 import { broadcastDashboardRefresh, broadcastKpiUpdate } from "./pipeline.broadcast";
+import { fetchAi } from "../../shared/http/fetch-ai";
 
 const COMMODITIES = ["rice", "wheat", "lentil", "onion"] as const;
 const HAZARD_CACHE_KEY = "pipeline:hazard:v1";
@@ -127,7 +128,7 @@ export class PipelineService {
     const commodities: string[] = [];
 
     for (const commodity of COMMODITIES) {
-      const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/arbitrage/analyze`, {
+      const res = await fetchAi(`/api/v1/arbitrage/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ commodity, quantity_mt: 1000 }),

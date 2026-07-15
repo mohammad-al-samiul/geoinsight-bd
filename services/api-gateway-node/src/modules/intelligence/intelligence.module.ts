@@ -6,7 +6,7 @@ import { authenticate } from "../../core/middlewares/auth.middleware";
 import { validate } from "../../core/middlewares/validate.middleware";
 import { container } from "../../core/di/container";
 import { asyncHandler, sendSuccess } from "../../core/utils/async-handler";
-import { env } from "../../core/config/env";
+import { fetchAi } from "../../shared/http/fetch-ai";
 import { intelligenceService } from "./intelligence.service";
 
 const scopeQuerySchema = z.object({
@@ -251,8 +251,8 @@ export class IntelligenceModule extends BaseModule {
       container.rbac.requireRoles(UserRole.PMO, UserRole.MINISTER, UserRole.DC),
       asyncHandler(async (req, res) => {
         const vipId = String(req.params.vipId ?? "");
-        const upstream = await fetch(
-          `${env.AI_SERVICE_URL}/api/v1/face-intel/sample/${encodeURIComponent(vipId)}`,
+        const upstream = await fetchAi(
+          `/api/v1/face-intel/sample/${encodeURIComponent(vipId)}`,
         );
         if (!upstream.ok) {
           sendSuccess(res, { error: "sample_not_found" }, 404);

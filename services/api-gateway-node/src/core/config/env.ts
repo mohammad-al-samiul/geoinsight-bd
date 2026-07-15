@@ -27,7 +27,7 @@ const envSchema = z.object({
   RABBITMQ_GOV_QUEUE: z.string().default("gov_core_queue"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
-  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(500),
   PUBLIC_FEED_333_RATE_MAX: z.coerce.number().int().positive().default(30),
   PUBLIC_FEED_333_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   PUBLIC_FEED_999_RATE_MAX: z.coerce.number().int().positive().default(15),
@@ -75,6 +75,8 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+const PLACEHOLDER_SECRET = /change_me|changeme|example\.gov|YOUR_VPS|password123/i;
+
 function loadEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
@@ -82,6 +84,20 @@ function loadEnv(): Env {
     process.exit(1);
   }
   const data = parsed.data;
+
+  if (data.NODE_ENV === "production") {
+    const violations: string[] = [];
+    if (PLACEHOLDER_SECRET.test(data.JWT_SECRET)) violations.push("JWT_SECRET");
+    if (PLACEHOLDER_SECRET.test(data.RABBITMQ_URL)) violations.push("RABBITMQ_URL");
+    if (!data.REDIS_URL) violations.push("REDIS_URL (required in production)");
+    if (violations.length > 0) {
+      console.error(
+        `[env] Production startup blocked — replace placeholder values: ${violations.join(", ")}`,
+      );
+      process.exit(1);
+    }
+  }
+
   return {
     ...data,
     DATABASE_READ_URL: data.DATABASE_READ_URL ?? data.DATABASE_URL,

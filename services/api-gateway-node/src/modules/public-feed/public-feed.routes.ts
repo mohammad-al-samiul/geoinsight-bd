@@ -6,12 +6,13 @@ import {
   publicFeedBurstLimiter,
 } from "../../core/middlewares/rate-limiter.middleware";
 import { asyncHandler, sendSuccess } from "../../core/utils/async-handler";
+import { fetchAi } from "../../shared/http/fetch-ai";
 
 async function proxyFeed(
   path: string,
   body: Record<string, unknown>,
 ): Promise<{ status: number; json: unknown }> {
-  const res = await fetch(`${env.AI_SERVICE_URL}${path}`, {
+  const res = await fetchAi(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

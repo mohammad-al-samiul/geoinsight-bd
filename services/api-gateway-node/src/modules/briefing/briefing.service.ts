@@ -7,6 +7,7 @@ import {
   type DashboardScopeQuery,
 } from "../dashboard/dashboard.service";
 import { ingestionService } from "../ingestion/ingestion.service";
+import { AI_FETCH_LLM_MS, fetchAi } from "../../shared/http/fetch-ai";
 
 export interface MorningBriefingQuery extends DashboardScopeQuery {
   lang?: "bn" | "en";
@@ -20,11 +21,15 @@ const COMMODITY_BN: Record<string, string> = {
 };
 
 async function callAiBriefing(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/briefing/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const res = await fetchAi(
+    `/api/v1/briefing/generate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+    { timeoutMs: AI_FETCH_LLM_MS },
+  );
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`AI briefing failed: ${err}`);

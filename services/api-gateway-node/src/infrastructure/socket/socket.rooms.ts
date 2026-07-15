@@ -7,6 +7,7 @@ export const SOCKET_EVENTS = {
   METADATA_UPDATE: "gov:metadata",
   DASHBOARD_REFRESH: "dashboard:refresh",
   ALERT_CREATED: "alert:created",
+  ARBITRAGE_UPDATE: "arbitrage:update",
   CONNECTED: "connected",
 } as const;
 

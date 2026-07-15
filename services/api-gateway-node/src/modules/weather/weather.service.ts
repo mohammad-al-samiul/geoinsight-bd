@@ -1,5 +1,4 @@
 import { Prisma } from "@prisma/client";
-import { env } from "../../core/config/env";
 import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
 import type { DashboardScopeQuery } from "../dashboard/dashboard.service";
@@ -17,6 +16,7 @@ import {
   type SegmentedNewsImpact,
 } from "../../shared/impact/news-impact";
 import { resolveImpactPlaces } from "../../shared/geo/news-place-matcher";
+import { fetchAi } from "../../shared/http/fetch-ai";
 
 const WEATHER_CACHE_KEY = "weather:live:v6";
 const WEATHER_CACHE_TTL_SEC = 900;
@@ -139,7 +139,7 @@ export interface WeatherLiveSummary {
 
 export class WeatherService {
   async syncFromAi(): Promise<Record<string, unknown>> {
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/weather/fetch`);
+    const res = await fetchAi(`/api/v1/weather/fetch`);
     if (!res.ok) {
       throw new Error(`Weather fetch failed: ${res.status}`);
     }

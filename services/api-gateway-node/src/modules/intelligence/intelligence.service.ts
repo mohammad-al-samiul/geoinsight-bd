@@ -11,6 +11,7 @@ import {
   normalizeDivisionName,
   resolveScopeContext,
 } from "../../shared/scope/scope-context";
+import { fetchAi } from "../../shared/http/fetch-ai";
 import { allStaticHazardZones } from "./flood-hotspots.data";
 
 export interface PredictiveScore {
@@ -79,8 +80,8 @@ export class IntelligenceService {
       return ingestionService.buildHeatmap(level, limit);
     }
 
-    const res = await fetch(
-      `${env.AI_SERVICE_URL}/api/v1/sentiment/heatmap?level=${level}&limit=${limit}`,
+    const res = await fetchAi(
+      `/api/v1/sentiment/heatmap?level=${level}&limit=${limit}`,
     );
     if (!res.ok) throw new Error("Sentiment heatmap unavailable");
     return res.json();
@@ -171,7 +172,7 @@ export class IntelligenceService {
       })),
     };
 
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/predictive/score`, {
+    const res = await fetchAi(`/api/v1/predictive/score`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(aiInput),
@@ -334,7 +335,7 @@ export class IntelligenceService {
       }),
     );
 
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/accountability/score`, {
+    const res = await fetchAi(`/api/v1/accountability/score`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ representatives: repInputs }),
@@ -349,7 +350,7 @@ export class IntelligenceService {
     contractor_nid?: string;
     lang?: "bn" | "en";
   }) {
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/documents/analyze`, {
+    const res = await fetchAi(`/api/v1/documents/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -369,7 +370,7 @@ export class IntelligenceService {
     timeout_seconds?: number;
     official_urls?: string[];
   }) {
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/phishing/scan`, {
+    const res = await fetchAi(`/api/v1/phishing/scan`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -384,7 +385,7 @@ export class IntelligenceService {
   }
 
   async registerPhishingOfficials(body: { urls: string[]; timeout_seconds?: number }) {
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/phishing/register`, {
+    const res = await fetchAi(`/api/v1/phishing/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -399,7 +400,7 @@ export class IntelligenceService {
   async registerPhishingDefaults(timeoutSeconds?: number) {
     const q =
       timeoutSeconds != null ? `?timeout_seconds=${encodeURIComponent(String(timeoutSeconds))}` : "";
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/phishing/register/defaults${q}`, {
+    const res = await fetchAi(`/api/v1/phishing/register/defaults${q}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -409,7 +410,7 @@ export class IntelligenceService {
   }
 
   async listPhishingOfficialDomains() {
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/phishing/official-domains`);
+    const res = await fetchAi(`/api/v1/phishing/official-domains`);
     if (!res.ok) throw new Error("Official domain list unavailable");
     return res.json();
   }
@@ -417,7 +418,7 @@ export class IntelligenceService {
   async getProximityLive(includeDemoVips = true) {
     const q = `?include_demo_vips=${includeDemoVips ? "true" : "false"}`;
     try {
-      const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/proximity/live${q}`);
+      const res = await fetchAi(`/api/v1/proximity/live${q}`);
       if (!res.ok) throw new Error(`Proximity live feed unavailable (${res.status})`);
       return res.json();
     } catch (err) {
@@ -437,7 +438,7 @@ export class IntelligenceService {
     }>;
     zone_ids?: string[];
   }) {
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/proximity/check`, {
+    const res = await fetchAi(`/api/v1/proximity/check`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -447,7 +448,7 @@ export class IntelligenceService {
   }
 
   async listProximityZones() {
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/proximity/zones`);
+    const res = await fetchAi(`/api/v1/proximity/zones`);
     if (!res.ok) throw new Error("Proximity zones unavailable");
     return res.json();
   }
@@ -459,7 +460,7 @@ export class IntelligenceService {
     demo_fallback?: boolean;
   }) {
     if (body.nid) {
-      const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/face-intel/match/nid`, {
+      const res = await fetchAi(`/api/v1/face-intel/match/nid`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nid: body.nid, lang: "bn" }),
@@ -468,7 +469,7 @@ export class IntelligenceService {
       return res.json() as Promise<{ match: FaceMatchPayload; gallery_size: number }>;
     }
     if (!body.image_base64) throw new Error("image_base64 or nid required");
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/face-intel/match`, {
+    const res = await fetchAi(`/api/v1/face-intel/match`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -482,7 +483,7 @@ export class IntelligenceService {
   }
 
   async listFaceGallery() {
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/face-intel/gallery`);
+    const res = await fetchAi(`/api/v1/face-intel/gallery`);
     if (!res.ok) throw new Error("Face gallery unavailable");
     return res.json();
   }
@@ -752,7 +753,7 @@ export class IntelligenceService {
       };
     });
 
-    const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/hazards/overlay`, {
+    const res = await fetchAi(`/api/v1/hazards/overlay`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
