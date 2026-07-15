@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { AdminCascadeFilter } from "@/components/filters/admin-cascade-filter";
 import { useAdminHierarchy } from "@/hooks/use-admin-hierarchy";
 import { ScorecardSkeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -56,8 +55,6 @@ export function ModuleShell({
           )}
         </div>
       </div>
-
-      <AdminCascadeFilter variant="glass" />
 
       {error && (
         <div className="flex items-start gap-3 rounded-xl border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive animate-fade-in">

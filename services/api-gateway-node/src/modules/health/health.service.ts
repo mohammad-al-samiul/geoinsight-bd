@@ -1,7 +1,6 @@
 import { prismaRead } from "../../core/database/prisma.client";
 import { isGovQueueConnected } from "../../infrastructure/messaging/gov-queue.consumer";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
-import { env } from "../../core/config/env";
 import { fetchAi } from "../../shared/http/fetch-ai";
 
 export type HealthCheckStatus = "ok" | "fail" | "skip";
@@ -62,7 +61,9 @@ export async function getReadiness(): Promise<ReadinessReport> {
 }
 
 export function readinessHttpStatus(report: ReadinessReport): number {
+  // Only block traffic when the database is down. Redis / RabbitMQ / AI are
+  // optional at the edge — returning 503 for "degraded" made Docker healthchecks
+  // and the dashboard BFF treat a live gateway as unreachable.
   if (report.status === "unhealthy") return 503;
-  if (report.status === "degraded" && env.NODE_ENV === "production") return 503;
   return 200;
 }

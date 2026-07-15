@@ -148,7 +148,6 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-      RABBITMQ_LOAD_DEFINITIONS: /etc/rabbitmq/definitions/definitions.json
       TZ: ${TZ:-Asia/Dhaka}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
@@ -305,7 +304,8 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       NEXT_TELEMETRY_DISABLED: "1"
-      API_GATEWAY_URL: http://api-gateway:4000
+      API_GATEWAY_URL: ${DASHBOARD_API_GATEWAY_URL:-http://api-gateway:4000}
+      NODE_OPTIONS: "--dns-result-order=ipv4first"
     depends_on:
       api-gateway:
         condition: service_healthy

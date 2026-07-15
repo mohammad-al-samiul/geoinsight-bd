@@ -2,7 +2,6 @@
 
 import { AnomalyFeedPanel } from "@/components/alerts/anomaly-feed-panel";
 import { PredictiveAlertsPanel } from "@/components/alerts/predictive-alerts-panel";
-import { AdminCascadeFilter } from "@/components/filters/admin-cascade-filter";
 import { useAdminHierarchy } from "@/hooks/use-admin-hierarchy";
 import { useTranslations } from "next-intl";
 
@@ -16,7 +15,6 @@ export default function AlertsPage() {
         <h1 className="text-2xl font-bold">{t("title")}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{t("pageDescription")}</p>
       </div>
-      <AdminCascadeFilter variant="glass" />
       <PredictiveAlertsPanel />
       <AnomalyFeedPanel />
     </div>

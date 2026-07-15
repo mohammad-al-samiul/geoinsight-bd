@@ -175,7 +175,6 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-      RABBITMQ_LOAD_DEFINITIONS: /etc/rabbitmq/definitions/definitions.json
       TZ: ${TZ:-Asia/Dhaka}
     ports:
       - "${RABBITMQ_PORT:-5672}:5672"

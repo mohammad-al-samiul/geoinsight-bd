@@ -192,11 +192,13 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       NEXT_TELEMETRY_DISABLED: "1"
-      API_GATEWAY_URL: http://api-gateway:4000
+      # BFF proxy must use Docker DNS — never the public host IP from inside the container
+      API_GATEWAY_URL: ${DASHBOARD_API_GATEWAY_URL:-http://api-gateway:4000}
+      NODE_OPTIONS: "--dns-result-order=ipv4first"
       COOKIE_SECURE: "false"
     depends_on:
       api-gateway:
-        condition: service_started
+        condition: service_healthy
     networks:
       - geoinsight_net
     healthcheck:
