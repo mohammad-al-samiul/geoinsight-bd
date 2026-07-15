@@ -388,3 +388,19 @@
     filter: drop-shadow(0 0 12px rgb(16 185 129 / 0.7));
   }
 }
+
+/* Recharts default tooltip text is near-black — force contrast on dark cards */
+.recharts-default-tooltip {
+  background-color: #0f172a !important;
+  border: 1px solid #334155 !important;
+  border-radius: 8px !important;
+  color: #f1f5f9 !important;
+}
+
+.recharts-default-tooltip .recharts-tooltip-label,
+.recharts-default-tooltip .recharts-tooltip-item,
+.recharts-default-tooltip .recharts-tooltip-item-name,
+.recharts-default-tooltip .recharts-tooltip-item-value,
+.recharts-default-tooltip .recharts-tooltip-item-separator {
+  color: #e2e8f0 !important;
+}
