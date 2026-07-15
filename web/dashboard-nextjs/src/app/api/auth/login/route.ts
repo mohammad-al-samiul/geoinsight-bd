@@ -7,6 +7,7 @@ import {
   REFRESH_MAX_AGE,
 } from "@/lib/auth/cookies";
 import { GATEWAY_API } from "@/lib/auth/gateway";
+import { fetchGateway } from "@/lib/auth/fetch-gateway";
 
 interface GatewayAuthResponse {
   success: boolean;
@@ -40,35 +41,32 @@ function setAuthCookies(
   );
 }
 
-function clearAuthCookies(response: NextResponse) {
-  response.cookies.set(AUTH_COOKIES.access, "", { ...cookieOptions(0), maxAge: 0 });
-  response.cookies.set(
-    AUTH_COOKIES.refresh,
-    "",
-    { ...refreshCookieOptions(0), maxAge: 0 },
-  );
-}
-
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const gatewayRes = await fetch(`${GATEWAY_API}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  try {
+    const body = await request.json();
+    const gatewayRes = await fetchGateway(`${GATEWAY_API}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
 
-  const json = (await gatewayRes.json()) as GatewayAuthResponse;
-  if (!gatewayRes.ok || !json.success) {
-    return NextResponse.json(
-      { success: false, message: json.message ?? "Invalid credentials" },
-      { status: gatewayRes.status },
-    );
+    const json = (await gatewayRes.json()) as GatewayAuthResponse;
+    if (!gatewayRes.ok || !json.success) {
+      return NextResponse.json(
+        { success: false, message: json.message ?? "Invalid credentials" },
+        { status: gatewayRes.status },
+      );
+    }
+
+    const response = NextResponse.json({
+      success: true,
+      data: { user: json.data.user },
+    });
+    setAuthCookies(response, json.data);
+    return response;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "API gateway unreachable";
+    return NextResponse.json({ success: false, message }, { status: 502 });
   }
-
-  const response = NextResponse.json({
-    success: true,
-    data: { user: json.data.user },
-  });
-  setAuthCookies(response, json.data);
-  return response;
 }

@@ -18,7 +18,7 @@ import type {
 function errorMessage(err: unknown): string {
   if (err instanceof ApiClientError) return err.message;
   if (err instanceof TypeError && err.message === "Failed to fetch") {
-    return "API gateway unreachable (proxy). Check that api-gateway is healthy, then refresh.";
+    return "API gateway temporarily unavailable — refresh in a few seconds.";
   }
   if (err instanceof Error) return err.message;
   return "Request failed";

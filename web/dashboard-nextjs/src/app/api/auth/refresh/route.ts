@@ -7,6 +7,7 @@ import {
   REFRESH_MAX_AGE,
 } from "@/lib/auth/cookies";
 import { GATEWAY_API } from "@/lib/auth/gateway";
+import { fetchGateway } from "@/lib/auth/fetch-gateway";
 
 interface GatewayRefreshResponse {
   success: boolean;
@@ -19,7 +20,7 @@ interface GatewayRefreshResponse {
 }
 
 async function performRefresh(refreshToken: string) {
-  return fetch(`${GATEWAY_API}/auth/refresh`, {
+  return fetchGateway(`${GATEWAY_API}/auth/refresh`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refreshToken }),

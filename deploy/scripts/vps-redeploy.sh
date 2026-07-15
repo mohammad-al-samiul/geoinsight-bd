@@ -82,24 +82,32 @@ run_deploy() {
   echo "==> Building images (this can take 10–20 min)..."
   "${COMPOSE[@]}" build api-gateway ai-analytics dashboard-nextjs pgbouncer
 
-  echo "==> Starting slim VPS stack (detached, no replica)..."
-  "${COMPOSE[@]}" up -d --remove-orphans
-
-  echo "==> Waiting for containers..."
-  sleep 8
-  "${COMPOSE[@]}" ps
-
-  echo "==> Waiting for API health (up to ~3 min)..."
+  echo "==> Starting infra + API first (keep dashboard serving until API is ready)..."
+  "${COMPOSE[@]}" up -d --remove-orphans postgres redis rabbitmq minio pgbouncer ai-analytics api-gateway
+  echo "==> Waiting for API health before recycling dashboard..."
   for i in $(seq 1 36); do
     if docker exec geoinsight-api-gateway wget -qO- http://127.0.0.1:4000/api/v1/health >/dev/null 2>&1; then
       echo "==> API healthy"
       break
     fi
     if [[ "$i" -eq 36 ]]; then
-      echo "WARN: API not healthy yet. Check:"
-      echo "  docker logs geoinsight-api-gateway --tail 80"
-      echo "  docker logs geoinsight-ai-analytics --tail 80"
-      echo "  docker ps -a"
+      echo "WARN: API not healthy yet — continuing with dashboard restart"
+    fi
+    sleep 5
+  done
+
+  echo "==> Starting / recycling dashboard..."
+  "${COMPOSE[@]}" up -d --remove-orphans
+
+  echo "==> Waiting for containers..."
+  sleep 8
+  "${COMPOSE[@]}" ps
+
+  echo "==> Re-check API health..."
+  for i in $(seq 1 12); do
+    if docker exec geoinsight-api-gateway wget -qO- http://127.0.0.1:4000/api/v1/health >/dev/null 2>&1; then
+      echo "==> API healthy"
+      break
     fi
     sleep 5
   done

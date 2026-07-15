@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AUTH_COOKIES } from "@/lib/auth/cookies";
+import { fetchGateway } from "@/lib/auth/fetch-gateway";
 import { GATEWAY_API, GATEWAY_URL } from "@/lib/auth/gateway";
 
 const FORWARD_HEADERS = ["content-type", "accept"];
@@ -48,14 +49,14 @@ async function proxyRequest(
 
   let upstream: Response;
   try {
-    upstream = await fetch(url, init);
+    upstream = await fetchGateway(url, init);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Upstream request failed";
     return NextResponse.json(
       {
         success: false,
-        message: `API gateway unreachable (${GATEWAY_URL}). ${message}`,
+        message: `API gateway temporarily unavailable. Retrying usually helps. (${GATEWAY_URL}: ${message})`,
       },
       { status: 502 },
     );
