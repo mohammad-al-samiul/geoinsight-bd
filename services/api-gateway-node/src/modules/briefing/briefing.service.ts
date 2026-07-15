@@ -8,10 +8,17 @@ import {
 } from "../dashboard/dashboard.service";
 import { ingestionService } from "../ingestion/ingestion.service";
 import { AI_FETCH_LLM_MS, fetchAi } from "../../shared/http/fetch-ai";
+import {
+  getLatestIntelSnapshot,
+  saveIntelSnapshot,
+} from "../intel/intel-snapshot.service";
+import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
 
 export interface MorningBriefingQuery extends DashboardScopeQuery {
   lang?: "bn" | "en";
 }
+
+const BRIEFING_TTL_SEC = 900;
 
 const COMMODITY_BN: Record<string, string> = {
   Rice: "চাল",
@@ -43,6 +50,77 @@ function scopeUnitId(query: DashboardScopeQuery): string | undefined {
 
 export class BriefingService {
   async getMorningBriefing(query: MorningBriefingQuery) {
+    const lang = query.lang ?? "bn";
+    const unitId = scopeUnitId(query);
+    const scopeKey = unitId ?? "national";
+    const cacheKey = `briefing:morning:v2:${lang}:${scopeKey}`;
+
+    if (isRedisEnabled()) {
+      const cached = await getRedisClient().get(cacheKey);
+      if (cached) return JSON.parse(cached) as Record<string, unknown>;
+    }
+
+    const fromDb = await getLatestIntelSnapshot("BRIEFING", lang, scopeKey);
+    if (fromDb) {
+      if (isRedisEnabled()) {
+        await getRedisClient().setex(cacheKey, BRIEFING_TTL_SEC, JSON.stringify(fromDb));
+      }
+      return fromDb;
+    }
+
+    const data = await this.buildMorningBriefing(query);
+    try {
+      await saveIntelSnapshot({
+        kind: "BRIEFING",
+        lang,
+        scopeKey,
+        payload: data,
+        sourceCount: Array.isArray((data as { news_headlines?: unknown[] }).news_headlines)
+          ? ((data as { news_headlines: unknown[] }).news_headlines.length)
+          : 0,
+        llmUsed: Boolean((data as { llm_used?: boolean }).llm_used),
+      });
+    } catch (err) {
+      console.warn(
+        "[briefing] snapshot persist failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+    if (isRedisEnabled()) {
+      await getRedisClient().setex(cacheKey, BRIEFING_TTL_SEC, JSON.stringify(data));
+    }
+    return data;
+  }
+
+  /** Force regenerate for pipeline cron */
+  async refreshMorningBriefing(lang: "bn" | "en" = "bn"): Promise<Record<string, unknown>> {
+    if (isRedisEnabled()) {
+      const redis = getRedisClient();
+      const keys = await redis.keys(`briefing:morning:v2:${lang}:*`);
+      if (keys.length) await redis.del(...keys);
+    }
+    const data = await this.buildMorningBriefing({ lang });
+    await saveIntelSnapshot({
+      kind: "BRIEFING",
+      lang,
+      scopeKey: "national",
+      payload: data,
+      sourceCount: Array.isArray((data as { news_headlines?: unknown[] }).news_headlines)
+        ? ((data as { news_headlines: unknown[] }).news_headlines.length)
+        : 0,
+      llmUsed: Boolean((data as { llm_used?: boolean }).llm_used),
+    });
+    if (isRedisEnabled()) {
+      await getRedisClient().setex(
+        `briefing:morning:v2:${lang}:national`,
+        BRIEFING_TTL_SEC,
+        JSON.stringify(data),
+      );
+    }
+    return { refreshed: true, lang };
+  }
+
+  private async buildMorningBriefing(query: MorningBriefingQuery) {
     const lang = query.lang ?? "bn";
     const metrics = await dashboardService.getNationalMetrics(query);
     const unitId = scopeUnitId(query);
@@ -86,9 +164,11 @@ export class BriefingService {
       ingestionService.getBriefingHeadlines(6, 3),
     ]);
 
+    // Deterministic “pressure drop” from riskScore (no Math.random)
     const completionDrops = metrics.unitScores
       .map((u) => {
-        const previous = Math.min(100, u.performanceScore + 4 + Math.random() * 2);
+        const risk = u.riskScore ?? 0;
+        const previous = Math.min(100, u.performanceScore + Math.max(2, Math.round(risk / 20)));
         const drop = Math.max(0, previous - u.performanceScore);
         return {
           name: u.unitId,
@@ -99,6 +179,7 @@ export class BriefingService {
         };
       })
       .filter((d) => d.drop_pct >= 2)
+      .sort((a, b) => b.drop_pct - a.drop_pct)
       .slice(0, 3);
 
     const divisions = await prismaRead.adminUnit.findMany({
@@ -117,12 +198,19 @@ export class BriefingService {
     });
 
     const budgetOverruns = env.LIVE_DATA_ONLY
-      ? overrunProjects.slice(0, 3).map((p) => ({
-          project_id: p.id,
-          title: p.title,
-          variance_pct: 8,
-          admin_unit_name: (p as { district?: string }).district ?? "National",
-        }))
+      ? overrunProjects
+          .slice(0, 8)
+          .map((p) => {
+            const severity = Number((p as { severity?: number }).severity ?? 3);
+            return {
+              project_id: p.id,
+              title: p.title,
+              variance_pct: Math.min(45, 4 + severity * 3),
+              admin_unit_name: (p as { district?: string }).district ?? "National",
+            };
+          })
+          .sort((a, b) => b.variance_pct - a.variance_pct)
+          .slice(0, 3)
       : overrunProjects
           .map((p) => {
             const row = p as {
@@ -212,11 +300,13 @@ export class BriefingService {
 
     return {
       ...briefing,
+      news_headlines: aiPayload.news_headlines,
       metrics_snapshot: {
         completionRate: metrics.completionRate,
         openAlerts: metrics.summary.openAlerts,
         projects: metrics.summary.projects,
       },
+      refreshed_at: new Date().toISOString(),
     };
   }
 }

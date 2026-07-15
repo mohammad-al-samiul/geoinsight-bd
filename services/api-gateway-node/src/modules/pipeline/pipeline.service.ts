@@ -95,6 +95,7 @@ export class PipelineService {
       ["weather", () => this.syncWeatherData()],
       ["unrest", () => this.refreshUnrestPulse()],
       ["outlook", () => this.refreshStrategicOutlook()],
+      ["briefing", () => this.refreshMorningBriefing()],
       ["signals", () => this.extractLiveSignals()],
     ];
 
@@ -118,7 +119,8 @@ export class PipelineService {
   }
 
   async syncNews(): Promise<Record<string, unknown>> {
-    const result = await ingestionService.syncFromAi(15);
+    const { AI_FETCH_LLM_MS } = await import("../../shared/http/fetch-ai");
+    const result = await ingestionService.syncFromAi(15, AI_FETCH_LLM_MS);
     await broadcastDashboardRefresh("pipeline:news");
     return result as unknown as Record<string, unknown>;
   }
@@ -592,6 +594,16 @@ export class PipelineService {
   async refreshStrategicOutlook(): Promise<Record<string, unknown>> {
     const { outlookService } = await import("../outlook/outlook.service");
     return outlookService.refresh();
+  }
+
+  async refreshMorningBriefing(): Promise<Record<string, unknown>> {
+    const { briefingService } = await import("../briefing/briefing.service");
+    const [bn, en] = await Promise.all([
+      briefingService.refreshMorningBriefing("bn"),
+      briefingService.refreshMorningBriefing("en"),
+    ]);
+    await broadcastDashboardRefresh("pipeline:briefing");
+    return { bn, en };
   }
 
   async getLatestCommodityQuotes(commodity: string, limit = 30) {

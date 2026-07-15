@@ -9,6 +9,10 @@ import {
   mandatePublicMeta,
 } from "../../shared/gov/current-mandate";
 import { AI_FETCH_LLM_MS, fetchAi } from "../../shared/http/fetch-ai";
+import {
+  getLatestIntelSnapshot,
+  saveIntelSnapshot,
+} from "../intel/intel-snapshot.service";
 
 const OUTLOOK_CACHE_KEY = "outlook:strategic:v3";
 const OUTLOOK_TTL_SEC = 1800;
@@ -58,7 +62,16 @@ export class OutlookService {
       if (cached) return JSON.parse(cached) as Record<string, unknown>;
     }
 
+    const fromDb = await getLatestIntelSnapshot("OUTLOOK", lang, null);
+    if (fromDb) {
+      if (isRedisEnabled()) {
+        await getRedisClient().setex(cacheKey, OUTLOOK_TTL_SEC, JSON.stringify(fromDb));
+      }
+      return fromDb;
+    }
+
     const data = await this.buildStrategic(lang);
+    await this.persistOutlook(lang, data);
     if (isRedisEnabled()) {
       await getRedisClient().setex(cacheKey, OUTLOOK_TTL_SEC, JSON.stringify(data));
     }
@@ -67,6 +80,7 @@ export class OutlookService {
 
   async refresh(): Promise<Record<string, unknown>> {
     const [bn, en] = await Promise.all([this.buildStrategic("bn"), this.buildStrategic("en")]);
+    await Promise.all([this.persistOutlook("bn", bn), this.persistOutlook("en", en)]);
     if (isRedisEnabled()) {
       const redis = getRedisClient();
       await redis.setex(`${OUTLOOK_CACHE_KEY}:bn`, OUTLOOK_TTL_SEC, JSON.stringify(bn));
@@ -83,7 +97,27 @@ export class OutlookService {
         (s) => (s as { domain: string }).domain !== "politics",
       ).length,
       challenges,
+      persisted: true,
     };
+  }
+
+  private async persistOutlook(lang: "bn" | "en", data: Record<string, unknown>) {
+    const sources = Array.isArray(data.sources) ? data.sources.length : 0;
+    try {
+      await saveIntelSnapshot({
+        kind: "OUTLOOK",
+        lang,
+        scopeKey: null,
+        payload: data,
+        sourceCount: typeof data.source_count === "number" ? data.source_count : sources,
+        llmUsed: Boolean(data.llm_used),
+      });
+    } catch (err) {
+      console.warn(
+        "[outlook] snapshot persist failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
 
   private async buildStrategic(lang: "bn" | "en"): Promise<Record<string, unknown>> {

@@ -3,6 +3,10 @@ import { prismaRead } from "../../core/database/prisma.client";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
 import { broadcastDashboardRefresh } from "../pipeline/pipeline.broadcast";
 import {
+  getLatestIntelSnapshot,
+  saveIntelSnapshot,
+} from "../intel/intel-snapshot.service";
+import {
   normalizeDivisionName,
   resolveScopeContext,
   matchesScopeDistrict,
@@ -240,11 +244,27 @@ export class UnrestService {
     if (isRedisEnabled()) {
       await getRedisClient().setex(UNREST_CACHE_KEY, UNREST_TTL_SEC, JSON.stringify(pulse));
     }
+    try {
+      await saveIntelSnapshot({
+        kind: "UNREST",
+        lang: "bn",
+        scopeKey: null,
+        payload: pulse as unknown as Record<string, unknown>,
+        sourceCount: pulse.signals.length,
+        llmUsed: false,
+      });
+    } catch (err) {
+      console.warn(
+        "[unrest] snapshot persist failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
     await broadcastDashboardRefresh("pipeline:unrest");
     return {
       districts: pulse.districts.length,
       signals: pulse.signals.length,
       districts_at_risk: pulse.summary.districts_at_risk,
+      persisted: true,
     };
   }
 
@@ -258,6 +278,16 @@ export class UnrestService {
         pulse = JSON.parse(cached) as UnrestPulse;
         return this.applyScope(pulse, ctx);
       }
+    }
+
+    const fromDb = await getLatestIntelSnapshot("UNREST", "bn", null);
+    if (fromDb) {
+      const { _snapshot: _s, ...rest } = fromDb;
+      pulse = rest as unknown as UnrestPulse;
+      if (isRedisEnabled()) {
+        await getRedisClient().setex(UNREST_CACHE_KEY, UNREST_TTL_SEC, JSON.stringify(pulse));
+      }
+      return this.applyScope(pulse, ctx);
     }
 
     pulse = await this.buildPulse();

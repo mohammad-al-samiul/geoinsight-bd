@@ -74,12 +74,26 @@ export class PipelineOrchestrator {
         env.PIPELINE_RUN_ON_START,
         stagger + 20_000,
       ),
+      new IntervalWorker(
+        "pipeline:outlook",
+        () => pipelineService.refreshStrategicOutlook(),
+        env.PIPELINE_OUTLOOK_INTERVAL_MS,
+        env.PIPELINE_RUN_ON_START,
+        stagger + 120_000,
+      ),
+      new IntervalWorker(
+        "pipeline:briefing",
+        () => pipelineService.refreshMorningBriefing(),
+        env.PIPELINE_BRIEFING_INTERVAL_MS,
+        env.PIPELINE_RUN_ON_START,
+        stagger + 135_000,
+      ),
     ];
 
     for (const worker of this.workers) {
       worker.start();
     }
-    console.info("[pipeline] Orchestrator started with 9 background workers");
+    console.info(`[pipeline] Orchestrator started with ${this.workers.length} background workers`);
   }
 
   stop(): void {

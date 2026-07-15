@@ -538,3 +538,26 @@ model DisasterAlert {
   @@index([division, isActive])
   @@map("disaster_alerts")
 }
+
+enum IntelSnapshotKind {
+  BRIEFING
+  OUTLOOK
+  UNREST
+}
+
+/// Persisted AI / pipeline analysis for PM briefing, political & economic outlook, unrest
+model IntelAnalysisSnapshot {
+  id          String            @id @default(uuid()) @db.Uuid
+  kind        IntelSnapshotKind
+  lang        String            @default("bn") @db.VarChar(8)
+  /// Optional admin scope id (null = national)
+  scopeKey    String?           @map("scope_key") @db.VarChar(64)
+  payload     Json
+  sourceCount Int               @default(0) @map("source_count")
+  llmUsed     Boolean           @default(false) @map("llm_used")
+  generatedAt DateTime          @default(now()) @map("generated_at") @db.Timestamptz
+
+  @@index([kind, lang, generatedAt(sort: Desc)])
+  @@index([kind, scopeKey, generatedAt(sort: Desc)])
+  @@map("intel_analysis_snapshots")
+}

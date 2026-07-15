@@ -112,12 +112,16 @@ function hardshipHint(text: string): string | null {
 }
 
 export class IngestionService {
-  async syncFromAi(maxPerFeed = 15): Promise<IngestionSyncResult> {
-    const res = await fetchAi(`/api/v1/ingestion/fetch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ max_per_feed: maxPerFeed, analyze_sentiment: true }),
-    });
+  async syncFromAi(maxPerFeed = 15, timeoutMs = 120_000): Promise<IngestionSyncResult> {
+    const res = await fetchAi(
+      `/api/v1/ingestion/fetch`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ max_per_feed: maxPerFeed, analyze_sentiment: true }),
+      },
+      { timeoutMs },
+    );
 
     if (!res.ok) {
       throw new Error(`Ingestion fetch failed (${res.status})`);
