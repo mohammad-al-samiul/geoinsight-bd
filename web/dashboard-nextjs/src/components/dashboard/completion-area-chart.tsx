@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { chartTooltipProps } from "@/lib/chart-tooltip";
 import type { CompletionTrendPoint } from "@/types/dashboard";
 
 interface CompletionAreaChartProps {
@@ -58,12 +59,7 @@ export function CompletionAreaChart({
             tickFormatter={(v) => `${v}%`}
           />
           <Tooltip
-            contentStyle={{
-              background: "hsl(222 44% 9%)",
-              border: "1px solid hsl(217 28% 16%)",
-              borderRadius: "8px",
-              fontSize: "12px",
-            }}
+            {...chartTooltipProps}
             formatter={(value: number) => [`${value}%`, "Completion"]}
           />
           <Area

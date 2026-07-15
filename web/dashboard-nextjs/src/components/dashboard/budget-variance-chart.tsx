@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { chartTooltipProps } from "@/lib/chart-tooltip";
 import type { BudgetVariancePoint } from "@/types/dashboard";
 
 interface BudgetVarianceChartProps {
@@ -65,12 +66,7 @@ export function BudgetVarianceChart({
           />
           <ReferenceLine x={0} stroke="hsl(217 28% 22%)" />
           <Tooltip
-            contentStyle={{
-              background: "hsl(222 44% 9%)",
-              border: "1px solid hsl(217 28% 16%)",
-              borderRadius: "8px",
-              fontSize: "12px",
-            }}
+            {...chartTooltipProps}
             formatter={(value: number, _name, item) => {
               const row = item.payload as BudgetVariancePoint;
               return [

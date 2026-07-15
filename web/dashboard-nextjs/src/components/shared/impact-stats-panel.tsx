@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { IntelCard } from "@/components/ui/intel-card";
 import { cn } from "@/lib/utils";
+import { chartTooltipProps } from "@/lib/chart-tooltip";
 import {
   AlertTriangle,
   Home,
@@ -152,13 +153,6 @@ function placeSeverity(d: DistrictImpactRow) {
     Math.min(d.livestock_lost ?? 0, 200)
   );
 }
-
-const tooltipStyle = {
-  background: "#0f172a",
-  border: "1px solid #334155",
-  borderRadius: 8,
-  fontSize: 12,
-};
 
 export function ImpactStatsPanel({
   title,
@@ -417,8 +411,7 @@ export function ImpactStatsPanel({
                   tick={{ fill: "#cbd5e1", fontSize: 10 }}
                 />
                 <Tooltip
-                  contentStyle={tooltipStyle}
-                  labelStyle={{ color: "#e2e8f0" }}
+                  {...chartTooltipProps}
                   labelFormatter={(_, payload) => {
                     const row = payload?.[0]?.payload as { fullName?: string } | undefined;
                     return row?.fullName ?? "";

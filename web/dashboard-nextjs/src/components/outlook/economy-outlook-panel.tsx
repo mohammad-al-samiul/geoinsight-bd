@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { SourceLink } from "@/components/ui/source-link";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useStrategicOutlook } from "@/hooks/use-strategic-outlook";
+import { chartTooltipProps } from "@/lib/chart-tooltip";
 import { cn } from "@/lib/utils";
 import {
   GaugeGrid,
@@ -171,13 +172,7 @@ export function EconomyOutlookPanel() {
                       height={60}
                     />
                     <YAxis domain={[0, 100]} tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                    <Tooltip
-                      contentStyle={{
-                        background: "#0f172a",
-                        border: "1px solid #334155",
-                        borderRadius: 8,
-                      }}
-                    />
+                    <Tooltip {...chartTooltipProps} />
                     <Bar dataKey="score" radius={[6, 6, 0, 0]}>
                       {gdpChart.map((d) => (
                         <Cell key={d.name} fill={d.score >= 75 ? "#10b981" : "#38bdf8"} />

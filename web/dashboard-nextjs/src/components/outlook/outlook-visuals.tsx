@@ -15,6 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { chartTooltipProps } from "@/lib/chart-tooltip";
 import { Badge } from "@/components/ui/badge";
 import { ProgressMeter } from "@/components/ui/progress-meter";
 import { IntelCard, MotionList, fadeUp } from "@/components/ui/intel-card";
@@ -52,10 +53,7 @@ export function GaugeGrid({ gauges }: { gauges: GaugeItem[] }) {
           <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 12, top: 8, bottom: 8 }}>
             <XAxis type="number" domain={[0, 100]} tick={{ fill: "#94a3b8", fontSize: 11 }} />
             <YAxis type="category" dataKey="name" width={110} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
-            <Tooltip
-              contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8 }}
-              labelStyle={{ color: "#e2e8f0" }}
-            />
+            <Tooltip {...chartTooltipProps} />
             <Bar dataKey="value" radius={[0, 6, 6, 0]}>
               {chartData.map((d) => (
                 <Cell key={d.name} fill={d.fill} />
@@ -70,9 +68,7 @@ export function GaugeGrid({ gauges }: { gauges: GaugeItem[] }) {
             <PolarGrid stroke="#334155" />
             <PolarAngleAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 10 }} />
             <Radar dataKey="value" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.35} />
-            <Tooltip
-              contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8 }}
-            />
+            <Tooltip {...chartTooltipProps} />
           </RadarChart>
         </ResponsiveContainer>
       </IntelCard>
