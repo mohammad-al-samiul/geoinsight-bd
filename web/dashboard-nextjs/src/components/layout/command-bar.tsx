@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
 import { AlertTriangle, LogOut, Menu, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePathname } from "next/navigation";
 
 interface CommandBarProps {
   onMenuClick: () => void;
@@ -28,6 +29,12 @@ export function CommandBar({
   const { logout } = useAuthActions();
   const t = useTranslations("shell");
   const tr = useTranslations("roles");
+  const pathname = usePathname();
+
+  // Production polish:
+  // Show "proshashonik elaka" cascade only where it is actually needed (Hazards / risk context).
+  // Everywhere else, drill-down can still work via map clicks (filter stays in URL).
+  const showAdminCascadeFilter = pathname?.startsWith("/hazards") ?? false;
 
   return (
     <header className="sticky top-0 z-[100] overflow-visible border-b border-command-border/80 bg-command/90 shadow-panel backdrop-blur-xl">
@@ -101,7 +108,7 @@ export function CommandBar({
           sidebarCollapsed && "lg:pl-4",
         )}
       >
-        <AdminCascadeFilter variant="solid" />
+        {showAdminCascadeFilter ? <AdminCascadeFilter variant="solid" /> : null}
       </div>
     </header>
   );

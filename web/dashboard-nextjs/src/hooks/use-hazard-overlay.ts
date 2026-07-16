@@ -17,6 +17,7 @@ export interface HazardExposure {
 
 export interface HazardOverlay {
   season: string;
+  lookback_days?: number;
   at_risk_count: number;
   exposures: HazardExposure[];
   narrative: string;
@@ -42,17 +43,7 @@ export interface HazardOverlay {
   projects_mapped: number;
 }
 
-function scopeQuery(filter: ReturnType<typeof useAdminFilter>["filter"]): string {
-  const params = new URLSearchParams();
-  if (filter.divisionId) params.set("divisionId", filter.divisionId);
-  if (filter.districtId) params.set("districtId", filter.districtId);
-  if (filter.upazilaId) params.set("upazilaId", filter.upazilaId);
-  if (filter.unionId) params.set("unionId", filter.unionId);
-  const qs = params.toString();
-  return qs ? `?${qs}` : "";
-}
-
-export function useHazardOverlay() {
+export function useHazardOverlay(lookbackDays = 1) {
   const { filter } = useAdminFilter();
   const [overlay, setOverlay] = useState<HazardOverlay | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,10 +53,15 @@ export function useHazardOverlay() {
     setLoading(true);
     setError(null);
     try {
-      const qs = scopeQuery(filter);
-      const sep = qs ? `${qs}&` : "?";
+      const params = new URLSearchParams();
+      if (filter.divisionId) params.set("divisionId", filter.divisionId);
+      if (filter.districtId) params.set("districtId", filter.districtId);
+      if (filter.upazilaId) params.set("upazilaId", filter.upazilaId);
+      if (filter.unionId) params.set("unionId", filter.unionId);
+      params.set("season", "monsoon");
+      params.set("lookbackDays", String(lookbackDays));
       const json = await apiClient<{ success: boolean; data: HazardOverlay }>(
-        `intelligence/hazards/overlay${sep}season=monsoon`,
+        `intelligence/hazards/overlay?${params.toString()}`,
       );
       setOverlay(json.data);
     } catch (err) {
@@ -74,7 +70,7 @@ export function useHazardOverlay() {
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, lookbackDays]);
 
   useEffect(() => {
     void load();

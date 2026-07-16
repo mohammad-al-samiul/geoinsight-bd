@@ -25,6 +25,7 @@ class BriefingService:
 
         narrative = self._narrative(data, bullets)
         voice_text = self._voice_text(data, bullets)
+        llm_used = False
 
         if self._ollama.enabled:
             context = json.dumps(
@@ -46,6 +47,7 @@ class BriefingService:
             if llm_narrative:
                 narrative = llm_narrative
                 voice_text = llm_narrative[:1200]
+                llm_used = True
 
         return BriefingResponse(
             lang=data.lang,
@@ -54,6 +56,7 @@ class BriefingService:
             bullets=bullets,
             narrative=narrative,
             voice_text=voice_text,
+            llm_used=llm_used,
         )
 
     def _build_bullets(self, data: BriefingInput) -> list[BriefingBullet]:

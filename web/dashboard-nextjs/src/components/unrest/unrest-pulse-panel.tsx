@@ -85,12 +85,8 @@ export function UnrestPulsePanel() {
             )}
           </div>
 
-          {isFiltered && (
-            <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary">
-              {t("scopeFilterActive")}:{" "}
-              {data.scope?.districtName ?? data.scope?.divisionName ?? t("scopedArea")}
-            </div>
-          )}
+          {/* Unrest page does not show admin-scope category banner to avoid duplicate "proshashonik elaka"
+              UI across the dashboard. Scope is still applied via URL drill-down. */}
 
           <p className="text-xs leading-relaxed text-muted-foreground">
             {locale === "bn" ? data.summary.note_bn : data.summary.note_en}

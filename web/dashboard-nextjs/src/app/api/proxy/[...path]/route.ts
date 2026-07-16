@@ -20,7 +20,21 @@ async function proxyRequest(
 
   const upstreamPath = pathSegments.join("/");
   const search = request.nextUrl.search;
-  const url = `${GATEWAY_API}/${upstreamPath}${search}`;
+
+  // Production hardening:
+  // Sometimes Docker DNS / env drift makes one gateway hostname fail
+  // (e.g. `api-gateway` vs `geoinsight-api-gateway`). Try a small set of
+  // known-good base URLs instead of failing immediately.
+  const baseCandidates = Array.from(
+    new Set([
+      GATEWAY_API, // from env / gateway.ts resolve
+      "http://api-gateway:4000/api/v1",
+      "http://geoinsight-api-gateway:4000/api/v1",
+      // local dev fallbacks (harmless if not reachable)
+      "http://localhost:4800/api/v1",
+      "http://localhost:4000/api/v1",
+    ]),
+  ).filter(Boolean);
 
   const headers = new Headers();
   headers.set("Authorization", `Bearer ${accessToken}`);
@@ -47,16 +61,27 @@ async function proxyRequest(
     init.body = await request.text();
   }
 
-  let upstream: Response;
-  try {
-    upstream = await fetchGateway(url, init);
-  } catch (error) {
+  let upstream: Response | null = null;
+  let lastErr: unknown = null;
+  for (const base of baseCandidates) {
+    const candidateUrl = `${base}/${upstreamPath}${search}`;
+    try {
+      upstream = await fetchGateway(candidateUrl, init);
+      break;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  if (!upstream) {
     const message =
-      error instanceof Error ? error.message : "Upstream request failed";
+      lastErr instanceof Error ? lastErr.message : "Upstream request failed";
     return NextResponse.json(
       {
         success: false,
-        message: `API gateway temporarily unavailable. Retrying usually helps. (${GATEWAY_URL}: ${message})`,
+        message: `API gateway unreachable (tried: ${baseCandidates.join(
+          ", ",
+        )}). ${message}`,
       },
       { status: 502 },
     );

@@ -541,6 +541,7 @@
       "impactWindow1": "Today",
       "impactWindow7": "7 days",
       "impactWindow30": "30 days",
+      "mapTimeHint": "Map shows only places with flood/water evidence in the selected window (e.g. Bohoddarhat, Halishahar)",
       "impactByDistrict": "Upazila / district impact",
       "impactByEvent": "Casualties by incident",
       "impactByEventHint": "Each bar = one district × day incident (max from headlines)",

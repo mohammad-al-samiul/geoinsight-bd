@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useHazardOverlay } from "@/hooks/use-hazard-overlay";
 import { useWeatherLive } from "@/hooks/use-weather-live";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
@@ -32,7 +33,8 @@ export function HazardOverlayPanel() {
   const t = useTranslations("modules.hazards");
   const locale = useLocale();
   const { filter, isFiltered } = useAdminFilter();
-  const { overlay, loading, error, reload: reloadOverlay } = useHazardOverlay();
+  const [windowDays, setWindowDays] = useState(1);
+  const { overlay, loading, error, reload: reloadOverlay } = useHazardOverlay(windowDays);
   const { data: weather, loading: weatherLoading, error: weatherError, reload: reloadWeather } =
     useWeatherLive();
 
@@ -106,6 +108,8 @@ export function HazardOverlayPanel() {
               subtitle={t("floodImpactSubtitle")}
               locale={locale}
               stats={impact.flood_impact}
+              windowDays={windowDays}
+              onWindowDaysChange={setWindowDays}
               labels={{
                 deaths: t("impactDeaths"),
                 civilian: t("impactCivilian"),
@@ -158,13 +162,39 @@ export function HazardOverlayPanel() {
       )}
 
       {overlay && weather && (
-        <HazardWeatherMap
-          filter={filter}
-          zones={overlay.zones}
-          observations={weather.observations}
-          alerts={weather.alerts}
-          className="mb-6"
-        />
+        <div className="mb-6 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">{t("mapTimeHint")}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {([1, 7, 30] as const).map((d) => {
+                const label =
+                  d === 1 ? t("impactWindow1") : d === 7 ? t("impactWindow7") : t("impactWindow30");
+                const selected = windowDays === d;
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setWindowDays(d)}
+                    className={cn(
+                      "rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                      selected
+                        ? "border-teal-400/50 bg-teal-500/15 text-teal-200"
+                        : "border-border/60 bg-background/40 text-muted-foreground hover:border-border hover:text-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <HazardWeatherMap
+            filter={filter}
+            zones={overlay.zones}
+            observations={weather.observations}
+            alerts={weather.alerts}
+          />
+        </div>
       )}
 
       {weather && weather.alerts.length > 0 && (

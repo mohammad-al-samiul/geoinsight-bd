@@ -105,6 +105,8 @@ interface ImpactStatsPanelProps {
     methodHint?: string;
   };
   className?: string;
+  windowDays?: number;
+  onWindowDaysChange?: (days: number) => void;
 }
 
 function StatTile({
@@ -161,6 +163,8 @@ export function ImpactStatsPanel({
   locale = "bn",
   labels,
   className,
+  windowDays: controlledWindowDays,
+  onWindowDaysChange,
 }: ImpactStatsPanelProps) {
   const windowKeys = useMemo(() => {
     if (stats.windows) {
@@ -172,9 +176,14 @@ export function ImpactStatsPanel({
     return [] as number[];
   }, [stats.windows]);
 
-  const [windowDays, setWindowDays] = useState(
+  const [internalWindowDays, setInternalWindowDays] = useState(
     stats.default_window ?? stats.window_days ?? 7,
   );
+  const windowDays = controlledWindowDays ?? internalWindowDays;
+  const setWindowDays = (days: number) => {
+    if (onWindowDaysChange) onWindowDaysChange(days);
+    else setInternalWindowDays(days);
+  };
   const [showAllPlaces, setShowAllPlaces] = useState(false);
 
   const active = useMemo(() => {

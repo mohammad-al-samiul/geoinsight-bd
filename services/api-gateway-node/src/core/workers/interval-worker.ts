@@ -50,7 +50,9 @@ export class IntervalWorker {
       return result;
     } catch (err) {
       console.error(`[${this.name}] Error:`, err);
-      throw err;
+      // Background jobs must never crash the gateway process.
+      // They will retry on the next interval / manual sync.
+      return { error: err instanceof Error ? err.message : String(err) };
     } finally {
       this.running = false;
     }

@@ -67,3 +67,4 @@ class BriefingResponse(BaseModel):
     bullets: list[BriefingBullet]
     narrative: str
     voice_text: str
+    llm_used: bool = False

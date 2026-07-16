@@ -138,8 +138,10 @@ export interface WeatherLiveSummary {
 }
 
 export class WeatherService {
-  async syncFromAi(): Promise<Record<string, unknown>> {
-    const res = await fetchAi(`/api/v1/weather/fetch`);
+  async syncFromAi(timeoutMs?: number): Promise<Record<string, unknown>> {
+    const res = await fetchAi(`/api/v1/weather/fetch`, undefined, {
+      timeoutMs,
+    });
     if (!res.ok) {
       throw new Error(`Weather fetch failed: ${res.status}`);
     }
@@ -335,13 +337,16 @@ export class WeatherService {
         recorded_at: Date;
       }>
     >`
-      SELECT DISTINCT ON (COALESCE(district, division))
+      -- Keep locality-level observations (name_bn) instead of collapsing
+      -- everything at district/division granularity.
+      -- This prevents Bohoddarhat/Halishahar style localities from being lost.
+      SELECT DISTINCT ON (COALESCE(district, division), name_bn)
         division, district, name_bn, lat, lng,
         temp_c::text, humidity_pct, precipitation_mm::text, wind_speed_kmh::text,
         weather_code, weather_label, weather_label_bn,
         flood_risk, cyclone_risk, heat_stress, population_at_risk, recorded_at
       FROM weather_observations
-      ORDER BY COALESCE(district, division), recorded_at DESC
+      ORDER BY COALESCE(district, division), name_bn, recorded_at DESC
     `;
     return rows;
   }

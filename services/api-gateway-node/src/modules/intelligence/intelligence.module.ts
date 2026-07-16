@@ -86,6 +86,7 @@ const hazardQuerySchema = z.object({
   upazilaId: z.string().uuid().optional(),
   unionId: z.string().uuid().optional(),
   season: z.string().max(32).optional(),
+  lookbackDays: z.coerce.number().int().min(1).max(30).optional(),
 });
 
 export class IntelligenceModule extends BaseModule {
@@ -292,7 +293,11 @@ export class IntelligenceModule extends BaseModule {
       validate(hazardQuerySchema, "query"),
       asyncHandler(async (req, res) => {
         const q = req.query as z.infer<typeof hazardQuerySchema>;
-        const data = await intelligenceService.getHazardOverlay(q, q.season ?? "monsoon");
+        const data = await intelligenceService.getHazardOverlay(
+          q,
+          q.season ?? "monsoon",
+          q.lookbackDays ?? 1,
+        );
         sendSuccess(res, data);
       }),
     );

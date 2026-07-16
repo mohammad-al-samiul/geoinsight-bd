@@ -13,6 +13,15 @@ import {
 } from "../../shared/scope/scope-context";
 import { fetchAi } from "../../shared/http/fetch-ai";
 import { allStaticHazardZones } from "./flood-hotspots.data";
+import {
+  fetchNewsLocalitiesForWindow,
+  fetchWeatherPeaksForWindow,
+  findNewsHitForZone,
+  findWeatherPeakForZone,
+  normKey,
+  weatherPeakToZone,
+  zoneHasWindowEvidence,
+} from "./hazard-window";
 
 export interface PredictiveScore {
   project_id: string;
@@ -701,8 +710,13 @@ export class IntelligenceService {
     };
   }
 
-  async getHazardOverlay(query: DashboardScopeQuery = {}, season = "monsoon") {
+  async getHazardOverlay(
+    query: DashboardScopeQuery = {},
+    season = "monsoon",
+    lookbackDays = 1,
+  ) {
     const unitId = scopeUnitId(query);
+    const windowDays = [1, 7, 30].includes(lookbackDays) ? lookbackDays : 1;
 
     const STATIC_ZONES: HazardZoneRecord[] = allStaticHazardZones().map((z) => ({
       zone_id: z.zone_id,
@@ -808,8 +822,6 @@ export class IntelligenceService {
           }))
         : [];
 
-    const mergedZones = [...dynamicZones, ...STATIC_ZONES];
-
     let weatherLive: Record<string, unknown> | null = null;
     const scopeCtx = await resolveScopeContext(query);
     try {
@@ -819,93 +831,63 @@ export class IntelligenceService {
       weatherLive = null;
     }
 
-    const weatherObs = (weatherLive?.observations ?? []) as Array<{
-      division: string;
-      district?: string | null;
-      name_bn: string;
-      lat: number;
-      lng: number;
-      flood_risk: number;
-      cyclone_risk: number;
-      heat_stress: number;
-      precipitation_mm: number;
-      rain_24h_mm?: number;
-      wind_speed_kmh: number;
-      temp_c: number;
-      population_at_risk: number;
-      weather_label: string;
-      weather_label_bn: string;
-    }>;
+    const [weatherPeaks, newsLocalityHits] = await Promise.all([
+      fetchWeatherPeaksForWindow(windowDays),
+      fetchNewsLocalitiesForWindow(windowDays),
+    ]);
 
-    const weatherZones = weatherObs
-      .filter((o) => {
-        const floodThreshold = o.district ? 2 : 3;
-        return (
-          o.flood_risk >= floodThreshold ||
-          o.cyclone_risk >= 3 ||
-          o.heat_stress >= 4
-        );
+    const staticLocalityKeys = new Set(
+      STATIC_ZONES.filter((z) => z.scale === "local").flatMap((z) => [
+        normKey(z.locality),
+        normKey(z.locality_bn),
+      ]),
+    );
+
+    const weatherZones = weatherPeaks
+      .map((peak) => ({ peak, zone: weatherPeakToZone(peak, windowDays) }))
+      .filter((row): row is { peak: (typeof weatherPeaks)[number]; zone: NonNullable<ReturnType<typeof weatherPeakToZone>> } => row.zone !== null)
+      .filter(({ peak }) => {
+        const nameKey = normKey(peak.name_bn);
+        return !staticLocalityKeys.has(nameKey);
       })
-      .flatMap((o) => {
-        const zones: HazardZoneRecord[] = [];
-        if (o.flood_risk >= (o.district ? 2 : 3)) {
-          zones.push({
-            zone_id: `weather-flood-${(o.district ?? o.division).toLowerCase().replace(/\s+/g, "-")}`,
-            name: `Live Flood Risk — ${o.district ?? o.division}`,
-            name_bn: `লাইভ বন্যা ঝুঁকি — ${o.name_bn}`,
-            hazard_type: "flood",
-            risk_level: o.flood_risk,
-            division: o.division,
-            district: o.district ?? undefined,
-            lat: o.lat,
-            lng: o.lng,
-            // District/live rain: keep compact so local named hotspots stay visible
-            radius_km: o.district ? 10 + o.flood_risk * 3 : 18 + o.flood_risk * 4,
-            scale: o.district ? "local" : "regional",
-            source: "open-meteo",
-            precipitation_mm: o.precipitation_mm,
-            population_at_risk: o.population_at_risk,
-            water_note_bn: `২৪ ঘণ্টায় ~${o.rain_24h_mm ?? o.precipitation_mm} mm বৃষ্টি — পানি বৃদ্ধির সংকেত`,
-            water_note_en: `~${o.rain_24h_mm ?? o.precipitation_mm} mm rain/24h — rising water signal`,
-          });
-        }
-        if (o.cyclone_risk >= 3) {
-          zones.push({
-            zone_id: `weather-cyclone-${o.division.toLowerCase()}`,
-            name: `Live Cyclone Risk — ${o.division}`,
-            name_bn: `লাইভ ঘূর্ণিঝড় ঝুঁকি — ${o.name_bn}`,
-            hazard_type: "cyclone",
-            risk_level: o.cyclone_risk,
-            division: o.division,
-            lat: o.lat,
-            lng: o.lng,
-            radius_km: 22 + o.cyclone_risk * 6,
-            scale: "regional",
-            source: "open-meteo",
-            wind_speed_kmh: o.wind_speed_kmh,
-            population_at_risk: o.population_at_risk,
-          });
-        }
-        if (o.heat_stress >= 4) {
-          zones.push({
-            zone_id: `weather-heat-${o.division.toLowerCase()}`,
-            name: `Heat Stress — ${o.division}`,
-            name_bn: `তাপপ্রবাহ ঝুঁকি — ${o.name_bn}`,
-            hazard_type: "heat",
-            risk_level: o.heat_stress,
-            division: o.division,
-            lat: o.lat,
-            lng: o.lng,
-            radius_km: 35,
-            source: "open-meteo",
-            temp_c: o.temp_c,
-            population_at_risk: o.population_at_risk,
-          });
-        }
-        return zones;
-      });
+      .map(({ zone }) => zone as HazardZoneRecord);
 
-    const allZones = [...weatherZones, ...mergedZones].filter((z) =>
+    const activeStaticZones = STATIC_ZONES.filter((z) => {
+      const weatherPeak = findWeatherPeakForZone(z, weatherPeaks);
+      const newsHit = findNewsHitForZone(z, newsLocalityHits);
+      return zoneHasWindowEvidence(z, weatherPeak, newsHit, windowDays);
+    }).map((z) => {
+      const weatherPeak = findWeatherPeakForZone(z, weatherPeaks);
+      const newsHit = findNewsHitForZone(z, newsLocalityHits);
+      const evidenceNoteBn = newsHit
+        ? `সংবাদে ${newsHit.article_count}টি উল্লেখ (${windowDays} দিন)`
+        : weatherPeak
+          ? `${windowDays} দিনে সর্বোচ্চ বন্যা ঝুঁকি ${weatherPeak.max_flood_risk}/৫`
+          : z.water_note_bn;
+      const evidenceNoteEn = newsHit
+        ? `${newsHit.article_count} news mention(s) in ${windowDays}d`
+        : weatherPeak
+          ? `Peak flood risk ${weatherPeak.max_flood_risk}/5 in ${windowDays}d`
+          : z.water_note_en;
+      return {
+        ...z,
+        risk_level: Math.max(
+          z.risk_level,
+          weatherPeak?.max_flood_risk ?? 0,
+          weatherPeak?.max_cyclone_risk ?? 0,
+          newsHit ? 3 : 0,
+        ),
+        water_note_bn: evidenceNoteBn,
+        water_note_en: evidenceNoteEn,
+        source: newsHit ? "news_window" : weatherPeak ? "open-meteo-window" : z.source,
+      };
+    });
+
+    const allZones = [
+      ...weatherZones,
+      ...dynamicZones,
+      ...activeStaticZones,
+    ].filter((z) =>
       matchesScopeDistrict(
         "district" in z && typeof (z as HazardZoneRecord).district === "string"
           ? (z as HazardZoneRecord).district!
@@ -918,16 +900,19 @@ export class IntelligenceService {
     return {
       ...overlay,
       zones: allZones,
+      lookback_days: windowDays,
       live_signals: liveSignals?.signals ?? [],
       weather: weatherLive,
       scope: scopeCtx,
       projects_mapped: projectInputs.length,
       data_source:
         weatherZones.length > 0
-          ? "open-meteo+gdacs"
-          : dynamicZones.length > 0
-            ? "news_rss_google"
-            : "static_baseline",
+          ? "open-meteo-window"
+          : activeStaticZones.some((z) => z.source === "news_window")
+            ? "news_window"
+            : dynamicZones.length > 0
+              ? "news_rss_google"
+              : "window_filtered",
     };
   }
 }
