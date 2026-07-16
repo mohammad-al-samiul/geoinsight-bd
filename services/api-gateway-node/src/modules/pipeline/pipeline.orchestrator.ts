@@ -1,6 +1,9 @@
 import { env } from "../../core/config/env";
 import { IntervalWorker } from "../../core/workers/interval-worker";
 import { pipelineService } from "./pipeline.service";
+import { loggedPipelineTask } from "../intel/pipeline-run-log.service";
+
+const DAY_MS = 86_400_000;
 
 export class PipelineOrchestrator {
   private workers: IntervalWorker[] = [];
@@ -9,84 +12,99 @@ export class PipelineOrchestrator {
     if (this.workers.length > 0) return;
 
     const stagger = env.PIPELINE_STARTUP_DELAY_MS;
+    const log = (job: string, fn: () => Promise<Record<string, unknown>>) =>
+      () => loggedPipelineTask(job, fn);
 
     this.workers = [
       new IntervalWorker(
         "pipeline:news",
-        () => pipelineService.syncNews(),
+        log("news", () => pipelineService.syncNews()),
         env.PIPELINE_NEWS_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
         stagger,
       ),
       new IntervalWorker(
         "pipeline:commodity",
-        () => pipelineService.syncCommodityPrices(),
+        log("commodity", () => pipelineService.syncCommodityPrices()),
         env.PIPELINE_COMMODITY_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
         stagger + 15_000,
       ),
       new IntervalWorker(
         "pipeline:kpi",
-        () => pipelineService.syncKpiRecords(),
+        log("kpi", () => pipelineService.syncKpiRecords()),
         env.PIPELINE_KPI_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
         stagger + 30_000,
       ),
       new IntervalWorker(
         "pipeline:alerts",
-        () => pipelineService.detectAnomalies(),
+        log("alerts", () => pipelineService.detectAnomalies()),
         env.PIPELINE_ALERT_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
         stagger + 45_000,
       ),
       new IntervalWorker(
         "pipeline:agro",
-        () => pipelineService.syncAgroPrices(),
+        log("agro", () => pipelineService.syncAgroPrices()),
         env.PIPELINE_AGRO_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
         stagger + 60_000,
       ),
       new IntervalWorker(
         "pipeline:hazard",
-        () => pipelineService.refreshHazardSignals(),
+        log("hazard", () => pipelineService.refreshHazardSignals()),
         env.PIPELINE_HAZARD_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
         stagger + 75_000,
       ),
       new IntervalWorker(
         "pipeline:weather",
-        () => pipelineService.syncWeatherData(),
+        log("weather", () => pipelineService.syncWeatherData()),
         env.PIPELINE_WEATHER_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
         stagger + 90_000,
       ),
       new IntervalWorker(
         "pipeline:unrest",
-        () => pipelineService.refreshUnrestPulse(),
+        log("unrest", () => pipelineService.refreshUnrestPulse()),
         env.PIPELINE_UNREST_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
         stagger + 105_000,
       ),
       new IntervalWorker(
         "pipeline:signals",
-        () => pipelineService.extractLiveSignals(),
+        log("signals", () => pipelineService.extractLiveSignals()),
         env.PIPELINE_NEWS_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
         stagger + 20_000,
       ),
       new IntervalWorker(
         "pipeline:outlook",
-        () => pipelineService.refreshStrategicOutlook(),
+        log("outlook", () => pipelineService.refreshStrategicOutlook()),
         env.PIPELINE_OUTLOOK_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
         stagger + 120_000,
       ),
       new IntervalWorker(
         "pipeline:briefing",
-        () => pipelineService.refreshMorningBriefing(),
+        log("briefing", () => pipelineService.refreshMorningBriefing()),
         env.PIPELINE_BRIEFING_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
         stagger + 135_000,
+      ),
+      new IntervalWorker(
+        "pipeline:maintenance",
+        async () => {
+          const { pruneIntelSnapshots } = await import("../intel/intel-snapshot.service");
+          const { pruneAuditLogs } = await import("../intel/pipeline-run-log.service");
+          const intel = await pruneIntelSnapshots();
+          const audit = await pruneAuditLogs();
+          return { intel, audit };
+        },
+        DAY_MS,
+        true,
+        stagger + 150_000,
       ),
     ];
 

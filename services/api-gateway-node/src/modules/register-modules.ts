@@ -25,6 +25,7 @@ import { pipelineModule } from "./pipeline/pipeline.module";
 import { weatherModule } from "./weather/weather.module";
 import { unrestModule } from "./unrest/unrest.module";
 import { outlookModule } from "./outlook/outlook.module";
+import { intelModule } from "./intel/intel.module";
 
 const modules: AppModule[] = [
   healthModule,
@@ -42,6 +43,7 @@ const modules: AppModule[] = [
   intelligenceModule,
   ingestionModule,
   pipelineModule,
+  intelModule,
   weatherModule,
   unrestModule,
   outlookModule,

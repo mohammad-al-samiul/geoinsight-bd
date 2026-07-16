@@ -561,3 +561,34 @@ model IntelAnalysisSnapshot {
   @@index([kind, scopeKey, generatedAt(sort: Desc)])
   @@map("intel_analysis_snapshots")
 }
+
+/// Audit log — each pipeline cron/manual job (news, briefing, outlook, …)
+model PipelineJobRun {
+  id          String   @id @default(uuid()) @db.Uuid
+  job         String   @db.VarChar(32)
+  ok          Boolean
+  detail      Json?
+  durationMs  Int?     @map("duration_ms")
+  startedAt   DateTime @default(now()) @map("started_at") @db.Timestamptz
+  completedAt DateTime @default(now()) @map("completed_at") @db.Timestamptz
+
+  @@index([job, completedAt(sort: Desc)])
+  @@index([completedAt(sort: Desc)])
+  @@map("pipeline_job_runs")
+}
+
+/// Audit log — each news/RSS ingestion sync into external_articles
+model IngestionSyncRun {
+  id          String   @id @default(uuid()) @db.Uuid
+  fetched     Int      @default(0)
+  inserted    Int      @default(0)
+  updated     Int      @default(0)
+  feedsOk     Int      @default(0) @map("feeds_ok")
+  feedsTotal  Int      @default(0) @map("feeds_total")
+  error       String?  @db.Text
+  durationMs  Int?     @map("duration_ms")
+  completedAt DateTime @default(now()) @map("completed_at") @db.Timestamptz
+
+  @@index([completedAt(sort: Desc)])
+  @@map("ingestion_sync_runs")
+}

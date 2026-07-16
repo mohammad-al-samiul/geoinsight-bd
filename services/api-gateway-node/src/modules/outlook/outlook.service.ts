@@ -11,6 +11,8 @@ import {
 import { AI_FETCH_LLM_MS, fetchAi } from "../../shared/http/fetch-ai";
 import {
   getLatestIntelSnapshot,
+  getStaleIntelFallback,
+  isUsableIntelPayload,
   saveIntelSnapshot,
 } from "../intel/intel-snapshot.service";
 
@@ -59,7 +61,10 @@ export class OutlookService {
     const cacheKey = `${OUTLOOK_CACHE_KEY}:${lang}`;
     if (isRedisEnabled()) {
       const cached = await getRedisClient().get(cacheKey);
-      if (cached) return JSON.parse(cached) as Record<string, unknown>;
+      if (cached) {
+        const parsed = JSON.parse(cached) as Record<string, unknown>;
+        if (isUsableIntelPayload("OUTLOOK", parsed)) return parsed;
+      }
     }
 
     const fromDb = await getLatestIntelSnapshot("OUTLOOK", lang, null);
@@ -70,7 +75,18 @@ export class OutlookService {
       return fromDb;
     }
 
-    const data = await this.buildStrategic(lang);
+    let data: Record<string, unknown>;
+    try {
+      data = await this.buildStrategic(lang);
+    } catch (err) {
+      console.warn(
+        "[outlook] build failed, trying DB stale fallback:",
+        err instanceof Error ? err.message : err,
+      );
+      const stale = await getStaleIntelFallback("OUTLOOK", lang, null);
+      if (stale) return stale;
+      throw err;
+    }
     await this.persistOutlook(lang, data);
     if (isRedisEnabled()) {
       await getRedisClient().setex(cacheKey, OUTLOOK_TTL_SEC, JSON.stringify(data));

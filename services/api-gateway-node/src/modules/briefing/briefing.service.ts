@@ -10,6 +10,8 @@ import { ingestionService } from "../ingestion/ingestion.service";
 import { AI_FETCH_LLM_MS, fetchAi } from "../../shared/http/fetch-ai";
 import {
   getLatestIntelSnapshot,
+  getStaleIntelFallback,
+  isUsableIntelPayload,
   saveIntelSnapshot,
 } from "../intel/intel-snapshot.service";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
@@ -44,6 +46,50 @@ async function callAiBriefing(payload: Record<string, unknown>): Promise<Record<
   return res.json() as Promise<Record<string, unknown>>;
 }
 
+function buildBriefingFallback(
+  payload: Record<string, unknown>,
+  lang: "bn" | "en",
+): Record<string, unknown> {
+  const bn = lang === "bn";
+  const scope = String(payload.scope_label_bn ?? payload.scope_label ?? (bn ? "জাতীয়" : "National"));
+  const completion = Number(payload.completion_rate ?? 0);
+  const alerts = Number(payload.open_alerts ?? 0);
+  const headlines = Array.isArray(payload.news_headlines)
+    ? (payload.news_headlines as Array<{ title: string; source: string; district?: string | null }>)
+    : [];
+
+  const bullets = headlines.slice(0, 5).map((h, idx) => ({
+    text: bn
+      ? `সংবাদ (${h.source}): ${h.title.slice(0, 140)}${h.district ? ` — ${h.district}` : ""}`
+      : `News (${h.source}): ${h.title.slice(0, 140)}${h.district ? ` — ${h.district}` : ""}`,
+    category: "news",
+    priority: idx === 0 ? 1 : 2,
+  }));
+
+  if (bullets.length === 0) {
+    bullets.push({
+      text: bn
+        ? `স্কোপ ${scope}: সমাপ্তির হার ${completion.toFixed(1)}%, ${alerts}টি খোলা সতর্কতা — লাইভ ফিড সিঙ্ক চালু আছে।`
+        : `Scope ${scope}: completion ${completion.toFixed(1)}%, ${alerts} open alerts — live feed sync is active.`,
+      category: "summary",
+      priority: 5,
+    });
+  }
+
+  const header = bn ? `আজ সকালের ব্রিফিং — ${scope}` : `Morning briefing — ${scope}`;
+  const body = bullets.map((b) => `• ${b.text}`).join("\n");
+
+  return {
+    lang,
+    scope_label: bn ? scope : String(payload.scope_label ?? "National"),
+    generated_at: new Date().toISOString(),
+    bullets,
+    narrative: `${header}\n\n${body}`,
+    voice_text: [header, ...bullets.map((b) => b.text)].join(" ").slice(0, 1200),
+    llm_used: false,
+  };
+}
+
 function scopeUnitId(query: DashboardScopeQuery): string | undefined {
   return query.unionId ?? query.upazilaId ?? query.districtId ?? query.divisionId;
 }
@@ -57,7 +103,10 @@ export class BriefingService {
 
     if (isRedisEnabled()) {
       const cached = await getRedisClient().get(cacheKey);
-      if (cached) return JSON.parse(cached) as Record<string, unknown>;
+      if (cached) {
+        const parsed = JSON.parse(cached) as Record<string, unknown>;
+        if (isUsableIntelPayload("BRIEFING", parsed)) return parsed;
+      }
     }
 
     const fromDb = await getLatestIntelSnapshot("BRIEFING", lang, scopeKey);
@@ -68,7 +117,15 @@ export class BriefingService {
       return fromDb;
     }
 
-    const data = await this.buildMorningBriefing(query);
+    const data = await this.buildMorningBriefing(query).catch(async (err) => {
+      console.warn(
+        "[briefing] build failed, trying DB stale fallback:",
+        err instanceof Error ? err.message : err,
+      );
+      const stale = await getStaleIntelFallback("BRIEFING", lang, scopeKey);
+      if (stale) return stale;
+      throw err;
+    });
     try {
       await saveIntelSnapshot({
         kind: "BRIEFING",
@@ -296,7 +353,16 @@ export class BriefingService {
       })),
     };
 
-    const briefing = await callAiBriefing(aiPayload);
+    let briefing: Record<string, unknown>;
+    try {
+      briefing = await callAiBriefing(aiPayload);
+    } catch (err) {
+      console.warn(
+        "[briefing] AI generate failed, using live fallback:",
+        err instanceof Error ? err.message : err,
+      );
+      briefing = buildBriefingFallback(aiPayload, lang);
+    }
 
     return {
       ...briefing,

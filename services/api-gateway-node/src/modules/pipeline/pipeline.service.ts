@@ -13,7 +13,7 @@ import { publishToGovQueue } from "../../infrastructure/messaging/gov-queue.publ
 import { hashAiExplanation } from "../twin/twin.service";
 import { ingestionService } from "../ingestion/ingestion.service";
 import { broadcastDashboardRefresh, broadcastKpiUpdate } from "./pipeline.broadcast";
-import { fetchAi } from "../../shared/http/fetch-ai";
+import { AI_FETCH_LLM_MS, fetchAi } from "../../shared/http/fetch-ai";
 
 const COMMODITIES = ["rice", "wheat", "lentil", "onion"] as const;
 const HAZARD_CACHE_KEY = "pipeline:hazard:v1";
@@ -119,10 +119,43 @@ export class PipelineService {
   }
 
   async syncNews(): Promise<Record<string, unknown>> {
-    const { AI_FETCH_LLM_MS } = await import("../../shared/http/fetch-ai");
-    const result = await ingestionService.syncFromAi(15, AI_FETCH_LLM_MS);
+    // Full 15-per-feed runs are too heavy for routine live refresh on a small VPS.
+    // Keep the dashboard fed with fresher, lighter batches instead of timing out.
+    const result = await ingestionService.syncFromAi(6, 240_000);
     await broadcastDashboardRefresh("pipeline:news");
+    void this.refreshIntelAfterNews().catch((err) => {
+      console.warn(
+        "[pipeline:news] post-news intel refresh failed:",
+        err instanceof Error ? err.message : err,
+      );
+    });
     return result as unknown as Record<string, unknown>;
+  }
+
+  /** Refresh briefing/outlook when news lands so narrative sections stay populated. */
+  private async refreshIntelAfterNews(): Promise<void> {
+    const { getLatestIntelSnapshot } = await import("../intel/intel-snapshot.service");
+    const { isUsableIntelPayload } = await import("../intel/intel-snapshot.service");
+    const { briefingService } = await import("../briefing/briefing.service");
+    const { outlookService } = await import("../outlook/outlook.service");
+
+    const [briefBn, briefEn, outlookBn] = await Promise.all([
+      getLatestIntelSnapshot("BRIEFING", "bn", "national"),
+      getLatestIntelSnapshot("BRIEFING", "en", "national"),
+      getLatestIntelSnapshot("OUTLOOK", "bn", null),
+    ]);
+
+    const tasks: Array<Promise<unknown>> = [];
+    if (!briefBn || !isUsableIntelPayload("BRIEFING", briefBn)) {
+      tasks.push(briefingService.refreshMorningBriefing("bn"));
+    }
+    if (!briefEn || !isUsableIntelPayload("BRIEFING", briefEn)) {
+      tasks.push(briefingService.refreshMorningBriefing("en"));
+    }
+    if (!outlookBn || !isUsableIntelPayload("OUTLOOK", outlookBn)) {
+      tasks.push(outlookService.refresh());
+    }
+    if (tasks.length) await Promise.all(tasks);
   }
 
   async syncCommodityPrices(): Promise<Record<string, unknown>> {
@@ -582,7 +615,9 @@ export class PipelineService {
 
   async syncWeatherData(): Promise<Record<string, unknown>> {
     const { weatherService } = await import("../weather/weather.service");
-    const result = await weatherService.syncFromAi();
+    // Weather fetch can fan out to many Open-Meteo points and often needs
+    // more than the default 30s gateway timeout.
+    const result = await weatherService.syncFromAi(AI_FETCH_LLM_MS);
     return result;
   }
 

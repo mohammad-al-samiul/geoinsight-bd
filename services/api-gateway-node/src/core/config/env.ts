@@ -53,6 +53,12 @@ const envSchema = z.object({
   PIPELINE_OUTLOOK_INTERVAL_MS: z.coerce.number().int().positive().default(1_800_000),
   PIPELINE_BRIEFING_INTERVAL_MS: z.coerce.number().int().positive().default(1_800_000),
 
+  /** Intel snapshot DB retention (days) + max rows kept per kind/lang/scope */
+  INTEL_SNAPSHOT_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+  INTEL_SNAPSHOT_KEEP_PER_SCOPE: z.coerce.number().int().positive().default(48),
+  PIPELINE_LOG_RETENTION_DAYS: z.coerce.number().int().positive().default(14),
+  INGESTION_LOG_RETENTION_DAYS: z.coerce.number().int().positive().default(14),
+
   LIVE_DATA_ONLY: z.string().default("true").transform((v) => v === "true"),
 
   /** National election / new cabinet — politics/economy/unrest scoped from this date */

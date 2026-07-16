@@ -6,6 +6,7 @@ import {
 import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
 import { redisCacheService } from "../../infrastructure/cache/redis-cache.service";
 import { fetchAi } from "../../shared/http/fetch-ai";
+import { logIngestionSyncRun } from "../intel/pipeline-run-log.service";
 
 const HEATMAP_TTL_SEC = 120;
 
@@ -113,74 +114,100 @@ function hardshipHint(text: string): string | null {
 
 export class IngestionService {
   async syncFromAi(maxPerFeed = 15, timeoutMs = 120_000): Promise<IngestionSyncResult> {
-    const res = await fetchAi(
-      `/api/v1/ingestion/fetch`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ max_per_feed: maxPerFeed, analyze_sentiment: true }),
-      },
-      { timeoutMs },
-    );
+    const t0 = Date.now();
+    try {
+      const res = await fetchAi(
+        `/api/v1/ingestion/fetch`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ max_per_feed: maxPerFeed, analyze_sentiment: true }),
+        },
+        { timeoutMs },
+      );
 
-    if (!res.ok) {
-      throw new Error(`Ingestion fetch failed (${res.status})`);
-    }
+      if (!res.ok) {
+        throw new Error(`Ingestion fetch failed (${res.status})`);
+      }
 
-    const payload = (await res.json()) as {
-      fetched: number;
-      feeds_ok: number;
-      feeds_total: number;
-      completed_at: string;
-      articles: IngestedArticlePayload[];
-    };
-
-    let inserted = 0;
-    let updated = 0;
-
-    for (const article of payload.articles) {
-      const existing = await prismaRead.externalArticle.findUnique({
-        where: { url: article.url },
-        select: { id: true },
-      });
-
-      const data: Prisma.ExternalArticleCreateInput = {
-        sourceType: mapSourceType(article.source_type),
-        sourceName: article.source_name,
-        title: article.title,
-        summary: article.summary ?? null,
-        url: article.url,
-        publishedAt: article.published_at ? new Date(article.published_at) : null,
-        district: article.district ?? null,
-        division: article.division ?? null,
-        sentimentCategory: mapSentiment(article.sentiment_category),
-        sentimentScore: article.sentiment_score ?? null,
-        language: article.language ?? "bn",
+      const payload = (await res.json()) as {
+        fetched: number;
+        feeds_ok: number;
+        feeds_total: number;
+        completed_at: string;
+        articles: IngestedArticlePayload[];
       };
 
-      if (existing) {
-        await prismaWrite.externalArticle.update({
-          where: { id: existing.id },
-          data: {
-            ...data,
-            fetchedAt: new Date(),
-          },
-        });
-        updated += 1;
-      } else {
-        await prismaWrite.externalArticle.create({ data });
-        inserted += 1;
-      }
-    }
+      let inserted = 0;
+      let updated = 0;
 
-    return {
-      fetched: payload.fetched,
-      inserted,
-      updated,
-      feeds_ok: payload.feeds_ok,
-      feeds_total: payload.feeds_total,
-      completed_at: payload.completed_at,
-    };
+      for (const article of payload.articles) {
+        const existing = await prismaRead.externalArticle.findUnique({
+          where: { url: article.url },
+          select: { id: true },
+        });
+
+        const data: Prisma.ExternalArticleCreateInput = {
+          sourceType: mapSourceType(article.source_type),
+          sourceName: article.source_name,
+          title: article.title,
+          summary: article.summary ?? null,
+          url: article.url,
+          publishedAt: article.published_at ? new Date(article.published_at) : null,
+          district: article.district ?? null,
+          division: article.division ?? null,
+          sentimentCategory: mapSentiment(article.sentiment_category),
+          sentimentScore: article.sentiment_score ?? null,
+          language: article.language ?? "bn",
+        };
+
+        if (existing) {
+          await prismaWrite.externalArticle.update({
+            where: { id: existing.id },
+            data: {
+              ...data,
+              fetchedAt: new Date(),
+            },
+          });
+          updated += 1;
+        } else {
+          await prismaWrite.externalArticle.create({ data });
+          inserted += 1;
+        }
+      }
+
+      const result: IngestionSyncResult = {
+        fetched: payload.fetched,
+        inserted,
+        updated,
+        feeds_ok: payload.feeds_ok,
+        feeds_total: payload.feeds_total,
+        completed_at: payload.completed_at,
+      };
+
+      await logIngestionSyncRun({
+        fetched: result.fetched,
+        inserted: result.inserted,
+        updated: result.updated,
+        feedsOk: result.feeds_ok,
+        feedsTotal: result.feeds_total,
+        durationMs: Date.now() - t0,
+      });
+
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await logIngestionSyncRun({
+        fetched: 0,
+        inserted: 0,
+        updated: 0,
+        feedsOk: 0,
+        feedsTotal: 0,
+        durationMs: Date.now() - t0,
+        error: message,
+      });
+      throw err;
+    }
   }
 
   async hasRecentArticles(days = 7, minCount = 5): Promise<boolean> {
