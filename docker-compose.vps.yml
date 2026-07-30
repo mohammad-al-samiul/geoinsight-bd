@@ -57,7 +57,7 @@ services:
       # Point OLLAMA_URL at a remote AI server in .env (not localhost on small VPS)
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gpt-oss:20b}
     deploy:
       resources:
         limits:

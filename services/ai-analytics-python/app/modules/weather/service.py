@@ -493,11 +493,16 @@ class WeatherService:
         if lat is not None and lng is not None:
             return float(lat), float(lng)
 
-        for pattern in (
-            r"lat[itude]*[:\s]+(-?\d+\.?\d*)",
-            r"lon[gitude]*[:\s]+(-?\d+\.?\d*)",
+        for pattern_lat, pattern_lon in (
+            (r"lat[itude]*[:\s]+(-?\d+\.?\d*)", r"lon[gitude]*[:\s]+(-?\d+\.?\d*)"),
         ):
-            pass
+            lat_match = re.search(pattern_lat, summary, re.I)
+            lon_match = re.search(pattern_lon, summary, re.I)
+            if lat_match and lon_match:
+                try:
+                    return float(lat_match.group(1)), float(lon_match.group(1))
+                except (ValueError, TypeError):
+                    continue
 
         lat_m = re.search(r"(\d{1,2}\.\d+)\s*[°]?\s*N", summary, re.I)
         lng_m = re.search(r"(\d{1,2}\.\d+)\s*[°]?\s*E", summary, re.I)

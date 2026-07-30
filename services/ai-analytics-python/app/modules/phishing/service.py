@@ -25,6 +25,7 @@ from app.modules.phishing.schemas import (
     ScanResponse,
 )
 from app.modules.phishing.signature import (
+    analyze_url_heuristics,
     build_signature_from_html,
     is_official_domain,
     normalize_hostname,
@@ -221,6 +222,8 @@ class AntiPhishingShield:
         await self._ensure_gallery(official_urls, body.timeout_seconds)
 
         details = self._domain_details(url)
+        
+        heuristics = analyze_url_heuristics(url, details.is_official)
 
         # Verified domain → never RED_FLAG even if self-similar
         if details.is_official:
@@ -228,15 +231,19 @@ class AntiPhishingShield:
                 status=PhishingStatus.CLEAN,
                 similarity_score=1.0,
                 domain_details=details,
+                heuristics=heuristics,
                 message="Domain is on the official verified allow-list.",
             )
 
         html, err = await self.fetch_html(url, timeout_seconds=body.timeout_seconds)
         if err or html is None:
+            # If fetch fails but heuristics are very high, it might be a dead phishing link
+            status = PhishingStatus.WATCH if heuristics.risk_score > 0.5 else PhishingStatus.ERROR
             return ScanResponse(
-                status=PhishingStatus.ERROR,
+                status=status,
                 similarity_score=0.0,
                 domain_details=details,
+                heuristics=heuristics,
                 message="Unable to fetch or parse the suspicious URL.",
                 error=err,
             )
@@ -248,6 +255,7 @@ class AntiPhishingShield:
                 status=PhishingStatus.ERROR,
                 similarity_score=0.0,
                 domain_details=details,
+                heuristics=heuristics,
                 message="HTML fingerprinting failed.",
                 error=f"parse:{exc.__class__.__name__}",
             )
@@ -255,9 +263,10 @@ class AntiPhishingShield:
         gallery = self._store.signatures
         if not gallery:
             return ScanResponse(
-                status=PhishingStatus.WATCH,
+                status=PhishingStatus.WATCH if heuristics.risk_score > 0.3 else PhishingStatus.ERROR,
                 similarity_score=0.0,
                 domain_details=details,
+                heuristics=heuristics,
                 candidate_signature=candidate,
                 message=(
                     "No official signatures available (offline bootstrap). "
@@ -276,6 +285,7 @@ class AntiPhishingShield:
                 status=PhishingStatus.RED_FLAG,
                 similarity_score=score,
                 domain_details=details,
+                heuristics=heuristics,
                 best_match=best,
                 cosine_score=breakdown.cosine,
                 levenshtein_score=breakdown.levenshtein,
@@ -286,17 +296,35 @@ class AntiPhishingShield:
                 ),
             )
 
-        if score >= max(0.55, threshold - 0.25):
+        # Heuristic boost: If URL looks highly suspicious and we have SOME similarity, flag it
+        if score >= max(0.40, threshold - 0.35) and heuristics.risk_score >= 0.7:
+            return ScanResponse(
+                status=PhishingStatus.RED_FLAG,
+                similarity_score=score,
+                domain_details=details,
+                heuristics=heuristics,
+                best_match=best,
+                cosine_score=breakdown.cosine,
+                levenshtein_score=breakdown.levenshtein,
+                candidate_signature=candidate,
+                message=(
+                    "Heuristic risk is VERY HIGH combined with moderate visual similarity. "
+                    "Strong indicator of a targeted phishing attack."
+                ),
+            )
+
+        if score >= max(0.55, threshold - 0.25) or heuristics.risk_score >= 0.5:
             status = PhishingStatus.WATCH
-            msg = "Moderate similarity — recommend analyst review."
+            msg = "Moderate similarity or suspicious URL pattern — recommend analyst review."
         else:
             status = PhishingStatus.CLEAR
-            msg = "Low similarity to official government digital signatures."
+            msg = "Low similarity to official government digital signatures and no suspicious URL patterns."
 
         return ScanResponse(
             status=status,
             similarity_score=score,
             domain_details=details,
+            heuristics=heuristics,
             best_match=best,
             cosine_score=breakdown.cosine,
             levenshtein_score=breakdown.levenshtein,

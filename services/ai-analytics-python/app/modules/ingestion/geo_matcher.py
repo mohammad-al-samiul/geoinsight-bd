@@ -37,16 +37,16 @@ class UpazilaRef:
     division_en: str
 
 
+# Require a clear BD national anchor — bare "সরকার"/"national" matches foreign copy too.
 NATIONAL_KEYWORDS = (
     "বাংলাদেশ",
     "bangladesh",
-    "জাতীয়",
-    "national",
-    "সরকার",
-    "cabinet",
-    "মন্ত্রিসভা",
-    "prime minister",
-    "প্রধানমন্ত্রী",
+    "গণপ্রজাতন্ত্রী বাংলাদেশ",
+    "people's republic of bangladesh",
+    "bangladesh government",
+    "বাংলাদেশ সরকার",
+    "interim government of bangladesh",
+    "অন্তর্বর্তী সরকার",
 )
 
 # Localities often in flood headlines (city areas, not upazila gazetteer)

@@ -83,10 +83,18 @@ class ScanRequest(BaseModel):
     )
 
 
+class HeuristicAnalysis(BaseModel):
+    """Early-stage URL pattern risk analysis."""
+    risk_score: float = Field(ge=0.0, le=1.0, description="0.0 to 1.0 indicating suspicion level")
+    suspicious_keywords: list[str] = Field(default_factory=list)
+    has_excessive_subdomains: bool = False
+    has_suspicious_hyphens: bool = False
+
 class ScanResponse(BaseModel):
     status: PhishingStatus
     similarity_score: float = Field(ge=0.0, le=1.0)
     domain_details: DomainDetails
+    heuristics: HeuristicAnalysis | None = None
     best_match: DigitalSignature | None = None
     cosine_score: float | None = None
     levenshtein_score: float | None = None

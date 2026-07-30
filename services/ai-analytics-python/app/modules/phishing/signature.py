@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup, Tag
 
-from app.modules.phishing.schemas import DigitalSignature
+from app.modules.phishing.schemas import DigitalSignature, HeuristicAnalysis
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,52 @@ def is_official_domain(hostname: str, allow_list: set[str] | frozenset[str]) -> 
         if "gov.bd" in allow_list:
             return True
     return False
+
+
+def analyze_url_heuristics(url: str, is_official: bool) -> HeuristicAnalysis:
+    """Evaluate URL string for phishing patterns (zero-day heuristics)."""
+    if is_official:
+        return HeuristicAnalysis(
+            risk_score=0.0,
+            suspicious_keywords=[],
+            has_excessive_subdomains=False,
+            has_suspicious_hyphens=False
+        )
+
+    parsed = urlparse(url if "://" in url else f"https://{url}")
+    host = normalize_hostname(parsed.netloc or parsed.path)
+    
+    # 1. Suspicious Keywords
+    # Common phishing keywords targeting BD citizens
+    target_keywords = {"login", "secure", "verify", "update", "account", "auth", "nid", "poricha", "bkash", "bdt", "portal"}
+    found_keywords = [kw for kw in target_keywords if kw in url.lower()]
+    
+    # 2. Excessive Subdomains
+    # Count dots in the host (ignoring www. which was stripped in normalize_hostname)
+    parts = host.split(".")
+    has_excessive_subdomains = len(parts) > 3  # e.g., login.nid.gov-bd.example.com
+    
+    # 3. Suspicious Hyphens
+    # Phishers often use hyphens to fake official domains: bangladesh-gov-bd.com
+    # Only flag if there are multiple hyphens in the domain part, or hyphens combined with official keywords
+    has_suspicious_hyphens = host.count("-") >= 2 or ("-" in host and any(k in host for k in ["gov", "bd", "bangladesh"]))
+    
+    # Calculate Risk Score
+    score = 0.0
+    if found_keywords:
+        score += min(len(found_keywords) * 0.2, 0.4)
+    if has_excessive_subdomains:
+        score += 0.3
+    if has_suspicious_hyphens:
+        score += 0.4
+        
+    return HeuristicAnalysis(
+        risk_score=min(score, 1.0),
+        suspicious_keywords=found_keywords,
+        has_excessive_subdomains=has_excessive_subdomains,
+        has_suspicious_hyphens=has_suspicious_hyphens
+    )
+
 
 
 def _clean_token(text: str | None, limit: int = 120) -> str:

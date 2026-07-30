@@ -25,7 +25,7 @@ export function AiStatusBadge({ className, compact }: AiStatusBadgeProps) {
   }
 
   const reachable = status?.ollama_reachable ?? false;
-  const model = status?.ollama_model ?? "llama3.1:8b";
+  const model = status?.ollama_model ?? "gpt-oss:20b";
 
   return (
     <Badge

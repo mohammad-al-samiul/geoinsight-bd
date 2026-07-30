@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     sovereign_mode: bool = Field(default=False, alias="SOVEREIGN_MODE")
     llm_provider: str = Field(default="ollama", alias="LLM_PROVIDER")
     ollama_url: str | None = Field(default="http://host.docker.internal:11434", alias="OLLAMA_URL")
-    ollama_model: str = Field(default="llama3.1:8b", alias="OLLAMA_MODEL")
+    ollama_model: str = Field(default="gpt-oss:20b", alias="OLLAMA_MODEL")
     public_feed_333_rate_max: int = Field(default=30, alias="PUBLIC_FEED_333_RATE_MAX")
     public_feed_999_rate_max: int = Field(default=15, alias="PUBLIC_FEED_999_RATE_MAX")
 

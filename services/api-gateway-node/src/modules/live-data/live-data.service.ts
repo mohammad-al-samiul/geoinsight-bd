@@ -8,6 +8,7 @@ import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
 import { redisCacheService } from "../../infrastructure/cache/redis-cache.service";
 import type { DashboardScopeQuery } from "../dashboard/dashboard.service";
 import { ingestionService } from "../ingestion/ingestion.service";
+import { isBangladeshRelevantArticle } from "../../shared/geo/bangladesh-relevance";
 
 const NATIONAL_METRICS_TTL_SEC = 90;
 
@@ -125,6 +126,19 @@ export class LiveDataService {
       if (exists) continue;
 
       const text = `${article.title} ${article.summary ?? ""}`;
+      if (
+        !isBangladeshRelevantArticle({
+          title: article.title,
+          summary: article.summary,
+          district: article.district,
+          division: article.division,
+          sourceName: article.sourceName,
+          url: article.url,
+        })
+      ) {
+        continue;
+      }
+
       const signalType = classifyArticle(text, article.sentimentCategory);
       if (!signalType) continue;
 

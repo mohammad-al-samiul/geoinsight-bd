@@ -27,8 +27,10 @@ import {
   mandateAnalysisSince,
   mandatePublicMeta,
 } from "../../shared/gov/current-mandate";
+import { isBangladeshRelevantArticle } from "../../shared/geo/bangladesh-relevance";
+import { clusterProtestMovements } from "../../shared/geo/protest-movements";
 
-const UNREST_CACHE_KEY = "unrest:pulse:v5";
+const UNREST_CACHE_KEY = "unrest:pulse:v8";
 const UNREST_TTL_SEC = 900;
 /** Fetch window — impact UI can slice 1d / 7d / 30d (floored at current mandate) */
 const LOOKBACK_DAYS = 30;
@@ -112,7 +114,12 @@ function includesAny(text: string, keywords: string[]): boolean {
 }
 
 function classifyUnrest(text: string, sentiment: IngestionSentiment | null): UnrestCategory | null {
-  const hasProtest = includesAny(text, PROTEST_KW);
+  // Cricket / sports "strike" (bowling) is not civil unrest.
+  const sportsNoise =
+    /\b(cricket|innings|bowled|five-match|test match|t20|odi|series against)\b/i.test(text) &&
+    !includesAny(text, ["আন্দোলন", "বিক্ষোভ", "হরতাল", "protest", "demonstration", "hartal"]);
+
+  const hasProtest = includesAny(text, PROTEST_KW) && !sportsNoise;
   const hasLaw = includesAny(text, LAW_KW);
   const hasGovt = includesAny(text, GOVT_DISCONTENT_KW);
   const hasSocial = includesAny(text, SOCIAL_KW);
@@ -195,9 +202,12 @@ export interface DistrictUnrestCell {
 export interface UnrestPulse {
   districts: DistrictUnrestCell[];
   signals: UnrestSignal[];
+  /** Named protest movements clustered by place + theme (e.g. HSC exam — Chattogram) */
+  movements: ReturnType<typeof clusterProtestMovements>;
   summary: {
     districts_at_risk: number;
     active_protests: number;
+    active_movements: number;
     law_hotspots: number;
     social_viral: number;
     total_signals: number;
@@ -263,6 +273,8 @@ export class UnrestService {
     return {
       districts: pulse.districts.length,
       signals: pulse.signals.length,
+      movements: pulse.movements.length,
+      active_movements: pulse.movements.filter((m) => m.status === "active").length,
       districts_at_risk: pulse.summary.districts_at_risk,
       persisted: true,
     };
@@ -299,7 +311,7 @@ export class UnrestService {
 
   private applyScope(pulse: UnrestPulse, ctx: ScopeContext): UnrestPulse {
     if (!ctx.divisionName && !ctx.districtName) {
-      return { ...pulse, scope: ctx };
+      return { ...pulse, movements: pulse.movements ?? [], scope: ctx };
     }
 
     const districts = pulse.districts.filter((d) =>
@@ -308,14 +320,19 @@ export class UnrestService {
     const signals = pulse.signals.filter((s) =>
       matchesScopeDistrict(s.district, s.division, ctx),
     );
+    const movements = (pulse.movements ?? []).filter((m) =>
+      matchesScopeDistrict(m.district, m.division, ctx),
+    );
 
     return {
       districts,
       signals,
+      movements,
       summary: {
         ...pulse.summary,
         districts_at_risk: districts.filter((d) => d.risk_level >= 3).length,
-        active_protests: districts.reduce((n, d) => n + d.protest_count, 0),
+        active_protests: movements.filter((m) => m.status === "active").length,
+        active_movements: movements.filter((m) => m.status === "active").length,
         law_hotspots: districts.filter((d) => d.law_reaction_count > 0).length,
         social_viral: districts.reduce((n, d) => n + d.social_viral_count, 0),
         total_signals: signals.length,
@@ -354,6 +371,19 @@ export class UnrestService {
     });
 
     const signals: UnrestSignal[] = [];
+    const movementInputs: Array<{
+      id: string;
+      title: string;
+      summary?: string | null;
+      category: UnrestCategory;
+      severity: number;
+      district: string | null;
+      division: string | null;
+      source_name: string;
+      url: string;
+      published_at: string | null;
+      impact: NewsImpactExtract;
+    }> = [];
     const byDistrict = new Map<
       string,
       {
@@ -374,6 +404,19 @@ export class UnrestService {
       if (published < mandate.termStartedAt) continue;
 
       const text = `${article.title} ${article.summary ?? ""}`;
+      if (
+        !isBangladeshRelevantArticle({
+          title: article.title,
+          summary: article.summary,
+          district: article.district,
+          division: article.division,
+          sourceName: article.sourceName,
+          url: article.url,
+        })
+      ) {
+        continue;
+      }
+
       const category = classifyUnrest(text, article.sentimentCategory);
       if (!category) continue;
 
@@ -398,6 +441,20 @@ export class UnrestService {
         url: article.url,
         published_at: publishedAt,
         sentiment: article.sentimentCategory,
+        impact,
+      });
+
+      movementInputs.push({
+        id: article.id,
+        title: article.title,
+        summary: article.summary,
+        category,
+        severity,
+        district: district === "National" ? null : district,
+        division,
+        source_name: article.sourceName,
+        url: article.url,
+        published_at: publishedAt,
         impact,
       });
 
@@ -494,15 +551,19 @@ export class UnrestService {
     districts.sort((a, b) => b.unrest_score - a.unrest_score || b.total_signals - a.total_signals);
     signals.sort((a, b) => b.severity - a.severity);
 
+    const movements = clusterProtestMovements(movementInputs);
+    const activeMovements = movements.filter((m) => m.status === "active");
     const atRisk = districts.filter((d) => d.risk_level >= 3);
     const impact = impactFromSignals(signals);
 
     return {
       districts,
       signals: signals.slice(0, 120),
+      movements,
       summary: {
         districts_at_risk: atRisk.length,
-        active_protests: districts.reduce((n, d) => n + d.protest_count, 0),
+        active_protests: activeMovements.length,
+        active_movements: activeMovements.length,
         law_hotspots: districts.filter((d) => d.law_reaction_count > 0).length,
         social_viral: districts.reduce((n, d) => n + d.social_viral_count, 0),
         total_signals: signals.length,
@@ -510,9 +571,9 @@ export class UnrestService {
         refreshed_at: new Date().toISOString(),
         sources: ["rss_newspapers", "google_news", "topic_feeds"],
         note_bn:
-          `${mandate.labelBn} — শুধু এই মেয়াদের সংবাদ। সংবাদপত্র ও গুগল নিউজ থেকে বিশ্লেষণ; ফেসবুক সরাসরি স্ক্র্যাপ নয়।`,
+          `${mandate.labelBn} — চলমান আন্দোলন স্থান ও বিষয় অনুযায়ী গ্রুপ করা। নিহত/আহত/ক্ষতি সংবাদ থেকে আনুমানিক।`,
         note_en:
-          `${mandate.labelEn} — news from this mandate only. Newspaper RSS and Google News; Facebook is not scraped directly.`,
+          `${mandate.labelEn} — active protests clustered by place and theme. Casualties estimated from news.`,
         government: mandatePublicMeta(mandate),
         impact,
       },

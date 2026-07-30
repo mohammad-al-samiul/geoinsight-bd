@@ -1,14 +1,20 @@
 # Run full GeoInsight BD stack in Docker (infra + apps)
 # Usage: .\deploy\scripts\docker-up.ps1
+# Optional: .\deploy\scripts\docker-up.ps1 -Build   # only rebuild images when needed
+
+param(
+  [switch]$Build
+)
 
 $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+
 Set-Location $Root
 
 function Get-EnvValue {
   param([string]$Name, [string]$Default)
   $match = Select-String -Path "$Root\.env" -Pattern "^\s*$([regex]::Escape($Name))\s*=" |
-    Select-Object -Last 1
+  Select-Object -Last 1
   if ($match) {
     return ($match.Line -split "=", 2)[1].Trim().Trim('"').Trim("'")
   }
@@ -76,13 +82,14 @@ function Invoke-DockerCompose {
   $prevEap = $ErrorActionPreference
   $ErrorActionPreference = "Continue"
   & docker compose -f docker-compose.yml -f docker-compose.apps.yml @Arguments 2>&1 |
-    ForEach-Object {
-      if ($_ -is [System.Management.Automation.ErrorRecord]) {
-        Write-Host $_.ToString()
-      } else {
-        Write-Host $_
-      }
+  ForEach-Object {
+    if ($_ -is [System.Management.Automation.ErrorRecord]) {
+      Write-Host $_.ToString()
     }
+    else {
+      Write-Host $_
+    }
+  }
   $code = $LASTEXITCODE
   $ErrorActionPreference = $prevEap
   return $code
@@ -121,7 +128,7 @@ function Clear-GeoInsightContainerConflicts {
   }
   # Rename leftovers: hashprefix_geoinsight-*
   $stuck = docker ps -a --format "{{.ID}} {{.Names}}" 2>$null |
-    Where-Object { $_ -match "geoinsight" }
+  Where-Object { $_ -match "geoinsight" }
   foreach ($line in $stuck) {
     $id = ($line -split "\s+")[0]
     if ($id) { docker rm -f $id 2>$null | Out-Null }
@@ -139,12 +146,21 @@ Write-Host "  Dashboard port: $DashboardPort | API port: $ApiPort" -ForegroundCo
 Write-Host "  Tip: AI image uses CPU torch + BuildKit pip cache (no CUDA re-download)." -ForegroundColor DarkGray
 Write-Host "  Tip: Prefer MINIO_API_PORT=19000 in .env if port 9000 is Hyper-V blocked." -ForegroundColor DarkGray
 
-$composeExit = Invoke-DockerCompose -Arguments @("up", "-d", "--build")
+$composeArgs = @("up", "-d")
+if ($Build.IsPresent) {
+  $composeArgs += "--build"
+  Write-Host "  Running with --build because -Build was passed." -ForegroundColor DarkGray
+}
+else {
+  Write-Host "  Running without --build for faster startup." -ForegroundColor DarkGray
+}
+
+$composeExit = Invoke-DockerCompose -Arguments $composeArgs
 if ($composeExit -ne 0) {
   Write-Host ""
   Write-Host "Retrying after force-cleaning name conflicts..." -ForegroundColor Yellow
   Clear-GeoInsightContainerConflicts
-  $composeExit = Invoke-DockerCompose -Arguments @("up", "-d", "--build")
+  $composeExit = Invoke-DockerCompose -Arguments $composeArgs
 }
 if ($composeExit -ne 0) {
   Write-Host ""
@@ -167,7 +183,8 @@ while ((Get-Date) -lt $deadline) {
       $ready = $true
       break
     }
-  } catch {
+  }
+  catch {
     # still starting
   }
   Start-Sleep -Seconds 3
@@ -176,7 +193,8 @@ while ((Get-Date) -lt $deadline) {
 Write-Host ""
 if ($ready) {
   Write-Host "All core services are up." -ForegroundColor Green
-} else {
+}
+else {
   Write-Host "WARNING: API health check timed out - containers may still be starting." -ForegroundColor Yellow
   Write-Host "  docker compose -f docker-compose.yml -f docker-compose.apps.yml logs api-gateway --tail 30" -ForegroundColor White
 }

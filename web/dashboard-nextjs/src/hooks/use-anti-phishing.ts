@@ -22,10 +22,18 @@ export interface PhishingSignature {
   captured_at: string;
 }
 
+export interface HeuristicAnalysis {
+  risk_score: number;
+  suspicious_keywords: string[];
+  has_excessive_subdomains: boolean;
+  has_suspicious_hyphens: boolean;
+}
+
 export interface PhishingScanResult {
   status: PhishingStatus;
   similarity_score: number;
   domain_details: PhishingDomainDetails;
+  heuristics: HeuristicAnalysis | null;
   best_match: PhishingSignature | null;
   cosine_score: number | null;
   levenshtein_score: number | null;

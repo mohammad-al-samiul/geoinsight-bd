@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   ShieldQuestion,
   ListChecks,
+  Activity,
 } from "lucide-react";
 
 const SAMPLE_SUSPICIOUS = "https://bangladesh-gov-bd-secure-login.example/login";
@@ -159,13 +160,23 @@ export function AntiPhishingPanel() {
           <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             {t("urlLabel")}
           </label>
-          <input
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder={t("urlPlaceholder")}
-            className="w-full rounded-xl border border-border/60 bg-background/50 px-3.5 py-3 font-mono text-sm outline-none ring-primary/25 transition focus:border-primary/40 focus:ring-2"
-          />
+          <div className="relative overflow-hidden rounded-xl">
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder={t("urlPlaceholder")}
+              className="relative z-10 w-full rounded-xl border border-border/60 bg-background/50 px-3.5 py-3 font-mono text-sm outline-none ring-primary/25 transition focus:border-primary/40 focus:ring-2"
+            />
+            {loading && (
+              <motion.div
+                className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent"
+                initial={{ x: "-100%" }}
+                animate={{ x: "100%" }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+              />
+            )}
+          </div>
         </div>
 
         <AnimatedSlider
@@ -241,27 +252,101 @@ export function AntiPhishingPanel() {
 
       {result && (
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, y: 12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 200, damping: 20 }}
           className="mt-6 space-y-4"
         >
-          <IntelCard
-            hoverLift={false}
-            accent={STATUS_ACCENT[result.status]}
-            padding="md"
-          >
-            <p className={cn("text-sm font-medium leading-relaxed", STATUS_TEXT[result.status])}>
-              {result.status === "RED_FLAG" ? (
-                <AlertTriangle className="mr-1.5 inline h-4 w-4" />
+          <div className="relative group">
+            {/* Ambient glow behind the main verdict card */}
+            <div className={cn(
+              "absolute -inset-0.5 rounded-2xl opacity-40 blur-xl transition-all duration-700",
+              result.status === "RED_FLAG" ? "bg-red-500/50 animate-pulse" : 
+              result.status === "CLEAN" ? "bg-emerald-500/30" : "bg-primary/20"
+            )} />
+            
+            <IntelCard
+              hoverLift={false}
+              accent={STATUS_ACCENT[result.status]}
+              padding="lg"
+              className={cn(
+                "relative z-10 border overflow-hidden backdrop-blur-sm",
+                result.status === "RED_FLAG" ? "border-red-500/40 bg-red-950/20" : 
+                result.status === "CLEAN" ? "border-emerald-500/30 bg-emerald-950/10" : ""
+              )}
+            >
+              <div className="flex items-start gap-4">
+                <div className={cn(
+                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-full border shadow-inner",
+                  result.status === "RED_FLAG" ? "border-red-500/30 bg-red-500/20 text-red-400" :
+                  result.status === "CLEAN" ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-400" :
+                  "border-primary/30 bg-primary/20 text-primary"
+                )}>
+                  {result.status === "RED_FLAG" ? (
+                    <AlertTriangle className="h-6 w-6" />
+                  ) : result.status === "CLEAN" ? (
+                    <ShieldCheck className="h-6 w-6" />
+                  ) : (
+                    <Globe2 className="h-6 w-6" />
+                  )}
+                </div>
+                <div>
+                  <h4 className={cn("font-display text-lg font-bold tracking-tight", STATUS_TEXT[result.status])}>
+                    {t(`status.${result.status}`)}
+                  </h4>
+                  <p className="mt-1 text-sm font-medium leading-relaxed text-foreground/90">
+                    {result.message}
+                  </p>
+                  {result.status === "RED_FLAG" && (
+                    <p className="mt-2 text-xs font-medium text-red-400/80 tracking-wide uppercase">
+                      {t("redFlagHint")}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </IntelCard>
+          </div>
+
+          {result.heuristics && (
+            <IntelCard hoverLift={false} accent={result.heuristics.risk_score > 0.5 ? "warning" : "info"} padding="md">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity className={cn("h-4 w-4", result.heuristics.risk_score > 0.5 ? "text-amber-400" : "text-sky-400")} />
+                <h4 className="font-display text-sm font-semibold tracking-tight">Heuristic Pattern Analysis</h4>
+              </div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1">
+                  <ProgressMeter 
+                    value={Math.round(result.heuristics.risk_score * 100)} 
+                    tone={result.heuristics.risk_score > 0.5 ? "warn" : "info"}
+                    height="sm"
+                  />
+                </div>
+                <span className="text-xs font-mono font-medium">{Math.round(result.heuristics.risk_score * 100)}% Risk</span>
+              </div>
+              
+              {(result.heuristics.suspicious_keywords.length > 0 || result.heuristics.has_excessive_subdomains || result.heuristics.has_suspicious_hyphens) ? (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {result.heuristics.suspicious_keywords.map((kw) => (
+                    <Badge key={kw} variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-400 text-[10px] uppercase">
+                      Keyword: {kw}
+                    </Badge>
+                  ))}
+                  {result.heuristics.has_excessive_subdomains && (
+                    <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-400 text-[10px] uppercase">
+                      Excessive Subdomains
+                    </Badge>
+                  )}
+                  {result.heuristics.has_suspicious_hyphens && (
+                    <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-400 text-[10px] uppercase">
+                      Suspicious Hyphens
+                    </Badge>
+                  )}
+                </div>
               ) : (
-                <Globe2 className="mr-1.5 inline h-4 w-4" />
+                <p className="text-xs text-muted-foreground">No suspicious URL patterns detected.</p>
               )}
-              {result.message}
-              {result.status === "RED_FLAG" && (
-                <span className="mt-1 block text-xs opacity-90">{t("redFlagHint")}</span>
-              )}
-            </p>
-          </IntelCard>
+            </IntelCard>
+          )}
 
           <div className="grid gap-3 md:grid-cols-2">
             <IntelCard index={0} accent={result.status === "RED_FLAG" ? "danger" : "default"} className="h-full">

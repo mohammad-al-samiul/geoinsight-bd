@@ -103,12 +103,52 @@ export interface GovernmentMandateMeta {
   election_en: string;
 }
 
+export interface ProtestMovement {
+  id: string;
+  title: string;
+  title_bn: string;
+  theme_id?: string;
+  theme: string;
+  theme_bn: string;
+  place: string;
+  place_bn: string;
+  district: string | null;
+  division: string | null;
+  status: "active" | "recent" | "cooling";
+  status_bn: string;
+  status_en: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  article_count: number;
+  severity: number;
+  impact: {
+    deaths: number;
+    civilian_deaths: number;
+    injuries: number;
+    homes_damaged: number;
+    livestock_lost: number;
+    damage_mentions: number;
+    evidence: string[];
+  };
+  summary_bn: string;
+  summary_en: string;
+  articles: Array<{
+    id: string;
+    title: string;
+    url: string;
+    source_name: string;
+    published_at: string;
+  }>;
+}
+
 export interface UnrestPulse {
   districts: DistrictUnrestCell[];
   signals: UnrestSignal[];
+  movements?: ProtestMovement[];
   summary: {
     districts_at_risk: number;
     active_protests: number;
+    active_movements?: number;
     law_hotspots: number;
     social_viral: number;
     total_signals: number;

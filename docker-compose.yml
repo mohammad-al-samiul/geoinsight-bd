@@ -19,7 +19,9 @@ services:
   # PostgreSQL + TimescaleDB
   # ---------------------------------------------------------------------------
   postgres:
-    image: timescale/timescaledb:2.17.2-pg16
+    build:
+      context: ./services/postgres
+      dockerfile: Dockerfile
     container_name: geoinsight-postgres
     restart: unless-stopped
     logging: *default-logging
@@ -40,6 +42,8 @@ services:
       - max_replication_slots=10
       - -c
       - hot_standby=on
+      - -c
+      - shared_preload_libraries=timescaledb
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
