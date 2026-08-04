@@ -131,198 +131,8 @@ export interface AuditLedgerItem {
   verified: boolean;
   timestamp: string;
 }
+const INITIAL_NARRATIVE_SPEECHES: NarrativeSpeechItem[] = [];
 
-const INITIAL_NARRATIVE_SPEECHES: NarrativeSpeechItem[] = [
-  {
-    id: "sp-701",
-    speaker: "Syed Abdullah (Organizer)",
-    organization: "Jamaat-e-Islami",
-    roleTitle: "Central Naib-e-Ameer Desk / কেন্দ্রীয় নায়েবে আমীর ডেস্কে যুক্ত",
-    venuePlatform: "Paltan Rally & Facebook Live Stream",
-    location: "Paltan Maidan, Dhaka",
-    district: "Dhaka",
-    timestamp: "2026-07-23 11:30 AM",
-    sourceType: "FACEBOOK_LIVE",
-    rawStatement: {
-      en: "The government has secretly signed an energy grid agreement surrendering national sovereignty and creating artificial power outages in rural areas.",
-      bn: "বর্তমান সরকার গোপনে জাতীয় সার্বভৌমত্ব বিকিয়ে দিয়ে জ্বালানি চুক্তি স্বাক্ষর করেছে এবং গ্রামীণ এলাকায় কৃত্রিম লোডশেডিং সৃষ্টি করছে।",
-    },
-    category: "ANTI_GOVT_INCITEMENT",
-    threatLevel: "CRITICAL",
-    ragDebunk: {
-      factualCounter: {
-        en: "False propaganda. Power Grid Company of Bangladesh (PGCB) real-time load dispatch confirms 98.4% demand fulfillment. The agreement is a transparent ADB multilateral grant for green grid modernizations published on Power Division portal.",
-        bn: "সম্পূর্ণ ভিত্তিহীন অপপ্রচার। পাওয়ার গ্রিড কোম্পানি অব বাংলাদেশ (PGCB) এর রিয়েল-টাইম লোড ডেসপ্যাচ অনুযায়ী বর্তমানে জাতীয় চাহিদার ৯৮.৪% বিদ্যুৎ সরবরাহ নিরবচ্ছিন্ন রয়েছে। উক্ত চুক্তিটি এডিবি (ADB) এর সাথে সবুজ গ্রিড আধুনিকীকরণের একটি স্বচ্ছ ঋণ চুক্তি যা বিদ্যুৎ বিভাগের পোর্টালে প্রকাশ্যে উপলব্ধ।",
-      },
-      verifiedSources: ["Power Division Gazette (July 2026)", "ADB Project Brief #BD-5049", "PGCB Daily Load Bulletin"],
-      officialPolicyRef: "National Energy Security Policy § 4.2",
-      confidenceScore: 98,
-    },
-    status: "FLAGGED",
-  },
-  {
-    id: "sp-702",
-    speaker: "Tariqul Islam (Spokesperson)",
-    organization: "NCP (Nationalist Citizen Party)",
-    roleTitle: "Regional Coordinator / আঞ্চলিক সমন্বয়ক",
-    venuePlatform: "National Press Club & News Bulletin",
-    location: "Press Club, Dhaka",
-    district: "Dhaka",
-    timestamp: "2026-07-23 09:15 AM",
-    sourceType: "NEWS_ARTICLE",
-    rawStatement: {
-      en: "Foreign currency reserves have plummeted below $10 billion and the central bank is hiding default figures to prevent mass panic.",
-      bn: "দেশের বৈদেশিক মুদ্রার রিজার্ভ ১০ বিলিয়ন ডলারের নিচে নেমে গেছে এবং গণআতঙ্ক এড়াতে বাংলাদেশ ব্যাংক খেলাপি ঋণের আসল তথ্য গোপন করছে।",
-    },
-    category: "ECONOMIC_SABOTAGE_CALL",
-    threatLevel: "HIGH",
-    ragDebunk: {
-      factualCounter: {
-        en: "Misleading figures. Official Bangladesh Bank IMF BPM6 gross reserves stand at $24.85 Billion as of July 20, 2026. Remittance inflows registered a +14.2% YoY increase following recent banking sector reforms.",
-        bn: "বিভ্রান্তিকর পরিসংখ্যান। বাংলাদেশ ব্যাংকের অফিসিয়াল IMF BPM6 নিট রিজার্ভ ২০ জুলাই ২০২৬ অনুযায়ী ২৪.৮৫ বিলিয়ন মার্কিন ডলারে উন্নীত হয়েছে। সাম্প্রতিক ব্যাংকিং সংস্কারের ফলে প্রবাসী আয় (রেমিট্যান্স) পূর্ববর্তী বছরের তুলনায় ১৪.২% বৃদ্ধি পেয়েছে।",
-      },
-      verifiedSources: ["Bangladesh Bank Foreign Reserve Bulletin", "IMF Article IV Mission Audit Statement"],
-      officialPolicyRef: "Bangladesh Bank Monetary Policy MPS-2026",
-      confidenceScore: 99,
-    },
-    status: "FLAGGED",
-  },
-  {
-    id: "sp-703",
-    speaker: "Mahfuzur Rahman",
-    organization: "Extremist Channel",
-    roleTitle: "Admin - Desh Bachao Network",
-    venuePlatform: "YouTube Broadcast & TikTok Stream",
-    location: "Online (IP Trace: Sylhet)",
-    district: "Sylhet",
-    timestamp: "2026-07-22 08:45 PM",
-    sourceType: "YOUTUBE_BROADCAST",
-    rawStatement: {
-      en: "Calling upon all transport workers to block national highways starting Sunday to paralyze state administration.",
-      bn: "আসন্ন রোববার থেকে জাতীয় মহাসড়ক অবরুদ্ধ করে রাষ্ট্রীয় প্রশাসন অচলাবস্থা তৈরির জন্য সমস্ত পরিবহন শ্রমিকদের প্রতি আহ্বান জানাচ্ছি।",
-    },
-    category: "STATE_SOVEREIGNTY_THREAT",
-    threatLevel: "CRITICAL",
-    ragDebunk: {
-      factualCounter: {
-        en: "Unlawful call for civil disruption. Transport Workers Federation issued an official disclaimer rejecting the strike call. Highway Police and District Magistrates have deployed precautionary security patrols along N1 & N2 routes.",
-        bn: "বেআইনি উসকানিমূলক আহ্বান। বাংলাদেশ সড়ক পরিবহন শ্রমিক ফেডারেশন আনুষ্ঠানিকভাবে সংবাদ সম্মেলন করে এই ধর্মঘটের আহ্বান প্রত্যাখ্যান করেছে। জেলা প্রশাসন এবং হাইওয়ে পুলিশ N1 এবং N2 মহাসড়কে পর্যাপ্ত নিরাপত্তামূলক ব্যবস্থা গ্রহণ করেছে।",
-      },
-      verifiedSources: ["Road Transport Workers Federation Statement", "Dhaka-Sylhet Highway Patrol Advisory"],
-      officialPolicyRef: "Essential Services Maintenance Act 2026 § 8",
-      confidenceScore: 96,
-    },
-    status: "DEBUNKD_PUBLISHED",
-  },
-  {
-    id: "sp-704",
-    speaker: "Barrister Rashed Khan",
-    organization: "NCP (Nationalist Citizen Party)",
-    roleTitle: "Central Legal Wing Chief / কেন্দ্রীয় আইন বিষয়ক সম্পাদক",
-    venuePlatform: "Facebook Live & Press Conference",
-    location: "Chittagong Press Club",
-    district: "Chittagong",
-    timestamp: "2026-07-23 02:10 PM",
-    sourceType: "FACEBOOK_LIVE",
-    rawStatement: {
-      en: "Urging all citizens to withdraw bank deposits immediately as commercial banks are facing imminent liquidity collapse.",
-      bn: "বাণিজ্যিক ব্যাংকগুলো চরম তারল্য সংকটে ধসে পড়ার মুখে রয়েছে, তাই অনতিবিলম্বে সকল নাগরিককে ব্যাংক থেকে টাকা তুলে নেওয়ার আহ্বান জানাচ্ছি।",
-    },
-    category: "ECONOMIC_SABOTAGE_CALL",
-    threatLevel: "CRITICAL",
-    ragDebunk: {
-      factualCounter: {
-        en: "Malicious financial rumor aimed at triggering bank run. Bangladesh Bank Cash Reserve Ratio (CRR) and statutory liquidity ratio are well above security thresholds. Interbank liquidity support mechanism is active.",
-        bn: "ব্যাংক ধসের গুজব তৈরি করে অর্থনীতি অস্থিতিশীল করার উদ্দেশ্যে ছড়ানো বক্তব্য। বাংলাদেশ ব্যাংকের ক্যাশ রিজার্ভ রেশিও (CRR) ও বিধিবদ্ধ তারল্য সংস্থান সংবিধিবদ্ধ সীমার উর্ধ্বে রয়েছে। আন্তঃব্যাংক তারল্য সহায়তা পুরোপুরি কার্যকর।",
-      },
-      verifiedSources: ["Bangladesh Bank Financial Stability Report", "Association of Bankers Bangladesh (ABB) Statement"],
-      officialPolicyRef: "Banking Companies Act § 44-A",
-      confidenceScore: 97,
-    },
-    status: "FLAGGED",
-  },
-  {
-    id: "sp-705",
-    speaker: "Maulana Mufti Harun",
-    organization: "Jamaat-e-Islami",
-    roleTitle: "District Executive Ameer / জেলা নির্বাহী আমীর",
-    venuePlatform: "Public Meeting & Telegram Channel",
-    location: "Sadar Road, Barishal",
-    district: "Barishal",
-    timestamp: "2026-07-23 01:25 PM",
-    sourceType: "NEWS_ARTICLE",
-    rawStatement: {
-      en: "Claiming the government is modifying school curricula to remove religious history and national heritage chapters.",
-      bn: "বর্তমান সরকার জাতীয় পাঠ্যপুস্তক থেকে ধর্মীয় ইতিহাস ও জাতীয় ঐতিহ্যের অধ্যায়সমূহ বাদ দেওয়ার জন্য শিক্ষাক্রম পরিবর্তন করছে।",
-    },
-    category: "PUBLIC_UNREST_COMMOTION",
-    threatLevel: "HIGH",
-    ragDebunk: {
-      factualCounter: {
-        en: "Fabricated claim. National Curriculum and Textbook Board (NCTB) official release confirms 100% preservation of national history and religious studies, with added digital literacy content.",
-        bn: "সম্পূর্ণ ভুয়া দাবি। জাতীয় শিক্ষাক্রম ও পাঠ্যপুস্তক বোর্ড (NCTB) নিশ্চিত করেছে যে ধর্মীয় শিক্ষা ও জাতীয় ইতিহাসের অধ্যায়সমূহ অক্ষুণ্ণ রয়েছে এবং ডিজিটাল লিটারেসি যুক্ত করা হয়েছে।",
-      },
-      verifiedSources: ["NCTB Official Press Release", "Ministry of Education Gazette"],
-      officialPolicyRef: "National Education Policy § 12.1",
-      confidenceScore: 99,
-    },
-    status: "FLAGGED",
-  },
-  {
-    id: "sp-706",
-    speaker: "Abu Sayed (Cyber Cell Admin)",
-    organization: "Extremist Channel",
-    roleTitle: "Admin - Cyber Mujahid Force",
-    venuePlatform: "Telegram & X (Twitter) Broadcast",
-    location: "Online (IP Trace: Rajshahi)",
-    district: "Rajshahi",
-    timestamp: "2026-07-23 12:40 PM",
-    sourceType: "YOUTUBE_BROADCAST",
-    rawStatement: {
-      en: "Circulating a forged Ministry of Home Affairs document claiming mandatory night curfew will be imposed in major divisions.",
-      bn: "স্বরাষ্ট্র মন্ত্রণালয়ের ভুয়া গেজেট বানিয়ে দেশের সকল প্রধান বিভাগে নৈশকালীন সান্ধ্য আইন জারির অসত্য খবর ছড়ানো হচ্ছে।",
-    },
-    category: "PUBLIC_UNREST_COMMOTION",
-    threatLevel: "CRITICAL",
-    ragDebunk: {
-      factualCounter: {
-        en: "Forged document alert. Ministry of Home Affairs Public Security Division issued an immediate clarification that no curfew order has been issued. Cyber Crime Unit is tracing forged PDF origin.",
-        bn: "ভুয়া নথি দিয়ে বিভ্রান্তি তৈরি। স্বরাষ্ট্র মন্ত্রণালয়ের জননিরাপত্তা বিভাগ অবিলম্বে স্পষ্টীকরণ জারি করে জানিয়েছে সান্ধ্য আইনের কোনো সিদ্ধান্ত নেওয়া হয়নি। সাইবার ক্রাইম ইউনিট জালিয়াতি করা পিডিএফটির উৎস চিহ্নিত করছে।",
-      },
-      verifiedSources: ["Ministry of Home Affairs Public Notice", "DMP Cyber Crime Division Warning"],
-      officialPolicyRef: "Cyber Security Act 2026 § 23",
-      confidenceScore: 100,
-    },
-    status: "FLAGGED",
-  },
-  {
-    id: "sp-707",
-    speaker: "Sharif Hossain",
-    organization: "Independent Anti-Govt Group",
-    roleTitle: "Student Movement Front / ছাত্র আন্দোলন ফ্রন্ট সমন্বয়ক",
-    venuePlatform: "Facebook Page Live",
-    location: "Shahbagh Intersection, Dhaka",
-    district: "Dhaka",
-    timestamp: "2026-07-23 10:05 AM",
-    sourceType: "FACEBOOK_LIVE",
-    rawStatement: {
-      en: "Inciting students to lay siege to the Secretariat building alleging leak of public service recruitment examination questions.",
-      bn: "সরকারি চাকরির পরীক্ষার প্রশ্ন ফাঁসের অভিযোগ তুলে শিক্ষার্থীদের সচিবালয় ঘেরাও করার উসকানিমূলক বার্তা দেওয়া হচ্ছে।",
-    },
-    category: "ANTI_GOVT_INCITEMENT",
-    threatLevel: "HIGH",
-    ragDebunk: {
-      factualCounter: {
-        en: "Baseless question leak rumor. Bangladesh Public Service Commission (BPSC) verified exam question security with encrypted digital distribution. Fraudulent social media question sellers were apprehended by RAB.",
-        bn: "ভিত্তিহীন প্রশ্ন ফাঁসের গুজব। বাংলাদেশ সরকারি কর্ম কমিশন (BPSC) নিশ্চিত করেছে যে এনক্রিপ্টেড ডিজিটাল প্রক্রিয়ায় পরীক্ষা অনুষ্ঠিত হচ্ছে। প্রশ্ন বিক্রির নাম করে প্রতারণাকারী চক্রকে র‍্যাব গ্রেপ্তার করেছে।",
-      },
-      verifiedSources: ["BPSC Security Inspection Audit", "RAB Media Wing Press Release"],
-      officialPolicyRef: "Public Examinations Offenses Act § 4",
-      confidenceScore: 98,
-    },
-    status: "FLAGGED",
-  },
-];
 
 // Simulated incoming stream items for auto/manual live ingestion
 const SIMULATED_INCOMING_FEEDS: Omit<NarrativeSpeechItem, "id" | "timestamp">[] = [
@@ -593,8 +403,8 @@ export function MustHaveOpsPanel() {
   const [dispatches, setDispatches] = useState<SmartDispatchItem[]>(INITIAL_DISPATCHES);
   const [audits, setAudits] = useState<AuditLedgerItem[]>(INITIAL_AUDITS);
 
-  // Live Auto-Stream Polling Simulation
-  const [isAutoIngestActive, setIsAutoIngestActive] = useState(true);
+  // Live Auto-Stream Polling Simulation (Off by default for a clean workspace)
+  const [isAutoIngestActive, setIsAutoIngestActive] = useState(false);
   const [isFetchingNow, setIsFetchingNow] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>("Just now");
   const [nextStreamIdx, setNextStreamIdx] = useState(0);
@@ -608,46 +418,10 @@ export function MustHaveOpsPanel() {
       const savedNarratives = localStorage.getItem("ops_narratives");
       const savedAudits = localStorage.getItem("ops_audits");
       const savedStreamIdx = localStorage.getItem("ops_stream_idx");
-      const lastSyncTimeStr = localStorage.getItem("ops_last_sync_time");
 
       let currentIdx = savedStreamIdx ? parseInt(savedStreamIdx, 10) : 0;
       let loadedNarratives = savedNarratives ? JSON.parse(savedNarratives) : INITIAL_NARRATIVE_SPEECHES;
       let loadedAudits = savedAudits ? JSON.parse(savedAudits) : INITIAL_AUDITS;
-
-      // Simulate background fetching by catching up on missed intervals
-      if (lastSyncTimeStr) {
-        const timePassedMs = Date.now() - parseInt(lastSyncTimeStr, 10);
-        const intervalsMissed = Math.floor(timePassedMs / 25000); // 25s per interval
-
-        if (intervalsMissed > 0) {
-          const maxToIngest = Math.min(intervalsMissed, SIMULATED_INCOMING_FEEDS.length);
-          for (let i = 0; i < maxToIngest; i++) {
-            const template = SIMULATED_INCOMING_FEEDS[(currentIdx + i) % SIMULATED_INCOMING_FEEDS.length];
-            const newItem: NarrativeSpeechItem = {
-              ...template,
-              id: `sp-${Date.now() + i}`,
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + " (Background Sync)",
-              isJustIngested: true,
-            };
-            loadedNarratives = [newItem, ...loadedNarratives];
-            
-            const newAudit: AuditLedgerItem = {
-              id: `aud-${Date.now() + i}`,
-              action: "REALTIME_FEED_AUTO_INGESTED",
-              actor: "crawler_ai_rag_bot",
-              role: "SYSTEM",
-              entity: "SocialMediaCrawler",
-              entityId: newItem.id,
-              ipAddress: "10.0.4.15",
-              hash: `0x${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}`,
-              verified: true,
-              timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-            };
-            loadedAudits = [newAudit, ...loadedAudits];
-          }
-          currentIdx += maxToIngest;
-        }
-      }
 
       setNarratives(loadedNarratives);
       setAudits(loadedAudits);
@@ -931,22 +705,22 @@ export function MustHaveOpsPanel() {
     URL.revokeObjectURL(url);
   }, [narratives]);
 
-  // Reset database to original seed data only (clears localStorage)
+  // Reset database — clears all data from memory and localStorage
   const handleResetDatabase = useCallback(() => {
     if (!window.confirm(
       isBn
-        ? "সতর্কতা: সব ইনজেস্টেড ডেটা মুছে যাবে। শুধুমাত্র মূল সিড রেকর্ড থাকবে। নিশ্চিত করুন?"
-        : "Warning: All ingested items will be removed. Only seed records will remain. Confirm?"
+        ? "সতর্কতা: কৌশলগত প্রতিরক্ষা থেকে সমস্ত ডেটা মুছে ফেলা হবে। নিশ্চিত করুন?"
+        : "Warning: All narrative defense records will be cleared. Confirm?"
     )) return;
-    setNarratives(INITIAL_NARRATIVE_SPEECHES);
+    setNarratives([]);
     localStorage.removeItem("ops_narratives");
     localStorage.removeItem("ops_stream_idx");
     localStorage.removeItem("ops_last_sync_time");
     setNextStreamIdx(0);
     setSelectedIds(new Set());
-    setDedupResult({ removed: 0, kept: INITIAL_NARRATIVE_SPEECHES.length });
+    setDedupResult({ removed: narratives.length, kept: 0 });
     setTimeout(() => setDedupResult(null), 4000);
-  }, [isBn]);
+  }, [isBn, narratives.length]);
 
   const handleEscalateToPmoBriefing = useCallback((id: string) => {
     setNarratives((prev) =>
