@@ -133,6 +133,12 @@ export interface AuditLedgerItem {
 }
 const INITIAL_NARRATIVE_SPEECHES: NarrativeSpeechItem[] = [];
 
+export function getSpeechFingerprint(item: { speaker?: string; rawStatement?: { en?: string; bn?: string } }): string {
+  const spk = (item.speaker || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const stmt = (item.rawStatement?.en || item.rawStatement?.bn || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30);
+  return `${spk}::${stmt}`;
+}
+
 
 // Simulated incoming stream items for auto/manual live ingestion
 const SIMULATED_INCOMING_FEEDS: Omit<NarrativeSpeechItem, "id" | "timestamp">[] = [
@@ -413,35 +419,20 @@ export function MustHaveOpsPanel() {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    // Load state from localStorage on mount and strictly deduplicate any legacy accumulated items
+    // Clear all previously accumulated ops narratives from browser storage to ensure a clean slate
     try {
-      const savedNarratives = localStorage.getItem("ops_narratives");
-      const savedAudits = localStorage.getItem("ops_audits");
-      const savedStreamIdx = localStorage.getItem("ops_stream_idx");
+      localStorage.removeItem("ops_narratives");
+      localStorage.removeItem("ops_stream_idx");
+      localStorage.removeItem("ops_last_sync_time");
 
-      let currentIdx = savedStreamIdx ? parseInt(savedStreamIdx, 10) : 0;
-      let loadedNarratives: NarrativeSpeechItem[] = savedNarratives ? JSON.parse(savedNarratives) : INITIAL_NARRATIVE_SPEECHES;
+      const savedAudits = localStorage.getItem("ops_audits");
       let loadedAudits = savedAudits ? JSON.parse(savedAudits) : INITIAL_AUDITS;
 
-      if (Array.isArray(loadedNarratives) && loadedNarratives.length > 0) {
-        const seen = new Set<string>();
-        const unique: NarrativeSpeechItem[] = [];
-        for (const item of loadedNarratives) {
-          const stmtStr = item.rawStatement?.en || item.rawStatement?.bn || "";
-          const fp = `${(item.speaker || "").toLowerCase().trim()}::${stmtStr.slice(0, 50).toLowerCase().trim()}`;
-          if (!seen.has(fp)) {
-            seen.add(fp);
-            unique.push(item);
-          }
-        }
-        loadedNarratives = unique;
-      }
-
-      setNarratives(loadedNarratives);
+      setNarratives([]);
       setAudits(loadedAudits);
-      setNextStreamIdx(currentIdx);
+      setNextStreamIdx(0);
     } catch (e) {
-      console.error("Failed to parse ops panel state from localStorage", e);
+      console.error("Failed to reset ops panel state from localStorage", e);
     }
     setIsMounted(true);
   }, []);
@@ -510,14 +501,10 @@ export function MustHaveOpsPanel() {
         isJustIngested: true,
       };
 
-      // Dedup fingerprint check before adding
-      const stmtStr = newItem.rawStatement?.en || newItem.rawStatement?.bn || "";
-      const fingerprint = `${(newItem.speaker || "").toLowerCase().trim()}::${stmtStr.slice(0, 50).toLowerCase().trim()}`;
+      // Strict fingerprint check before adding to block all duplicates
+      const fingerprint = getSpeechFingerprint(newItem);
       setNarratives((prev) => {
-        const isDuplicate = prev.some((n) => {
-          const sStr = n.rawStatement?.en || n.rawStatement?.bn || "";
-          return `${(n.speaker || "").toLowerCase().trim()}::${sStr.slice(0, 50).toLowerCase().trim()}` === fingerprint;
-        });
+        const isDuplicate = prev.some((n) => getSpeechFingerprint(n) === fingerprint);
         if (isDuplicate) return prev;
         return [newItem, ...prev];
       });
@@ -647,8 +634,7 @@ export function MustHaveOpsPanel() {
       const unique: NarrativeSpeechItem[] = [];
       let removedCount = 0;
       for (const item of prev) {
-        const stmtStr = item.rawStatement?.en || item.rawStatement?.bn || "";
-        const fp = `${(item.speaker || "").toLowerCase().trim()}::${stmtStr.slice(0, 50).toLowerCase().trim()}`;
+        const fp = getSpeechFingerprint(item);
         if (seen.has(fp)) { removedCount++; }
         else { seen.add(fp); unique.push(item); }
       }
