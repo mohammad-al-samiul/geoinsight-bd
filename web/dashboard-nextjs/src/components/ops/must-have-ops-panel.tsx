@@ -413,15 +413,29 @@ export function MustHaveOpsPanel() {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    // Load state from localStorage on mount
+    // Load state from localStorage on mount and strictly deduplicate any legacy accumulated items
     try {
       const savedNarratives = localStorage.getItem("ops_narratives");
       const savedAudits = localStorage.getItem("ops_audits");
       const savedStreamIdx = localStorage.getItem("ops_stream_idx");
 
       let currentIdx = savedStreamIdx ? parseInt(savedStreamIdx, 10) : 0;
-      let loadedNarratives = savedNarratives ? JSON.parse(savedNarratives) : INITIAL_NARRATIVE_SPEECHES;
+      let loadedNarratives: NarrativeSpeechItem[] = savedNarratives ? JSON.parse(savedNarratives) : INITIAL_NARRATIVE_SPEECHES;
       let loadedAudits = savedAudits ? JSON.parse(savedAudits) : INITIAL_AUDITS;
+
+      if (Array.isArray(loadedNarratives) && loadedNarratives.length > 0) {
+        const seen = new Set<string>();
+        const unique: NarrativeSpeechItem[] = [];
+        for (const item of loadedNarratives) {
+          const stmtStr = item.rawStatement?.en || item.rawStatement?.bn || "";
+          const fp = `${(item.speaker || "").toLowerCase().trim()}::${stmtStr.slice(0, 50).toLowerCase().trim()}`;
+          if (!seen.has(fp)) {
+            seen.add(fp);
+            unique.push(item);
+          }
+        }
+        loadedNarratives = unique;
+      }
 
       setNarratives(loadedNarratives);
       setAudits(loadedAudits);
@@ -497,11 +511,13 @@ export function MustHaveOpsPanel() {
       };
 
       // Dedup fingerprint check before adding
-      const fingerprint = `${newItem.speaker}::${newItem.rawStatement.en.slice(0, 60)}`;
+      const stmtStr = newItem.rawStatement?.en || newItem.rawStatement?.bn || "";
+      const fingerprint = `${(newItem.speaker || "").toLowerCase().trim()}::${stmtStr.slice(0, 50).toLowerCase().trim()}`;
       setNarratives((prev) => {
-        const isDuplicate = prev.some(
-          (n) => `${n.speaker}::${n.rawStatement.en.slice(0, 60)}` === fingerprint
-        );
+        const isDuplicate = prev.some((n) => {
+          const sStr = n.rawStatement?.en || n.rawStatement?.bn || "";
+          return `${(n.speaker || "").toLowerCase().trim()}::${sStr.slice(0, 50).toLowerCase().trim()}` === fingerprint;
+        });
         if (isDuplicate) return prev;
         return [newItem, ...prev];
       });
@@ -631,7 +647,8 @@ export function MustHaveOpsPanel() {
       const unique: NarrativeSpeechItem[] = [];
       let removedCount = 0;
       for (const item of prev) {
-        const fp = `${item.speaker}::${item.rawStatement.en.slice(0, 60)}`;
+        const stmtStr = item.rawStatement?.en || item.rawStatement?.bn || "";
+        const fp = `${(item.speaker || "").toLowerCase().trim()}::${stmtStr.slice(0, 50).toLowerCase().trim()}`;
         if (seen.has(fp)) { removedCount++; }
         else { seen.add(fp); unique.push(item); }
       }
