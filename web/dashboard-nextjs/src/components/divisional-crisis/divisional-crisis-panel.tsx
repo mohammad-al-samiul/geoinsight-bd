@@ -249,10 +249,10 @@ export function DivisionalCrisisPanel() {
           {/* AI Voice Briefing Player */}
           <div className="flex items-center gap-2">
             <Button
-              variant={isSpeechPlaying ? "destructive" : "default"}
+              variant="default"
               size="sm"
               onClick={isSpeechPlaying ? stopVoiceBriefing : playVoiceBriefing}
-              className="text-xs h-8 gap-1.5 font-semibold"
+              className={`text-xs h-8 gap-1.5 font-semibold ${isSpeechPlaying ? "bg-red-600 hover:bg-red-700 text-white" : ""}`}
             >
               {isSpeechPlaying ? <VolumeX className="h-4 w-4 animate-bounce" /> : <Volume2 className="h-4 w-4" />}
               {isSpeechPlaying ? (bn ? "অডিও ব্রিপিং থামান" : "Stop Voice Briefing") : (bn ? "এআই অডিও ব্রিপিং শুনুন" : "AI Voice Briefing")}
@@ -275,10 +275,10 @@ export function DivisionalCrisisPanel() {
             </Button>
 
             <Button
-              variant={showAutoAlertDrawer ? "destructive" : "outline"}
+              variant="outline"
               size="sm"
               onClick={() => setShowAutoAlertDrawer(!showAutoAlertDrawer)}
-              className="text-xs h-8 gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10"
+              className={`text-xs h-8 gap-1.5 ${showAutoAlertDrawer ? "bg-red-600 text-white border-red-600 hover:bg-red-700" : "border-red-500/40 text-red-400 hover:bg-red-500/10"}`}
             >
               <Mail className="h-3.5 w-3.5" />
               {bn ? `অটো-অ্যালার্ট মেইল/এসএমএস (${criticalDivisions.length})` : `Auto-Alert Dispatch (${criticalDivisions.length})`}

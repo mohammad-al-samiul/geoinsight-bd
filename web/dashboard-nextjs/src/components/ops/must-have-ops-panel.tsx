@@ -38,6 +38,13 @@ import {
   RefreshCw,
   Zap,
   Activity,
+  Trash2,
+  Download,
+  RotateCcw,
+  CheckSquare,
+  Square,
+  ListChecks,
+  Filter,
 } from "lucide-react";
 
 // --- Seed Types & Mock Data for Interactive Ops Workspace ---
@@ -678,6 +685,18 @@ export function MustHaveOpsPanel() {
   const [newStatement, setNewStatement] = useState("");
   const [newThreat, setNewThreat] = useState<NarrativeSpeechItem["threatLevel"]>("HIGH");
 
+  // Bulk select
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Dedup result toast (null = hidden)
+  const [dedupResult, setDedupResult] = useState<{ removed: number; kept: number } | null>(null);
+
+  // Advanced filters
+  const [threatFilter, setThreatFilter] = useState<string>("ALL");
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
+  const [sourceTypeFilter, setSourceTypeFilter] = useState<string>("ALL");
+  const [showDebunked, setShowDebunked] = useState(true);
+
   // New complaint form state
   const [showNewComplaintModal, setShowNewComplaintModal] = useState(false);
   const [newComplaintTitle, setNewComplaintTitle] = useState("");
@@ -703,7 +722,15 @@ export function MustHaveOpsPanel() {
         isJustIngested: true,
       };
 
-      setNarratives((prev) => [newItem, ...prev]);
+      // Dedup fingerprint check before adding
+      const fingerprint = `${newItem.speaker}::${newItem.rawStatement.en.slice(0, 60)}`;
+      setNarratives((prev) => {
+        const isDuplicate = prev.some(
+          (n) => `${n.speaker}::${n.rawStatement.en.slice(0, 60)}` === fingerprint
+        );
+        if (isDuplicate) return prev;
+        return [newItem, ...prev];
+      });
       setNextStreamIdx((prev) => prev + 1);
       setLastSyncTime(new Date().toLocaleTimeString());
       setIsFetchingNow(false);
@@ -759,10 +786,14 @@ export function MustHaveOpsPanel() {
     [audits],
   );
 
-  // Filtered Narrative List
+  // Extended filtered narratives with advanced filters
   const filteredNarratives = useMemo(() => {
     return narratives.filter((item) => {
+      if (!showDebunked && item.status === "DEBUNKD_PUBLISHED") return false;
       if (orgFilter !== "ALL" && item.organization !== orgFilter) return false;
+      if (threatFilter !== "ALL" && item.threatLevel !== threatFilter) return false;
+      if (categoryFilter !== "ALL" && item.category !== categoryFilter) return false;
+      if (sourceTypeFilter !== "ALL" && item.sourceType !== sourceTypeFilter) return false;
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
       const statementStr = (item.rawStatement[locale] || item.rawStatement.en).toLowerCase();
@@ -770,10 +801,12 @@ export function MustHaveOpsPanel() {
         item.speaker.toLowerCase().includes(q) ||
         statementStr.includes(q) ||
         item.location.toLowerCase().includes(q) ||
-        item.organization.toLowerCase().includes(q)
+        item.organization.toLowerCase().includes(q) ||
+        item.district.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q)
       );
     });
-  }, [narratives, orgFilter, searchQuery, locale]);
+  }, [narratives, orgFilter, threatFilter, categoryFilter, sourceTypeFilter, showDebunked, searchQuery, locale]);
 
   // Filtered Complaints List
   const filteredComplaints = useMemo(() => {
@@ -792,7 +825,6 @@ export function MustHaveOpsPanel() {
     });
   }, [complaints, filter, statusFilter, searchQuery]);
 
-  // Handlers for Narrative Actions
   const handleDebunkAndPublish = useCallback((id: string) => {
     setNarratives((prev) =>
       prev.map((n) => (n.id === id ? { ...n, status: "DEBUNKD_PUBLISHED", isJustIngested: false } : n)),
@@ -811,6 +843,110 @@ export function MustHaveOpsPanel() {
     };
     setAudits((prev) => [newAudit, ...prev]);
   }, []);
+
+  // Dismiss / Delete individual narrative from active feed
+  const handleDismissNarrative = useCallback((id: string) => {
+    setNarratives((prev) => prev.filter((n) => n.id !== id));
+    setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+  }, []);
+
+  // Deduplicate database — remove items with same speaker+statement fingerprint, keep first
+  const handleDeduplicateDatabase = useCallback(() => {
+    setNarratives((prev) => {
+      const seen = new Set<string>();
+      const unique: NarrativeSpeechItem[] = [];
+      let removedCount = 0;
+      for (const item of prev) {
+        const fp = `${item.speaker}::${item.rawStatement.en.slice(0, 60)}`;
+        if (seen.has(fp)) { removedCount++; }
+        else { seen.add(fp); unique.push(item); }
+      }
+      setDedupResult({ removed: removedCount, kept: unique.length });
+      setTimeout(() => setDedupResult(null), 6000);
+      return unique;
+    });
+    setSelectedIds(new Set());
+  }, []);
+
+  // Bulk: toggle single item selection
+  const handleToggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Bulk: select/deselect all visible items
+  const handleSelectAll = useCallback((ids: string[]) => {
+    setSelectedIds((prev) =>
+      ids.every((id) => prev.has(id)) ? new Set() : new Set(ids)
+    );
+  }, []);
+
+  // Bulk: mark all selected as debunked
+  const handleBulkDebunk = useCallback(() => {
+    setNarratives((prev) =>
+      prev.map((n) => selectedIds.has(n.id) ? { ...n, status: "DEBUNKD_PUBLISHED" as const, isJustIngested: false } : n)
+    );
+    setSelectedIds(new Set());
+  }, [selectedIds]);
+
+  // Bulk: escalate all selected to PMO
+  const handleBulkEscalate = useCallback(() => {
+    setNarratives((prev) =>
+      prev.map((n) => selectedIds.has(n.id) ? { ...n, status: "ESCALATED_PMO" as const, isJustIngested: false } : n)
+    );
+    setSelectedIds(new Set());
+  }, [selectedIds]);
+
+  // Bulk: dismiss/remove all selected
+  const handleBulkDismiss = useCallback(() => {
+    setNarratives((prev) => prev.filter((n) => !selectedIds.has(n.id)));
+    setSelectedIds(new Set());
+  }, [selectedIds]);
+
+  // Export all narratives as CSV file
+  const handleExportNarratives = useCallback(() => {
+    if (narratives.length === 0) return;
+    const rows = narratives.map((n) => ({
+      id: n.id, speaker: n.speaker, organization: n.organization,
+      district: n.district, timestamp: n.timestamp, sourceType: n.sourceType,
+      category: n.category, threatLevel: n.threatLevel, status: n.status,
+      statement_en: n.rawStatement.en, statement_bn: n.rawStatement.bn,
+      ragDebunk_en: n.ragDebunk.factualCounter.en,
+      confidence: n.ragDebunk.confidenceScore, policyRef: n.ragDebunk.officialPolicyRef,
+    }));
+    const header = Object.keys(rows[0]).join(",");
+    const csvRows = rows.map((r) =>
+      Object.values(r).map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
+    );
+    const csv = [header, ...csvRows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `GeoInsight_NarrativeReport_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [narratives]);
+
+  // Reset database to original seed data only (clears localStorage)
+  const handleResetDatabase = useCallback(() => {
+    if (!window.confirm(
+      isBn
+        ? "সতর্কতা: সব ইনজেস্টেড ডেটা মুছে যাবে। শুধুমাত্র মূল সিড রেকর্ড থাকবে। নিশ্চিত করুন?"
+        : "Warning: All ingested items will be removed. Only seed records will remain. Confirm?"
+    )) return;
+    setNarratives(INITIAL_NARRATIVE_SPEECHES);
+    localStorage.removeItem("ops_narratives");
+    localStorage.removeItem("ops_stream_idx");
+    localStorage.removeItem("ops_last_sync_time");
+    setNextStreamIdx(0);
+    setSelectedIds(new Set());
+    setDedupResult({ removed: 0, kept: INITIAL_NARRATIVE_SPEECHES.length });
+    setTimeout(() => setDedupResult(null), 4000);
+  }, [isBn]);
 
   const handleEscalateToPmoBriefing = useCallback((id: string) => {
     setNarratives((prev) =>
@@ -1075,6 +1211,17 @@ export function MustHaveOpsPanel() {
         </div>
       </div>
 
+      {/* Dedup result toast */}
+      {dedupResult !== null && (
+        <div className="flex items-center gap-3 rounded-xl border border-sky-500/40 bg-sky-500/10 px-4 py-2.5 text-sm font-medium text-sky-700 dark:text-sky-300 shadow-sm">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-sky-500" />
+          {dedupResult.removed === 0
+            ? (isBn ? `✅ ডেটাবেজ পরিষ্কার — কোনো ডুপ্লিকেট পাওয়া যায়নি। মোট ${dedupResult.kept} টি রেকর্ড।` : `✅ Database clean — no duplicates found. ${dedupResult.kept} unique records.`)
+            : (isBn ? `🧹 ${dedupResult.removed} টি ডুপ্লিকেট সরানো হয়েছে। ${dedupResult.kept} টি অনন্য রেকর্ড রক্ষিত।` : `🧹 Removed ${dedupResult.removed} duplicates. ${dedupResult.kept} unique records retained.`)}
+          <button type="button" onClick={() => setDedupResult(null)} className="ml-auto opacity-60 hover:opacity-100 transition-opacity"><X className="h-3.5 w-3.5" /></button>
+        </div>
+      )}
+
       {/* Real-time Ingestion Stream Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-2.5 shadow-sm">
         <div className="flex items-center gap-3 text-xs">
@@ -1087,26 +1234,52 @@ export function MustHaveOpsPanel() {
           </span>
           <Badge variant="outline" className="bg-background/80 text-[10px] gap-1">
             <Globe className="h-3 w-3 text-primary" />
-            {narratives.length} {isBn ? "টি বক্তব্য অটো-অ্যানালাইজড" : "statements analyzed"}
+            {narratives.length} {isBn ? "টি বক্তব্য বিশ্লেষণাধীন" : "statements analyzed"}
           </Badge>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Fetch Now */}
+          <Button size="sm" variant="outline"
             className="h-7 gap-1.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 text-xs font-semibold"
-            disabled={isFetchingNow}
-            onClick={triggerIngestNewSpeech}
+            disabled={isFetchingNow} onClick={triggerIngestNewSpeech}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isFetchingNow ? "animate-spin" : ""}`} />
-            {isFetchingNow
-              ? (isBn ? "লাইভ ফিড স্ক্যান হচ্ছে..." : "Crawling Live Feeds...")
-              : (isBn ? "নতুন ফিড স্ক্যান করুন (Fetch Now)" : "Fetch Latest Feeds Now")}
+            {isFetchingNow ? (isBn ? "ফিড স্ক্যান হচ্ছে..." : "Crawling...") : (isBn ? "নতুন ফিড আনুন" : "Fetch Now")}
           </Button>
 
-          <button
-            type="button"
+          {/* Deduplicate DB */}
+          <Button size="sm" variant="outline"
+            className="h-7 gap-1.5 border-sky-500/40 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10 text-xs font-semibold"
+            onClick={handleDeduplicateDatabase}
+            title={isBn ? "ডেটাবেজ থেকে ডুপ্লিকেট বক্তব্য সরান" : "Remove duplicate records from database"}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {isBn ? "ডুপ্লিকেট মুছুন" : "Dedup DB"}
+          </Button>
+
+          {/* Export CSV */}
+          <Button size="sm" variant="outline"
+            className="h-7 gap-1.5 border-violet-500/40 text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 text-xs font-semibold"
+            onClick={handleExportNarratives}
+            title={isBn ? "সকল বক্তব্য CSV ফাইলে রপ্তানি করুন" : "Export all narratives as CSV report"}
+          >
+            <Download className="h-3.5 w-3.5" />
+            {isBn ? "CSV রপ্তানি" : "Export CSV"}
+          </Button>
+
+          {/* Reset DB */}
+          <Button size="sm" variant="outline"
+            className="h-7 gap-1.5 border-red-500/40 text-red-500 hover:bg-red-500/10 text-xs font-semibold"
+            onClick={handleResetDatabase}
+            title={isBn ? "সব ইনজেস্টেড ডেটা মুছে সিড ডেটায় ফিরুন" : "Reset to original seed data only"}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            {isBn ? "DB রিসেট" : "Reset DB"}
+          </Button>
+
+          {/* Auto-Feed Toggle */}
+          <button type="button"
             className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium border transition-all ${
               isAutoIngestActive
                 ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
@@ -1115,9 +1288,7 @@ export function MustHaveOpsPanel() {
             onClick={() => setIsAutoIngestActive((prev) => !prev)}
           >
             <Zap className={`h-3 w-3 ${isAutoIngestActive ? "text-emerald-500" : ""}`} />
-            {isAutoIngestActive
-              ? (isBn ? "অটো-ফিড: চালু" : "Auto-Feed: ON")
-              : (isBn ? "অটো-ফিড: বন্ধ" : "Auto-Feed: OFF")}
+            {isAutoIngestActive ? (isBn ? "অটো-ফিড: চালু" : "Auto-Feed: ON") : (isBn ? "অটো-ফিড: বন্ধ" : "Auto-Feed: OFF")}
           </button>
         </div>
       </div>
@@ -1180,31 +1351,83 @@ export function MustHaveOpsPanel() {
           </button>
         </div>
 
-        {/* Tab Controls (Search & Filters) */}
+        {/* Tab Controls: Advanced Multi-Filter bar for Narrative tab */}
         {activeTab === "narrative" && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Search */}
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder={isBn ? "বক্তা বা বক্তব্য খুঁজুন..." : "Search speaker, statements..."}
+                placeholder={isBn ? "বক্তা, বক্তব্য, জেলা খুঁজুন..." : "Search speaker, statement, district..."}
                 value={searchQuery}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
-                className="h-8 w-44 pl-8 text-xs sm:w-60"
+                className="h-8 w-44 pl-8 text-xs sm:w-52"
               />
             </div>
-            <select
-              value={orgFilter}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setOrgFilter(e.target.value)}
-              aria-label="Filter speeches by organization"
-              className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
-            >
-              <option value="ALL">{isBn ? "সকল দল / সংগঠন" : "All Organizations"}</option>
+
+            {/* Organization filter */}
+            <select value={orgFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setOrgFilter(e.target.value)}
+              aria-label="Filter by organization" className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground">
+              <option value="ALL">{isBn ? "সকল সংগঠন" : "All Orgs"}</option>
               <option value="Jamaat-e-Islami">{isBn ? "জামায়াতে ইসলামী" : "Jamaat-e-Islami"}</option>
               <option value="NCP (Nationalist Citizen Party)">{isBn ? "এনসিপি (NCP)" : "NCP"}</option>
-              <option value="Independent Anti-Govt Group">{isBn ? "স্বাধীন বিরোধী গ্রুপ" : "Independent Groups"}</option>
-              <option value="Extremist Channel">{isBn ? "উগ্রবাদী ডিজিটাল চ্যানেল" : "Extremist Channels"}</option>
+              <option value="Independent Anti-Govt Group">{isBn ? "স্বাধীন গ্রুপ" : "Indep. Groups"}</option>
+              <option value="Extremist Channel">{isBn ? "উগ্রবাদী চ্যানেল" : "Extremist Ch."}</option>
             </select>
+
+            {/* Threat Level filter */}
+            <select value={threatFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setThreatFilter(e.target.value)}
+              aria-label="Filter by threat level" className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground">
+              <option value="ALL">{isBn ? "সকল ভাবকি" : "All Threats"}</option>
+              <option value="CRITICAL">{isBn ? "অতি জরুরি" : "Critical"}</option>
+              <option value="HIGH">{isBn ? "উচ্চ" : "High"}</option>
+              <option value="MEDIUM">{isBn ? "মাঘারি" : "Medium"}</option>
+            </select>
+
+            {/* Category filter */}
+            <select value={categoryFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCategoryFilter(e.target.value)}
+              aria-label="Filter by category" className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground">
+              <option value="ALL">{isBn ? "সকল ধরন" : "All Categories"}</option>
+              <option value="ANTI_GOVT_INCITEMENT">{isBn ? "সরকার বিরোধী" : "Anti-Govt Incitement"}</option>
+              <option value="STATE_SOVEREIGNTY_THREAT">{isBn ? "সার্বভৌমত্ব হুমকি" : "Sovereignty Threat"}</option>
+              <option value="ECONOMIC_SABOTAGE_CALL">{isBn ? "অর্থনৈতিক ক্ষতি" : "Economic Sabotage"}</option>
+              <option value="PUBLIC_UNREST_COMMOTION">{isBn ? "সামাজিক অস্থিরতা" : "Public Unrest"}</option>
+            </select>
+
+            {/* Source type filter */}
+            <select value={sourceTypeFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSourceTypeFilter(e.target.value)}
+              aria-label="Filter by source type" className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground">
+              <option value="ALL">{isBn ? "সকল মাধ্যম" : "All Sources"}</option>
+              <option value="FACEBOOK_LIVE">{isBn ? "ফেসবুক" : "Facebook Live"}</option>
+              <option value="TELEGRAM_CHANNEL text">{isBn ? "টেলিগ্রাম" : "Telegram"}</option>
+              <option value="YOUTUBE_BROADCAST">{isBn ? "ইউটিউব" : "YouTube"}</option>
+              <option value="NEWS_ARTICLE">{isBn ? "সংবাদপত্র" : "News Article"}</option>
+            </select>
+
+            {/* Show/Hide debunked toggle */}
+            <button type="button"
+              onClick={() => setShowDebunked((prev) => !prev)}
+              className={`flex items-center gap-1 rounded-md px-2 py-1 h-8 text-[11px] font-medium border transition-all ${
+                showDebunked
+                  ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                  : "border-border bg-muted text-muted-foreground"
+              }`}
+            >
+              <Eye className="h-3 w-3" />
+              {showDebunked ? (isBn ? "খণ্ডিত দেখাচ্ছে" : "Showing Debunked") : (isBn ? "খণ্ডিত লুকানো" : "Hide Debunked")}
+            </button>
+
+            {/* Clear all filters */}
+            {(searchQuery || orgFilter !== "ALL" || threatFilter !== "ALL" || categoryFilter !== "ALL" || sourceTypeFilter !== "ALL") && (
+              <button type="button"
+                onClick={() => { setSearchQuery(""); setOrgFilter("ALL"); setThreatFilter("ALL"); setCategoryFilter("ALL"); setSourceTypeFilter("ALL"); }}
+                className="flex items-center gap-1 rounded-md px-2 py-1 h-8 text-[11px] font-medium border border-red-400/40 bg-red-400/10 text-red-400 hover:bg-red-400/20 transition-all"
+              >
+                <X className="h-3 w-3" />
+                {isBn ? "ফিল্টার মুছুন" : "Clear Filters"}
+              </button>
+            )}
           </div>
         )}
 
@@ -1220,12 +1443,8 @@ export function MustHaveOpsPanel() {
                 className="h-8 w-44 pl-8 text-xs sm:w-60"
               />
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value)}
-              aria-label="Filter complaints by status"
-              className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
-            >
+            <select value={statusFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value)}
+              aria-label="Filter complaints by status" className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground">
               <option value="ALL">All Status</option>
               <option value="SUBMITTED">Submitted</option>
               <option value="IN_REVIEW">In Review</option>
@@ -1239,6 +1458,33 @@ export function MustHaveOpsPanel() {
       {/* Tab 0: Narrative Defense & RAG Debunking Engine */}
       {activeTab === "narrative" && (
         <div className="space-y-4">
+          {/* Bulk Action Bar — appears when items are selected */}
+          {selectedIds.size > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 shadow-sm">
+              <ListChecks className="h-4 w-4 text-primary shrink-0" />
+              <span className="text-sm font-semibold text-primary">
+                {selectedIds.size} {isBn ? "টি বক্তব্য নির্বাচিত" : "selected"}
+              </span>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <Button size="sm" className="h-7 gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 text-xs" onClick={handleBulkDebunk}>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {isBn ? "সকল খণ্ডন করুন" : "Bulk Debunk"}
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 gap-1.5 border-sky-500/40 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10 text-xs" onClick={handleBulkEscalate}>
+                  <Send className="h-3.5 w-3.5" />
+                  {isBn ? "PMO-তে এস্কেলেট" : "Escalate PMO"}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-red-400 hover:bg-red-500/10 text-xs" onClick={handleBulkDismiss}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {isBn ? "সকল ডিসমিস" : "Bulk Dismiss"}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => setSelectedIds(new Set())}>
+                  <X className="h-3.5 w-3.5 mr-1" />{isBn ? "বাতিল" : "Cancel"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Card className="border-border/70 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
@@ -1248,10 +1494,23 @@ export function MustHaveOpsPanel() {
                 </CardTitle>
                 <CardDescription className="text-xs">{t("narrative.subtitle")}</CardDescription>
               </div>
-              <Badge className="bg-primary/10 text-primary border-primary/20">
-                <Sparkles className="mr-1 h-3 w-3" />
-                {isBn ? "RAG AI সত্যতা নিশ্চিতকরণ" : "RAG Engine Grounded"}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {/* Select All button */}
+                <button type="button"
+                  onClick={() => handleSelectAll(filteredNarratives.map((n) => n.id))}
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium border border-border bg-muted text-muted-foreground hover:bg-background hover:text-foreground transition-all"
+                  title={isBn ? "সকল দৃশ্যমান বক্তব্য নির্বাচন/অনির্বাচন" : "Select / Deselect all visible"}
+                >
+                  {filteredNarratives.length > 0 && filteredNarratives.every((n) => selectedIds.has(n.id))
+                    ? <CheckSquare className="h-3.5 w-3.5 text-primary" />
+                    : <Square className="h-3.5 w-3.5" />}
+                  {isBn ? "সব নির্বাচন" : "Select All"}
+                </button>
+                <Badge className="bg-primary/10 text-primary border-primary/20">
+                  <Sparkles className="mr-1 h-3 w-3" />
+                  {isBn ? "RAG AI সত্যতা নিশ্চিতকরণ" : "RAG Engine Grounded"}
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent>
               {filteredNarratives.length === 0 ? (
@@ -1265,21 +1524,37 @@ export function MustHaveOpsPanel() {
                     const debunkText = item.ragDebunk.factualCounter[locale] || item.ragDebunk.factualCounter.en;
                     const categoryLabel = t(`narrative.categories.${item.category}`);
 
+                    const isSelected = selectedIds.has(item.id);
+
                     return (
                       <div
                         key={item.id}
-                        className={`group rounded-xl border p-4 transition-all hover:border-amber-500/50 hover:shadow-md space-y-3 ${
-                          item.isJustIngested
+                        className={`group rounded-xl border p-4 transition-all hover:shadow-md space-y-3 ${
+                          isSelected
+                            ? "border-primary/60 bg-primary/5 ring-1 ring-primary/20"
+                            : item.isJustIngested
                             ? "border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/30"
-                            : "border-border/70 bg-card"
+                            : "border-border/70 bg-card hover:border-amber-500/50"
                         }`}
                       >
                         {/* Top bar: Speaker & Meta */}
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2">
                           <div className="flex flex-wrap items-center gap-2">
+                            {/* Per-card checkbox for bulk select */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSelect(item.id)}
+                              className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                              title={isBn ? "এই বক্তব্য নির্বাচন করুন" : "Select this item"}
+                            >
+                              {isSelected
+                                ? <CheckSquare className="h-4 w-4 text-primary" />
+                                : <Square className="h-4 w-4 opacity-40 group-hover:opacity-100" />}
+                            </button>
+
                             {item.isJustIngested && (
                               <Badge className="bg-emerald-500 text-white font-bold text-[10px] animate-pulse">
-                                NEW / JUST INGESTED
+                                {isBn ? "নতুন ইনজেস্টেড" : "NEW / LIVE"}
                               </Badge>
                             )}
                             <div className="flex items-center gap-1.5 font-semibold text-sm">
@@ -1387,11 +1662,37 @@ export function MustHaveOpsPanel() {
 
                         {/* Action buttons for narrative response */}
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                          <div className="text-[11px] text-muted-foreground">
-                            {isBn ? "অবস্থা:" : "Status:"} <strong className="text-foreground">{item.status.replace("_", " ")}</strong>
+                          <div className="flex items-center gap-2">
+                            {/* Status badge */}
+                            <span
+                              className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                                item.status === "DEBUNKD_PUBLISHED"
+                                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                  : item.status === "ESCALATED_PMO"
+                                  ? "bg-sky-500/15 text-sky-600 dark:text-sky-400"
+                                  : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                              }`}
+                            >
+                              {item.status === "DEBUNKD_PUBLISHED"
+                                ? (isBn ? "✅ RAG খণ্ডন প্রকাশিত" : "✅ Debunked & Published")
+                                : item.status === "ESCALATED_PMO"
+                                ? (isBn ? "📨 PMO-তে এস্কেলেট" : "📨 Escalated to PMO")
+                                : (isBn ? "🚨 ফ্ল্যাগড / সক্রিয়" : "🚨 Flagged / Active")}
+                            </span>
                           </div>
 
                           <div className="flex items-center gap-2">
+                            {/* Dismiss button */}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                              title={isBn ? "তালিকা থেকে বাদ দিন" : "Dismiss from active feed"}
+                              onClick={() => handleDismissNarrative(item.id)}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+
                             {item.status !== "DEBUNKD_PUBLISHED" && (
                               <Button
                                 size="sm"
@@ -1410,7 +1711,7 @@ export function MustHaveOpsPanel() {
                               onClick={() => handleDebunkAndPublish(item.id)}
                             >
                               <CheckCircle2 className="h-3.5 w-3.5" />
-                              {item.status === "DEBUNKD_PUBLISHED" ? t("narrative.actionDebunked") : (isBn ? "RAG সত্যতা প্রকাশ করুন" : "Publish RAG Fact Counter")}
+                              {item.status === "DEBUNKD_PUBLISHED" ? t("narrative.actionDebunked") : (isBn ? "RAG সত্যতা প্রকাশ" : "Publish RAG Counter")}
                             </Button>
                           </div>
                         </div>
