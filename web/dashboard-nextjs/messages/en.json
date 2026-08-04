@@ -11,6 +11,7 @@
     "outlookPolitics": "Political Outlook",
     "outlookEconomy": "Economic Outlook",
     "unrest": "Protest & Public Unrest",
+    "divisionalCrisis": "8 Divisions Crime & Crisis",
     "antiPhishing": "Anti-Phishing Shield",
     "ops": "Strategic Defense Command",
     "notifications": "Notifications",
@@ -146,6 +147,10 @@
     "apiUnreachable": "Cannot reach the API. Is the gateway running?"
   },
   "modules": {
+    "divisionalCrisis": {
+      "title": "8 Divisions Crime & Resource Crisis Intelligence",
+      "description": "Comprehensive visual analytics on crime distribution, percentages, gas, oil/fuel, power, and water scarcity across all 8 divisions of Bangladesh."
+    },
     "ops": {
       "title": "Strategic Defense & Operations Command",
       "description": "National command center — RAG narrative defense & propaganda counter-analysis, field grievance resolution, and high-risk governance approvals.",
