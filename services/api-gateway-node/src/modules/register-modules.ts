@@ -24,8 +24,9 @@ import { ingestionModule } from "./ingestion/ingestion.module";
 import { pipelineModule } from "./pipeline/pipeline.module";
 import { weatherModule } from "./weather/weather.module";
 import { unrestModule } from "./unrest/unrest.module";
-import { outlookModule } from "./outlook/outlook.module";
 import { intelModule } from "./intel/intel.module";
+import { narrativeShieldModule } from "./narrative-shield/narrative-shield.module";
+import { outlookModule } from "./outlook/outlook.module";
 
 const modules: AppModule[] = [
   healthModule,
@@ -46,6 +47,7 @@ const modules: AppModule[] = [
   intelModule,
   weatherModule,
   unrestModule,
+  narrativeShieldModule,
   outlookModule,
   simulatorModule,
   procurementModule,

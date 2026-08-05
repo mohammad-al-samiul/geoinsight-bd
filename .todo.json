@@ -1,0 +1,27 @@
+[
+  {
+    "content": "Inspect repository and identify unfinished work",
+    "active_form": "Inspecting repository for unfinished work",
+    "status": "completed"
+  },
+  {
+    "content": "Complete Narrative Shield backend",
+    "active_form": "Completing Narrative Shield backend",
+    "status": "completed"
+  },
+  {
+    "content": "Complete Narrative Shield frontend",
+    "active_form": "Completing Narrative Shield frontend",
+    "status": "completed"
+  },
+  {
+    "content": "Run tests and fix failures",
+    "active_form": "Running tests and fixing failures",
+    "status": "completed"
+  },
+  {
+    "content": "Review changes and summarize",
+    "active_form": "Reviewing changes and summarizing",
+    "status": "completed"
+  }
+]

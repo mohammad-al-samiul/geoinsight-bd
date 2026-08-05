@@ -73,11 +73,11 @@ export class PipelineOrchestrator {
         stagger + 105_000,
       ),
       new IntervalWorker(
-        "pipeline:signals",
-        log("signals", () => pipelineService.extractLiveSignals()),
-        env.PIPELINE_NEWS_INTERVAL_MS,
+        "pipeline:narrative",
+        log("narrative", () => pipelineService.refreshNarrativeShield()),
+        env.PIPELINE_NARRATIVE_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
-        stagger + 20_000,
+        stagger + 115_000,
       ),
       new IntervalWorker(
         "pipeline:outlook",
@@ -87,11 +87,18 @@ export class PipelineOrchestrator {
         stagger + 120_000,
       ),
       new IntervalWorker(
+        "pipeline:signals",
+        log("signals", () => pipelineService.extractLiveSignals()),
+        env.PIPELINE_NEWS_INTERVAL_MS,
+        env.PIPELINE_RUN_ON_START,
+        stagger + 20_000,
+      ),
+      new IntervalWorker(
         "pipeline:briefing",
         log("briefing", () => pipelineService.refreshMorningBriefing()),
         env.PIPELINE_BRIEFING_INTERVAL_MS,
         env.PIPELINE_RUN_ON_START,
-        stagger + 135_000,
+        stagger + 120_000,
       ),
       new IntervalWorker(
         "pipeline:maintenance",

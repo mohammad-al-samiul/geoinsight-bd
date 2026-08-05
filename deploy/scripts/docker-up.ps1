@@ -1,3 +1,4 @@
+#!/usr/bin/env pwsh
 # Run full GeoInsight BD stack in Docker (infra + apps)
 # Usage: .\deploy\scripts\docker-up.ps1
 # Optional: .\deploy\scripts\docker-up.ps1 -Build   # only rebuild images when needed

@@ -37,92 +37,6 @@ export interface OutlookSource {
   analyst_like?: boolean;
 }
 
-export interface GaugeItem {
-  id: string;
-  label: string;
-  value: number;
-  tone: string;
-}
-
-export interface PressureItem {
-  id: string;
-  title: string;
-  intensity: number;
-  status: string;
-  summary: string;
-  evidence: string[];
-}
-
-export interface RiskItem {
-  id: string;
-  title: string;
-  likelihood: string;
-  horizon: string;
-  summary: string;
-  early_signals: string[];
-}
-
-export interface SolutionItem {
-  id: string;
-  title: string;
-  targets: string[];
-  steps: string[];
-  expected_effect: string;
-  timeframe: string;
-}
-
-export interface PreventionItem {
-  id: string;
-  title: string;
-  actions: string[];
-  owner_hint: string;
-}
-
-export interface PriceOutlookItem {
-  item: string;
-  direction: string;
-  magnitude: string;
-  reason: string;
-  confidence: string;
-}
-
-export interface InvestmentItem {
-  sector: string;
-  outlook: string;
-  rationale: string;
-  risk: string;
-  horizon: string;
-}
-
-export interface GdpLever {
-  sector: string;
-  action: string;
-  gdp_impact: string;
-  feasibility: string;
-  score: number;
-}
-
-export interface PoliticsDeep {
-  narrative: string;
-  gauges: GaugeItem[];
-  current_pressures: PressureItem[];
-  upcoming_issues: RiskItem[];
-  solutions: SolutionItem[];
-  prevention: PreventionItem[];
-}
-
-export interface EconomyDeep {
-  narrative: string;
-  gauges: GaugeItem[];
-  current_pressures: PressureItem[];
-  upcoming_issues: RiskItem[];
-  price_outlook: PriceOutlookItem[];
-  gdp_levers: GdpLever[];
-  investments: InvestmentItem[];
-  solutions: SolutionItem[];
-  prevention: PreventionItem[];
-}
-
 export interface StrategicOutlook {
   challenges: OutlookChallenge[];
   direction: OutlookDirection[];
@@ -133,17 +47,7 @@ export interface StrategicOutlook {
   llm_used?: boolean;
   sources: OutlookSource[];
   unrest?: Record<string, unknown>;
-  government?: {
-    term_started_on: string;
-    ruling_party: string;
-    label_bn: string;
-    label_en: string;
-    election_bn: string;
-    election_en: string;
-  };
   refreshed_at?: string;
-  politics_deep?: PoliticsDeep;
-  economy_deep?: EconomyDeep;
 }
 
 export function useStrategicOutlook() {
@@ -163,8 +67,35 @@ export function useStrategicOutlook() {
       );
       setData(json.data);
     } catch (err) {
-      setData(null);
-      setError(err instanceof Error ? err.message : "Outlook unavailable");
+      // If backend is not available in local dev, provide a mock preview so UI can be inspected.
+      if (process.env.NODE_ENV === "development") {
+        const mock: StrategicOutlook = {
+          challenges: [
+            { domain: "politics", title: "Election tensions", severity: 4, summary: "Heightened rhetoric around upcoming elections.", evidence: ["Local paper: report 1", "Local paper: report 2"] },
+            { domain: "economy", title: "Fuel price shock", severity: 3, summary: "Import cost increases affecting transport.", evidence: ["Financial section: analysis"] },
+          ],
+          direction: [
+            { domain: "politics", trajectory: "deteriorating", summary: "Polarisation increasing.", drivers: ["polarised media", "opposition protests"] },
+            { domain: "economy", trajectory: "improving", summary: "Remittances stabilising currency.", drivers: ["remittances", "crop yields"] },
+          ],
+          scenarios: [
+            { label: "Adverse: Political unrest", horizon: "3 months", probability_band: "adverse", politics: "High", economy: "Moderate", watchpoints: ["Strike action", "Roadblocks"] },
+            { label: "Reform: Fiscal consolidation", horizon: "12 months", probability_band: "reform", politics: "Moderate", economy: "High", watchpoints: ["Budget law", "IMF talks"] },
+          ],
+          narrative: "Mock narrative: This preview shows the Strategic Outlook components when backend is unavailable.",
+          disclaimer: "This is mock data for local development only.",
+          source_count: 6,
+          llm_used: false,
+          sources: [
+            { title: "Election update from The Daily Star", source: "The Daily Star", url: "https://thedailystar.net/news/election-update", domain: "news", published_at: new Date().toISOString(), analyst_like: false },
+            { title: "Fuel price analysis - Prothom Alo", source: "Prothom Alo", url: "https://www.prothomalo.com/economy/fuel-price", domain: "news", published_at: new Date().toISOString(), analyst_like: false },
+          ],
+        };
+        setData(mock);
+      } else {
+        setData(null);
+        setError(err instanceof Error ? err.message : "Outlook unavailable");
+      }
     } finally {
       setLoading(false);
     }

@@ -48,6 +48,7 @@ export class PipelineModule extends BaseModule {
           hazard: () => pipelineService.refreshHazardSignals(),
           weather: () => pipelineService.syncWeatherData(),
           unrest: () => pipelineService.refreshUnrestPulse(),
+          narrative: () => pipelineService.refreshNarrativeShield(),
           outlook: () => pipelineService.refreshStrategicOutlook(),
           briefing: () => pipelineService.refreshMorningBriefing(),
           signals: () => pipelineService.extractLiveSignals(),

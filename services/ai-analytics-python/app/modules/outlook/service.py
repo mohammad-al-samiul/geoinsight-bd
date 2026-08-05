@@ -10,26 +10,15 @@ from app.ml.ollama_client import OllamaClient
 from app.modules.outlook.schemas import (
     ChallengeItem,
     DirectionItem,
-    EconomyDeep,
-    GaugeItem,
-    GdpLever,
-    InvestmentItem,
     OutlookGenerateRequest,
     OutlookGenerateResponse,
-    PoliticsDeep,
-    PreventionItem,
-    PressureItem,
-    PriceOutlookItem,
-    RiskItem,
     ScenarioItem,
-    SolutionItem,
 )
 
 POLITICS_THEME_KW: dict[str, tuple[str, ...]] = {
-    "governance_delivery": (
-        "cabinet", "parliament", "bnp", "ruling", "manifesto", "minister",
-        "opposition", "coalition", "governance", "delivery",
-        "মন্ত্রিসভা", "সংসদ", "বিএনপি", "ইশতেহার", "মন্ত্রী", "বিরোধী", "শাসন",
+    "governance_legitimacy": (
+        "interim", "election", "reform", "constitution", "caretaker",
+        "অন্তর্বর্তী", "নির্বাচন", "সংস্কার", "সংবিধান",
     ),
     "security_unrest": (
         "protest", "violence", "clash", "security", "police",
@@ -90,9 +79,7 @@ class OutlookService:
         challenges = self._build_challenges(req, bn)
         direction = self._build_direction(req, bn)
         scenarios = self._build_scenarios(req, bn)
-        politics_deep = self._build_politics_deep(req, challenges, direction, bn)
-        economy_deep = self._build_economy_deep(req, challenges, direction, bn)
-        narrative = self._build_narrative(req, challenges, direction, scenarios, bn)
+        narrative = self._build_narrative(challenges, direction, scenarios, bn)
         llm_used = False
 
         if self._ollama.enabled and req.sources:
@@ -122,8 +109,6 @@ class OutlookService:
             disclaimer=disclaimer,
             source_count=len(req.sources),
             llm_used=llm_used,
-            politics_deep=politics_deep,
-            economy_deep=economy_deep,
         )
 
     def _build_challenges(self, req: OutlookGenerateRequest, bn: bool) -> list[ChallengeItem]:
@@ -151,7 +136,7 @@ class OutlookService:
             )
 
         labels = {
-            "governance_delivery": ("নির্বাচিত সরকারের শাসন ও প্রতিশ্রুতি", "Elected government delivery & pledges"),
+            "governance_legitimacy": ("শাসন ও নির্বাচনী বৈধতা", "Governance & electoral legitimacy"),
             "security_unrest": ("নিরাপত্তা ও জনঅসন্তোষ", "Security & public unrest"),
             "institutional_reform": ("প্রাতিষ্ঠানিক সংস্কার চাপ", "Institutional reform pressure"),
             "foreign_policy": ("পররাষ্ট্র ও ভূরাজনীতি", "Foreign policy & geopolitics"),
@@ -162,9 +147,9 @@ class OutlookService:
         }
 
         summaries = {
-            "governance_delivery": (
-                "ফেব্রুয়ারি ২০২৬ নির্বাচনের পর ক্ষমতাসীন সরকারের ইশতেহার/মন্ত্রিসভা/সংসদ কার্যক্রম নিয়ে সংবাদ চাপ — বাস্তবায়নই মূল চ্যালেঞ্জ।",
-                "Post–Feb 2026 election: news stress on ruling cabinet/parliament/manifesto delivery — implementation is the core challenge.",
+            "governance_legitimacy": (
+                "নির্বাচন/সংস্কার/অন্তর্বর্তী শাসন নিয়ে সংবাদে চাপ — রাজনৈতিক রোডম্যাপের অনিশ্চয়তা সরকারের প্রধান চ্যালেঞ্জ।",
+                "News stress around elections/reforms/interim governance — roadmap uncertainty is a core political challenge.",
             ),
             "security_unrest": (
                 "বিক্ষোভ/সহিংসতা/জেলাভিত্তিক অসন্তোষ সংকেত সক্রিয় — আইনশৃঙ্খলা ও সামাজিক স্থিতি রক্ষায় চাপ।",
@@ -281,9 +266,9 @@ class OutlookService:
                 domain="politics",
                 trajectory=pol_traj,
                 summary=(
-                    f"রাজনীতি: {traj_bn[pol_traj]} — নির্বাচিত সরকারের বাস্তবায়ন/সংস্কার/অসন্তোষ সংকেত অনুযায়ী।"
+                    f"রাজনীতি: {traj_bn[pol_traj]} — নির্বাচন/সংস্কার/অসন্তোষ সংকেত অনুযায়ী দিক নির্ধারণ।"
                     if bn
-                    else f"Politics: {pol_traj} — direction inferred from delivery/reform/unrest signals."
+                    else f"Politics: {pol_traj} — direction inferred from election/reform/unrest signals."
                 ),
                 drivers=[
                     f"politics sources: {pol}",
@@ -313,15 +298,15 @@ class OutlookService:
                     label="ভিত্তি দৃশ্যপট (Base)",
                     horizon="৩–৫ বছর",
                     probability_band="base",
-                    politics="নির্বাচিত সরকার ধাপে ধাপে ইশতেহার/প্রাতিষ্ঠানিক সংস্কার এগোয়; অসন্তোষ নিয়ন্ত্রণযোগ্য থাকলে স্থিতিশীলতা বাড়ে।",
+                    politics="ধাপে ধাপে নির্বাচনী/প্রাতিষ্ঠানিক সংস্কার; অসন্তোষ নিয়ন্ত্রণযোগ্য থাকলে স্থিতিশীলতা বাড়ে।",
                     economy="IMF কর্মসূচি ও রেমিট্যান্স/RMG পুনরুদ্ধার ধীর গতিতে ম্যাক্রো স্থিতি ফেরায়; মূল্যস্ফীতি ধীরে কমতে পারে।",
-                    watchpoints=["ইশতেহার বাস্তবায়ন", "রিজার্ভ ও মূল্যস্ফীতি", "ব্যাংকিং সংস্কার"],
+                    watchpoints=["নির্বাচনী রোডম্যাপ", "রিজার্ভ ও মূল্যস্ফীতি", "ব্যাংকিং সংস্কার"],
                 ),
                 ScenarioItem(
                     label="প্রতিকূল দৃশ্যপট (Adverse)",
                     horizon="৩–৫ বছর",
                     probability_band="adverse",
-                    politics="প্রতিশ্রুতি বিলম্ব + বিক্ষোভ/জেলা অসন্তোষ তীব্র হলে শাসন ক্ষমতা ও জনআস্থা চাপে পড়ে।",
+                    politics="সংস্কার বিলম্ব + বিক্ষোভ/জেলা অসন্তোষ তীব্র হলে শাসন ক্ষমতা ও বৈধতা চাপে পড়ে।",
                     economy="রিজার্ভ চাপ, ব্যাংকিং দুর্বলতা ও রপ্তানি মন্দার সমন্বয়ে প্রবৃদ্ধি ও কর্মসংস্থান ক্ষতিগ্রস্ত।",
                     watchpoints=["সহিংসতা/হরতাল", "IMF শর্ত পূরণ ব্যর্থতা", "RMG অর্ডার পতন"],
                 ),
@@ -329,7 +314,7 @@ class OutlookService:
                     label="সংস্কার দৃশ্যপট (Reform)",
                     horizon="৩–৫ বছর",
                     probability_band="reform",
-                    politics="দৃশ্যমান শাসন ডেলিভারি ও প্রাতিষ্ঠানিক সংস্কার এগোলে রাজনৈতিক অনিশ্চয়তা কমে বিনিয়োগ আস্থা বাড়ে।",
+                    politics="স্বচ্ছ নির্বাচন ও প্রাতিষ্ঠানিক সংস্কার এগোলে রাজনৈতিক অনিশ্চয়তা কমে বিনিয়োগ আস্থা বাড়ে।",
                     economy="আর্থিক খাত পরিচ্ছন্নতা + রপ্তানি বৈচিত্র্য + জ্বালানি স্থিতি থাকলে মধ্যমেয়াদে স্থিতিশীল প্রবৃদ্ধি সম্ভব।",
                     watchpoints=["সংস্কার বাস্তবায়ন গতি", "FDI/বিনিয়োগ প্রবাহ", "শ্রমবাজার স্থিতি"],
                 ),
@@ -339,15 +324,15 @@ class OutlookService:
                 label="Base case",
                 horizon="3–5 years",
                 probability_band="base",
-                politics="Elected government gradually delivers manifesto/institutional reform; stability improves if unrest stays manageable.",
+                politics="Gradual electoral/institutional reform; stability improves if unrest stays manageable.",
                 economy="IMF program plus remittance/RMG recovery slowly restore macro stability; inflation eases gradually.",
-                watchpoints=["Manifesto delivery", "Reserves & inflation", "Banking reform"],
+                watchpoints=["Election roadmap", "Reserves & inflation", "Banking reform"],
             ),
             ScenarioItem(
                 label="Adverse case",
                 horizon="3–5 years",
                 probability_band="adverse",
-                politics="Delivery slippage plus sharper protests/district unrest put governing capacity and public trust under pressure.",
+                politics="Reform delays plus sharper protests/district unrest weaken governance capacity and legitimacy.",
                 economy="Combined reserve stress, banking weakness and export slowdown hit growth and jobs.",
                 watchpoints=["Violence/hartals", "IMF program slippage", "RMG order drop"],
             ),
@@ -355,7 +340,7 @@ class OutlookService:
                 label="Reform case",
                 horizon="3–5 years",
                 probability_band="reform",
-                politics="Visible governing delivery and institutional reform reduce uncertainty and lift investment confidence.",
+                politics="Credible elections and institutional reform reduce uncertainty and lift investment confidence.",
                 economy="Financial cleanup + export diversification + energy stability enable steadier medium-term growth.",
                 watchpoints=["Reform delivery speed", "FDI inflows", "Labor-market stability"],
             ),
@@ -363,7 +348,6 @@ class OutlookService:
 
     def _build_narrative(
         self,
-        req: OutlookGenerateRequest,
         challenges: list[ChallengeItem],
         direction: list[DirectionItem],
         scenarios: list[ScenarioItem],
@@ -371,622 +355,58 @@ class OutlookService:
     ) -> str:
         pol = [c for c in challenges if c.domain == "politics"]
         eco = [c for c in challenges if c.domain == "economy"]
+
+        sev_label_bn = {5: "অত্যন্ত উচ্চ", 4: "উচ্চ", 3: "মাঝারি", 2: "নিম্ন", 1: "সামান্য"}
+        sev_label_en = {5: "Critical", 4: "High", 3: "Moderate", 2: "Low", 1: "Minor"}
+
         if bn:
-            gov = (req.government_context or {}).get("label_bn") or "বর্তমান সরকার (BNP, ফেব্রুয়ারি ২০২৬–)"
             lines = [
-                f"বাংলাদেশ — রাজনৈতিক ও অর্থনৈতিক কৌশলগত আউটলুক · {gov}।",
-                "বিশ্লেষণ শুধু জাতীয় নির্বাচন ফেব্রুয়ারি ২০২৬-এর পরের মেয়াদ নিয়ে।",
+                "বাংলাদেশের বর্তমান রাজনৈতিক ও অর্থনৈতিক পরিস্থিতি খোলা সোর্স তথ্যের ভিত্তিতে বিশ্লেষণ করা হয়েছে।",
                 "",
-                "বর্তমান সরকারের প্রধান চ্যালেঞ্জ:",
+                "রাজনৈতিক চ্যালেঞ্জ:",
             ]
             for c in pol[:3]:
-                lines.append(f"• [রাজনীতি L{c.severity}] {c.title}: {c.summary}")
+                sev = sev_label_bn.get(c.severity, "মাঝারি")
+                lines.append(f"• {c.title} ({sev} ঝুঁকি) — {c.summary}")
+            if eco:
+                lines.append("")
+                lines.append("অর্থনৈতিক চ্যালেঞ্জ:")
             for c in eco[:3]:
-                lines.append(f"• [অর্থনীতি L{c.severity}] {c.title}: {c.summary}")
+                sev = sev_label_bn.get(c.severity, "মাঝারি")
+                lines.append(f"• {c.title} ({sev} ঝুঁকি) — {c.summary}")
             lines.append("")
-            lines.append("দিকনির্দেশনা:")
+            lines.append("গতিপথ:")
             for d in direction:
                 lines.append(f"• {d.summary}")
             lines.append("")
-            lines.append("আগামী ৩–৫ বছর (দৃশ্যপট):")
+            lines.append("আগামী ৩–৫ বছরের সম্ভাব্য দৃশ্যপট:")
             for s in scenarios:
-                lines.append(f"• {s.label}: {s.politics} | {s.economy}")
+                lines.append(f"• {s.label}: {s.politics} অর্থনীতিতে — {s.economy}")
             return "\n".join(lines)
 
-        gov = (req.government_context or {}).get("label_en") or "Current government (BNP, Feb 2026–)"
         lines = [
-            f"Bangladesh — Political & Economic Strategic Outlook · {gov}.",
-            "Scoped to the post–February 2026 national election mandate only.",
+            "Bangladesh's current political and economic situation is analysed on the basis of open-source reporting.",
             "",
-            "Current government challenges:",
+            "Political challenges:",
         ]
         for c in pol[:3]:
-            lines.append(f"• [Politics L{c.severity}] {c.title}: {c.summary}")
+            sev = sev_label_en.get(c.severity, "Moderate")
+            lines.append(f"• {c.title} ({sev} risk) — {c.summary}")
+        if eco:
+            lines.append("")
+            lines.append("Economic challenges:")
         for c in eco[:3]:
-            lines.append(f"• [Economy L{c.severity}] {c.title}: {c.summary}")
+            sev = sev_label_en.get(c.severity, "Moderate")
+            lines.append(f"• {c.title} ({sev} risk) — {c.summary}")
         lines.append("")
         lines.append("Direction of travel:")
         for d in direction:
             lines.append(f"• {d.summary}")
         lines.append("")
-        lines.append("Next 3–5 years (scenarios):")
+        lines.append("Probable scenarios over the next 3–5 years:")
         for s in scenarios:
-            lines.append(f"• {s.label}: {s.politics} | {s.economy}")
+            lines.append(f"• {s.label}: {s.politics} On the economy — {s.economy}")
         return "\n".join(lines)
-
-    def _cite_for(self, req: OutlookGenerateRequest, domain: str, limit: int = 3) -> list[str]:
-        rows = [
-            f"{s.source}: {s.title[:90]}"
-            for s in req.sources
-            if s.domain in (domain, "both")
-        ]
-        return rows[:limit]
-
-    def _build_politics_deep(
-        self,
-        req: OutlookGenerateRequest,
-        challenges: list[ChallengeItem],
-        direction: list[DirectionItem],
-        bn: bool,
-    ) -> PoliticsDeep:
-        unrest = req.unrest_summary or {}
-        at_risk = int(unrest.get("districts_at_risk") or 0)
-        protests = int(unrest.get("active_protests") or 0)
-        pol_dir = next((d for d in direction if d.domain == "politics"), None)
-        cites = self._cite_for(req, "politics")
-        sev = {c.title: c.severity for c in challenges if c.domain == "politics"}
-
-        def intensity_from(theme_key: str, base: int) -> int:
-            bump = 0
-            for title, s in sev.items():
-                blob = title.lower()
-                if theme_key in blob or any(k in blob for k in theme_key.split("_")):
-                    bump = max(bump, s * 12)
-            return min(100, base + bump)
-
-        unrest_i = min(100, 25 + at_risk * 12 + protests * 6)
-        gov_i = intensity_from("নির্বাচন", 45) if bn else intensity_from("governance", 45)
-        reform_i = intensity_from("সংস্কার", 40) if bn else intensity_from("reform", 40)
-        foreign_i = intensity_from("পররাষ্ট্র", 35) if bn else intensity_from("foreign", 35)
-
-        if bn:
-            pressures = [
-                PressureItem(
-                    id="pol_unrest",
-                    title="জেলাভিত্তিক অসন্তোষ ও আইনশৃঙ্খলা চাপ",
-                    intensity=unrest_i,
-                    status="rising" if unrest_i >= 55 else "active",
-                    summary=(
-                        f"অসন্তোষ পাল্সে {at_risk} জেলা ঝুঁকিতে, প্রতিবাদ সংকেত {protests}। "
-                        "স্থানীয় সহিংসতা/বিক্ষোভ শাসন ক্ষমতা ও জনআস্থা কেড়ে নেয়।"
-                    ),
-                    evidence=cites
-                    + ([f"Unrest: {at_risk} districts, {protests} protests"] if at_risk or protests else []),
-                ),
-                PressureItem(
-                    id="pol_election",
-                    title="ইশতেহার ও শাসন বাস্তবায়ন চাপ",
-                    intensity=gov_i,
-                    status="active",
-                    summary="ফেব্রুয়ারি ২০২৬ নির্বাচনের পর ক্ষমতাসীন সরকারের প্রতিশ্রুতি/মন্ত্রিসভা সিদ্ধান্ত বাস্তবায়নই বৈধতা ও জনআস্থার কেন্দ্র।",
-                    evidence=cites,
-                ),
-                PressureItem(
-                    id="pol_institutions",
-                    title="প্রাতিষ্ঠানিক সংস্কার বাস্তবায়ন চাপ",
-                    intensity=reform_i,
-                    status="rising" if reform_i >= 50 else "active",
-                    summary="পুলিশ/বিচার/দুর্নীতি দমন সংস্কার বিলম্ব হলে জনঅসন্তোষ ও বিরোধী চাপ বাড়ে।",
-                    evidence=cites,
-                ),
-                PressureItem(
-                    id="pol_foreign",
-                    title="আঞ্চলিক কূটনীতি ও বাহ্যিক চাপ",
-                    intensity=foreign_i,
-                    status="active",
-                    summary="ভারত–চীন–পশ্চিম ভারসাম্য, সাহায্য/ঋণ শর্ত ও অভিবাসন ইস্যু পররাষ্ট্র কৌশলকে সংবেদনশীল রাখে।",
-                    evidence=cites,
-                ),
-            ]
-            upcoming = [
-                RiskItem(
-                    id="risk_election_delay",
-                    title="প্রতিশ্রুতি/বাস্তবায়ন বিলম্ব",
-                    likelihood="high" if gov_i >= 50 else "medium",
-                    horizon="৬–১৮ মাস",
-                    summary="ইশতেহার বাস্তবায়ন ধীর হলে বিরোধী চাপ ও রাস্তার অসন্তোষ বাড়তে পারে।",
-                    early_signals=["মন্ত্রিসভা বিতর্ক", "বড় বিক্ষোভ", "সংস্কার বিলম্ব সংবাদ"],
-                ),
-                RiskItem(
-                    id="risk_local_violence",
-                    title="স্থানীয় সহিংসতা/হরতাল চক্র",
-                    likelihood="high" if unrest_i >= 50 else "medium",
-                    horizon="৩–১২ মাস",
-                    summary="জেলা অসন্তোষ দমন না হলে পরিবহন/বাজার ও প্রশাসনিক কার্যক্রম ব্যাহত হতে পারে।",
-                    early_signals=["জেলা হিটম্যাপ উষ্ণতা", "পুলিশ–জনতা সংঘাত", "হরতাল ঘোষণা"],
-                ),
-                RiskItem(
-                    id="risk_reform_backlash",
-                    title="সংস্কার বাস্তবায়নে প্রাতিষ্ঠানিক প্রতিরোধ",
-                    likelihood="medium",
-                    horizon="১–৩ বছর",
-                    summary="কমিশন/আইন পাস হলেও বাস্তবায়ন আটকে গেলে আস্থা সংকট গভীর হয়।",
-                    early_signals=["কমিটি গঠন কিন্তু অগ্রগতি নেই", "দুর্নীতি মামলা স্থবির"],
-                ),
-                RiskItem(
-                    id="risk_geopolitics",
-                    title="ভূরাজনৈতিক টানাপোড়েন",
-                    likelihood="medium",
-                    horizon="১–৫ বছর",
-                    summary="বাণিজ্য/নিরাপত্তা জোট চাপ অভ্যন্তরীণ রাজনীতিতে স্পিলওভার করতে পারে।",
-                    early_signals=["সীমান্ত উত্তেজনা", "সাহায্য শর্ত কঠোর", "কূটনৈতিক সমালোচনা"],
-                ),
-            ]
-            solutions = [
-                SolutionItem(
-                    id="sol_roadmap",
-                    title="ইশতেহার ডেলিভারি স্কোরকার্ড",
-                    targets=["pol_election", "risk_election_delay"],
-                    steps=[
-                        "প্রধান প্রতিশ্রুতির মাসিক পাবলিক অগ্রগতি",
-                        "মন্ত্রণালয়ভিত্তিক দায়িত্ব ও সময়সীমা প্রকাশ",
-                        "সংসদ ও নাগরিক সমাজের সাথে নিয়মিত ব্রিফিং",
-                    ],
-                    expected_effect="বাস্তবায়ন দৃশ্যমান হলে বৈধতা চাপ ও রাস্তার উত্তেজনা কমতে পারে।",
-                    timeframe="৩–৯ মাস",
-                ),
-                SolutionItem(
-                    id="sol_unrest",
-                    title="জেলা অসন্তোষ ডি-এস্কেলেশন সেল",
-                    targets=["pol_unrest", "risk_local_violence"],
-                    steps=[
-                        "উচ্চ-ঝুঁকি জেলায় দ্রুত অভিযোগ নিষ্পত্তি সেল",
-                        "অতিরিক্ত বলপ্রয়োগ এড়িয়ে সংলাপ + স্থানীয় মধ্যস্থতা",
-                        "খাদ্য/জ্বালানি/চাকরি অভিযোগের সাথে সমন্বিত সাড়া",
-                    ],
-                    expected_effect="সহিংসতা ও হরতাল চক্র ভাঙতে সাহায্য করে।",
-                    timeframe="তাৎক্ষণিক–৬ মাস",
-                ),
-                SolutionItem(
-                    id="sol_reform",
-                    title="সংস্কার ডেলিভারি স্কোরকার্ড",
-                    targets=["pol_institutions", "risk_reform_backlash"],
-                    steps=[
-                        "পুলিশ/বিচার/দুর্নীতি দমনে মাসিক পাবলিক স্কোরকার্ড",
-                        "সময়সীমাসহ দায়িত্বপ্রাপ্ত প্রতিষ্ঠান নির্ধারণ",
-                        "নাগরিক ফিডব্যাক চ্যানেল খোলা",
-                    ],
-                    expected_effect="‘শুধু ঘোষণা’ ধারণা কমে আস্থা বাড়ে।",
-                    timeframe="৬–২৪ মাস",
-                ),
-            ]
-            prevention = [
-                PreventionItem(
-                    id="prev_early_warn",
-                    title="রাজনৈতিক আর্লি-ওয়ার্নিং",
-                    actions=[
-                        "জেলা অসন্তোষ হিটম্যাপ সাপ্তাহিক পর্যালোচনা",
-                        "বড় বিক্ষোভের আগে স্থানীয় সংলাপ টিম মোতায়েন",
-                        "গুজব/বিভ্রান্তি মোকাবিলায় দ্রুত তথ্য সেল",
-                    ],
-                    owner_hint="স্বরাষ্ট্র + স্থানীয় প্রশাসন",
-                ),
-                PreventionItem(
-                    id="prev_inclusive",
-                    title="অন্তর্ভুক্তিমূলক রাজনৈতিক সংলাপ",
-                    actions=[
-                        "প্রধান দল/নাগরিক সমাজের সাথে নিয়মিত টেবিল",
-                        "যুব ও নারী প্রতিনিধিত্ব নিশ্চিত করা",
-                        "নির্বাচনী আচরণবিধি আগে থেকে চূড়ান্ত করা",
-                    ],
-                    owner_hint="মন্ত্রিপরিষদ / নির্বাচন কমিশন",
-                ),
-                PreventionItem(
-                    id="prev_comms",
-                    title="স্বচ্ছ যোগাযোগ নীতি",
-                    actions=[
-                        "বড় সিদ্ধান্তের আগে জনব্রিফিং",
-                        "অর্থনীতি–রাজনীতি যৌথ বার্তা (মূল্যস্ফীতি + নিরাপত্তা)",
-                        "গুজব দমনে ঘণ্টাভিত্তিক ফ্যাক্টচেক",
-                    ],
-                    owner_hint="তথ্য মন্ত্রণালয় / পিএমও",
-                ),
-            ]
-            narrative = (
-                f"রাজনৈতিক চাপ এখন মূলত নির্বাচিত সরকারের প্রতিশ্রুতি বাস্তবায়ন, প্রাতিষ্ঠানিক সংস্কার ও জেলা অসন্তোষকে ঘিরে "
-                f"(ফেব্রুয়ারি ২০২৬ নির্বাচন–পরবর্তী মেয়াদ)। "
-                f"দিক: {(pol_dir.trajectory if pol_dir else 'uncertain')}। "
-                "সমাধান = দৃশ্যমান ডেলিভারি + ডি-এস্কেলেশন + সংস্কার স্কোরকার্ড; প্রতিরোধ = আর্লি-ওয়ার্নিং ও অন্তর্ভুক্তিমূলক সংলাপ।"
-            )
-        else:
-            pressures = [
-                PressureItem(
-                    id="pol_unrest",
-                    title="District unrest & law-and-order pressure",
-                    intensity=unrest_i,
-                    status="rising" if unrest_i >= 55 else "active",
-                    summary=f"{at_risk} districts at risk, {protests} protest signals — local unrest erodes governance capacity.",
-                    evidence=cites,
-                ),
-                PressureItem(
-                    id="pol_election",
-                    title="Manifesto & governing delivery pressure",
-                    intensity=gov_i,
-                    status="active",
-                    summary="After the Feb 2026 election, delivery on ruling-party pledges/cabinet decisions is the core legitimacy stress.",
-                    evidence=cites,
-                ),
-                PressureItem(
-                    id="pol_institutions",
-                    title="Institutional reform delivery pressure",
-                    intensity=reform_i,
-                    status="rising" if reform_i >= 50 else "active",
-                    summary="Delayed police/judiciary/anti-corruption reform fuels discontent and opposition pressure.",
-                    evidence=cites,
-                ),
-                PressureItem(
-                    id="pol_foreign",
-                    title="Regional diplomacy & external pressure",
-                    intensity=foreign_i,
-                    status="active",
-                    summary="India–China–West balancing, aid conditionality and migration issues keep foreign policy sensitive.",
-                    evidence=cites,
-                ),
-            ]
-            upcoming = [
-                RiskItem(
-                    id="risk_election_delay",
-                    title="Pledge/delivery slippage",
-                    likelihood="high" if gov_i >= 50 else "medium",
-                    horizon="6–18 months",
-                    summary="Slow manifesto delivery can sharpen opposition pressure and street discontent.",
-                    early_signals=["Cabinet controversies", "mass protests", "reform delay headlines"],
-                ),
-                RiskItem(
-                    id="risk_local_violence",
-                    title="Local violence/hartal cycles",
-                    likelihood="high" if unrest_i >= 50 else "medium",
-                    horizon="3–12 months",
-                    summary="Unmanaged district unrest can disrupt transport, markets and administration.",
-                    early_signals=["Heatmap warming", "police–crowd clashes", "hartal calls"],
-                ),
-                RiskItem(
-                    id="risk_reform_backlash",
-                    title="Institutional resistance to reform",
-                    likelihood="medium",
-                    horizon="1–3 years",
-                    summary="Laws/commissions without delivery deepen trust deficits.",
-                    early_signals=["Committees without progress", "stalled corruption cases"],
-                ),
-                RiskItem(
-                    id="risk_geopolitics",
-                    title="Geopolitical spillover",
-                    likelihood="medium",
-                    horizon="1–5 years",
-                    summary="Trade/security alignment pressure can spill into domestic politics.",
-                    early_signals=["Border tension", "tighter aid terms", "diplomatic criticism"],
-                ),
-            ]
-            solutions = [
-                SolutionItem(
-                    id="sol_roadmap",
-                    title="Publish a manifesto delivery scorecard",
-                    targets=["pol_election", "risk_election_delay"],
-                    steps=[
-                        "Monthly public progress on top pledges",
-                        "Ministry owners and deadlines",
-                        "Regular briefings with parliament and civil society",
-                    ],
-                    expected_effect="Visible delivery lowers legitimacy stress and street temperature.",
-                    timeframe="3–9 months",
-                ),
-                SolutionItem(
-                    id="sol_unrest",
-                    title="District de-escalation cells",
-                    targets=["pol_unrest", "risk_local_violence"],
-                    steps=[
-                        "Rapid grievance cells in high-risk districts",
-                        "Dialogue-first posture; avoid excess force",
-                        "Link response to food/fuel/jobs complaints",
-                    ],
-                    expected_effect="Break violence/hartal cycles.",
-                    timeframe="Immediate–6 months",
-                ),
-                SolutionItem(
-                    id="sol_reform",
-                    title="Reform delivery scorecard",
-                    targets=["pol_institutions", "risk_reform_backlash"],
-                    steps=[
-                        "Monthly public scorecard for police/justice/anti-corruption",
-                        "Named owners and deadlines",
-                        "Open citizen feedback channel",
-                    ],
-                    expected_effect="Shift from announcements to delivery trust.",
-                    timeframe="6–24 months",
-                ),
-            ]
-            prevention = [
-                PreventionItem(
-                    id="prev_early_warn",
-                    title="Political early-warning",
-                    actions=[
-                        "Weekly district unrest heatmap review",
-                        "Pre-protest local dialogue teams",
-                        "Rapid fact cell against rumor spikes",
-                    ],
-                    owner_hint="Home + local admin",
-                ),
-                PreventionItem(
-                    id="prev_inclusive",
-                    title="Inclusive political dialogue",
-                    actions=[
-                        "Regular table with major parties/civil society",
-                        "Youth and women representation",
-                        "Finalize electoral code of conduct early",
-                    ],
-                    owner_hint="Cabinet / Election Commission",
-                ),
-                PreventionItem(
-                    id="prev_comms",
-                    title="Transparent communications",
-                    actions=[
-                        "Public briefings before major decisions",
-                        "Joint politics–economy messaging",
-                        "Hourly fact-checks during rumor waves",
-                    ],
-                    owner_hint="Info Ministry / PMO",
-                ),
-            ]
-            narrative = (
-                f"Political pressure centers on post–Feb 2026 elected-government delivery, reform lags and district unrest. "
-                f"Trajectory: {(pol_dir.trajectory if pol_dir else 'uncertain')}. "
-                "Solution stack = visible delivery + de-escalation + reform scorecard; prevention = early-warning and inclusive dialogue."
-            )
-
-        gauges = [
-            GaugeItem(id="g_legitimacy", label="শাসন/প্রতিশ্রুতি চাপ" if bn else "Delivery pressure", value=gov_i, tone="bad" if gov_i >= 60 else "warn"),
-            GaugeItem(id="g_unrest", label="অসন্তোষ চাপ" if bn else "Unrest pressure", value=unrest_i, tone="bad" if unrest_i >= 60 else "warn"),
-            GaugeItem(id="g_reform", label="সংস্কার চাপ" if bn else "Reform pressure", value=reform_i, tone="warn"),
-            GaugeItem(id="g_foreign", label="কূটনৈতিক চাপ" if bn else "Diplomatic pressure", value=foreign_i, tone="neutral"),
-        ]
-        return PoliticsDeep(
-            narrative=narrative,
-            gauges=gauges,
-            current_pressures=pressures,
-            upcoming_issues=upcoming,
-            solutions=solutions,
-            prevention=prevention,
-        )
-
-    def _build_economy_deep(
-        self,
-        req: OutlookGenerateRequest,
-        challenges: list[ChallengeItem],
-        direction: list[DirectionItem],
-        bn: bool,
-    ) -> EconomyDeep:
-        cites = self._cite_for(req, "economy")
-        eco_dir = next((d for d in direction if d.domain == "economy"), None)
-        blob = " ".join(_text_blob(s.title, s.summary) for s in req.sources if s.domain in ("economy", "both"))
-        infl = len(re.findall(r"inflation|মূল্যস্ফীতি|price|দাম", blob))
-        reserve = len(re.findall(r"reserve|রিজার্ভ|forex|imf", blob))
-        bank = len(re.findall(r"npl|default|bank|ব্যাংক|খেলাপি", blob))
-        export = len(re.findall(r"rmg|export|রপ্তানি|remittance|রেমিট্যান্স", blob))
-        energy = len(re.findall(r"energy|fuel|power|জ্বালানি|বিদ্যুৎ", blob))
-
-        infl_g = min(100, 35 + infl * 8)
-        reserve_g = min(100, 30 + reserve * 7)
-        bank_g = min(100, 30 + bank * 9)
-        export_g = min(100, 25 + export * 6)
-        energy_g = min(100, 30 + energy * 8)
-
-        if bn:
-            pressures = [
-                PressureItem(
-                    id="eco_inflation",
-                    title="মূল্যস্ফীতি ও জীবনযাত্রার ব্যয়",
-                    intensity=infl_g,
-                    status="rising" if infl_g >= 55 else "active",
-                    summary="খাদ্য/জ্বালানি দামের চাপ পরিবার ও রাজনৈতিক স্থিতি উভয়কেই চাপে ফেলে।",
-                    evidence=cites,
-                ),
-                PressureItem(
-                    id="eco_fx",
-                    title="রিজার্ভ, মুদ্রা ও IMF শর্ত",
-                    intensity=reserve_g,
-                    status="active",
-                    summary="রিজার্ভ ও টাকার চাপ আমদানি/ঋণ পরিশোধ ও নীতিনির্ধারণকে সীমাবদ্ধ করে।",
-                    evidence=cites,
-                ),
-                PressureItem(
-                    id="eco_banking",
-                    title="ব্যাংকিং দুর্বলতা ও খেলাপি ঋণ",
-                    intensity=bank_g,
-                    status="rising" if bank_g >= 50 else "active",
-                    summary="দুর্বল ব্যাংক ও NPL বিনিয়োগ ও ঋণপ্রবাহ আটকে রাখে।",
-                    evidence=cites,
-                ),
-                PressureItem(
-                    id="eco_external",
-                    title="রপ্তানি/রেমিট্যান্স ও কর্মসংস্থান",
-                    intensity=export_g,
-                    status="active",
-                    summary="RMG অর্ডার ও রেমিট্যান্স ওঠানামা প্রবৃদ্ধি ও চাকরির বাজারকে প্রভাবিত করে।",
-                    evidence=cites,
-                ),
-            ]
-            upcoming = [
-                RiskItem(
-                    id="risk_food_fuel",
-                    title="খাদ্য–জ্বালানি মূল্য ঝাঁকুনি",
-                    likelihood="high" if infl_g >= 50 else "medium",
-                    horizon="৩–১২ মাস",
-                    summary="বৈশ্বিক পণ্যমূল্য বা অভ্যন্তরীণ সরবরাহ বিঘ্ন হলে মূল্যস্ফীতি আবার তীব্র হতে পারে।",
-                    early_signals=["জ্বালানি মূল্যবৃদ্ধি", "খাদ্য মজুত সংকট", "টাকা দুর্বলতা"],
-                ),
-                RiskItem(
-                    id="risk_banking",
-                    title="ব্যাংকিং খাতের তারল্য চাপ",
-                    likelihood="medium",
-                    horizon="৬–২৪ মাস",
-                    summary="খেলাপি ঋণ ও দুর্বল গভর্ন্যান্স আমানতকারী আস্থা ও ঋণপ্রবাহ কমাতে পারে।",
-                    early_signals=["NPL বৃদ্ধি", "তারল্য সহায়তা চাহিদা", "মার্জার চাপ"],
-                ),
-                RiskItem(
-                    id="risk_rmg",
-                    title="RMG অর্ডার/প্রতিযোগিতা চাপ",
-                    likelihood="medium",
-                    horizon="১–৩ বছর",
-                    summary="বৈশ্বিক চাহিদা কমলে রপ্তানি আয় ও কর্মসংস্থান ক্ষতিগ্রস্ত হতে পারে।",
-                    early_signals=["অর্ডার বাতিল", "কারখানা বন্ধ", "প্রতিযোগী দেশে স্থানান্তর"],
-                ),
-            ]
-            prices = [
-                PriceOutlookItem(item="চাল/খাদ্যশস্য", direction="up", magnitude="moderate", reason="সরবরাহ ও পরিবহন খরচ + মুদ্রা চাপ", confidence="medium"),
-                PriceOutlookItem(item="জ্বালানি/বিদ্যুৎ", direction="up", magnitude="moderate" if energy_g >= 40 else "mild", reason="আমদানি নির্ভরতা ও সাবসিডি সমন্বয়", confidence="medium"),
-                PriceOutlookItem(item="পোশাক রপ্তানি একক মূল্য", direction="stable", magnitude="mild", reason="ক্রেতা চাপ বনাম খরচ বৃদ্ধি — মিশ্র", confidence="low"),
-                PriceOutlookItem(item="নির্মাণ সামগ্রী", direction="up", magnitude="mild", reason="ডলার ও আমদানি খরচ", confidence="medium"),
-                PriceOutlookItem(item="রেমিট্যান্স প্রবাহ", direction="up", magnitude="mild", reason="প্রণোদনা ও বৈধ চ্যানেল জোর — ওঠানামাসহ", confidence="medium"),
-                PriceOutlookItem(item="ব্যাংক ঋণ সুদ", direction="stable", magnitude="mild", reason="মূল্যস্ফীতি নিয়ন্ত্রণ বনাম প্রবৃদ্ধি লক্ষ্য", confidence="low"),
-            ]
-            gdp = [
-                GdpLever(sector="RMG ও রপ্তানি বৈচিত্র্য", action="নতুন পণ্য/বাজার + কমপ্লায়েন্স", gdp_impact="উচ্চ — রপ্তানি আয় ও কর্মসংস্থান", feasibility="high", score=82),
-                GdpLever(sector="রেমিট্যান্স", action="বৈধ চ্যানেল ও দক্ষতা রপ্তানি", gdp_impact="উচ্চ — চলতি হিসাব স্থিতি", feasibility="high", score=78),
-                GdpLever(sector="কৃষি–খাদ্য প্রক্রিয়াকরণ", action="কোল্ড চেইন ও কৃষিপণ্য রপ্তানি", gdp_impact="মাঝারি–উচ্চ — গ্রামীণ আয়", feasibility="medium", score=70),
-                GdpLever(sector="ডিজিটাল/আইটি সার্ভিস", action="ফ্রিল্যান্স/বিপিও/সফটওয়্যার রপ্তানি", gdp_impact="মাঝারি–উচ্চ — বৈদেশিক মুদ্রা", feasibility="high", score=74),
-                GdpLever(sector="বিদ্যুৎ ও লজিস্টিক্স", action="খরচ কমানো + পোর্ট/রেল দক্ষতা", gdp_impact="উচ্চ — উৎপাদনশীলতা", feasibility="medium", score=68),
-                GdpLever(sector="ব্যাংকিং সংস্কার", action="NPL কমানো + সুশাসন", gdp_impact="মাঝারি — বিনিয়োগ সক্ষমতা", feasibility="medium", score=65),
-            ]
-            invest = [
-                InvestmentItem(sector="রপ্তানিমুখী ম্যানুফ্যাকচারিং (কমপ্লায়েন্ট)", outlook="profit", rationale="বৈদেশিক মুদ্রা আয় ও কর্মসংস্থান — নীতি সহায়তা থাকলে লাভের সম্ভাবনা বেশি", risk="বৈশ্বিক চাহিদা ও শ্রম অস্থিরতা", horizon="২–৫ বছর"),
-                InvestmentItem(sector="কৃষি প্রক্রিয়াকরণ ও কোল্ড স্টোরেজ", outlook="profit", rationale="খাদ্য অপচয় কমিয়ে দাম স্থিতি ও রপ্তানি সম্ভাবনা", risk="বিদ্যুৎ/লজিস্টিক্স খরচ", horizon="৩–৭ বছর"),
-                InvestmentItem(sector="নবায়নযোগ্য জ্বালানি", outlook="mixed", rationale="দীর্ঘমেয়াদে খরচ কমায়; অগ্রিম ক্যাপেক্স বেশি", risk="ট্যারিফ/নীতি অনিশ্চয়তা", horizon="৫–১০ বছর"),
-                InvestmentItem(sector="দুর্বল/অস্বচ্ছ আর্থিক পণ্য", outlook="loss", rationale="NPL ও গভর্ন্যান্স ঝুঁকিতে মূলধন ক্ষতির সম্ভাবনা", risk="খেলাপি ও তারল্য", horizon="১–৩ বছর"),
-                InvestmentItem(sector="আইটি/বিপিও/ফ্রিল্যান্স ইকোসিস্টেম", outlook="profit", rationale="কম ক্যাপেক্স, উচ্চ রপ্তানি সম্ভাবনা", risk="দক্ষতা ঘাটতি ও ইন্টারনেট নির্ভরতা", horizon="১–৪ বছর"),
-                InvestmentItem(sector="অপরিকল্পিত রিয়েল এস্টেট জল্পনা", outlook="mixed", rationale="মুদ্রাস্ফীতি হেজিং হতে পারে কিন্তু তারল্য ও নিয়ন্ত্রণ ঝুঁকি", risk="মূল্য সংশোধন", horizon="৩–৮ বছর"),
-            ]
-            solutions = [
-                SolutionItem(
-                    id="eco_sol_infl",
-                    title="লক্ষ্যভিত্তিক মূল্যস্ফীতি নিয়ন্ত্রণ প্যাকেজ",
-                    targets=["eco_inflation", "risk_food_fuel"],
-                    steps=["খাদ্য মজুত ও বাজার মনিটরিং", "জ্বালানি সাবসিডি টার্গেটিং", "মুদ্রানীতি–রাজস্ব সমন্বয়"],
-                    expected_effect="জীবনযাত্রার চাপ ও সামাজিক অসন্তোষ কমায়।",
-                    timeframe="৩–১২ মাস",
-                ),
-                SolutionItem(
-                    id="eco_sol_bank",
-                    title="ব্যাংকিং পরিচ্ছন্নতা ও তদারকি",
-                    targets=["eco_banking", "risk_banking"],
-                    steps=["NPL স্বীকৃতি ও পুনরুদ্ধার", "দুর্বল ব্যাংক মার্জার/পুনঃপুঁজিকরণ", "ঋণ সুশাসন জোর"],
-                    expected_effect="ঋণপ্রবাহ ও বিনিয়োগ আস্থা ফেরায়।",
-                    timeframe="১–৩ বছর",
-                ),
-                SolutionItem(
-                    id="eco_sol_gdp",
-                    title="জিডিপি চালক প্যাকেজ",
-                    targets=["eco_external"],
-                    steps=["রপ্তানি বৈচিত্র্য", "রেমিট্যান্স চ্যানেল", "লজিস্টিক্স খরচ কমানো", "দক্ষতা উন্নয়ন"],
-                    expected_effect="টেকসই প্রবৃদ্ধি ও কর্মসংস্থান বাড়ায়।",
-                    timeframe="২–৫ বছর",
-                ),
-            ]
-            prevention = [
-                PreventionItem(
-                    id="eco_prev_shock",
-                    title="মূল্য ঝাঁকুনি বাফার",
-                    actions=["কৌশলগত খাদ্য মজুত", "জ্বালানি হেজিং/বিকল্প সরবরাহ", "সামাজিক সুরক্ষা টার্গেটিং"],
-                    owner_hint="অর্থ/খাদ্য/জ্বালানি মন্ত্রণালয়",
-                ),
-                PreventionItem(
-                    id="eco_prev_fx",
-                    title="বৈদেশিক মুদ্রা প্রতিরোধক্ষমতা",
-                    actions=["রপ্তানি ও রেমিট্যান্স জোর", "অপ্রয়োজনীয় আমদানি নিয়ন্ত্রণ", "IMF কর্মসূচি শর্ত পূরণ"],
-                    owner_hint="বাংলাদেশ ব্যাংক / অর্থ",
-                ),
-                PreventionItem(
-                    id="eco_prev_invest",
-                    title="বিনিয়োগ ঝুঁকি গেটকিপিং",
-                    actions=["খাতভিত্তিক ঝুঁকি স্কোরকার্ড", "স্বচ্ছ প্রকল্প মূল্যায়ন", "FDI ওয়ান-স্টপ সহায়তা"],
-                    owner_hint="বিওআই / পরিকল্পনা",
-                ),
-            ]
-            narrative = (
-                f"অর্থনৈতিক চাপ মূল্যস্ফীতি, রিজার্ভ/মুদ্রা, ব্যাংকিং ও রপ্তানি চক্রকে ঘিরে। "
-                f"দিক: {(eco_dir.trajectory if eco_dir else 'uncertain')}। "
-                "জিডিপি বাড়াতে RMG বৈচিত্র্য, রেমিট্যান্স, কৃষি প্রক্রিয়াকরণ, আইটি ও লজিস্টিক্স অগ্রাধিকার; "
-                "দুর্বল আর্থিক পণ্য ও অস্বচ্ছ জল্পনা এড়িয়ে কমপ্লায়েন্ট রপ্তানি/কৃষি/আইটিতে বিনিয়োগ লাভের সম্ভাবনা বেশি।"
-            )
-        else:
-            pressures = [
-                PressureItem(id="eco_inflation", title="Inflation & cost of living", intensity=infl_g, status="rising" if infl_g >= 55 else "active", summary="Food/fuel price stress hits households and political stability.", evidence=cites),
-                PressureItem(id="eco_fx", title="Reserves, currency & IMF terms", intensity=reserve_g, status="active", summary="Reserve/taka pressure constrains imports, debt service and policy space.", evidence=cites),
-                PressureItem(id="eco_banking", title="Banking weakness & NPLs", intensity=bank_g, status="rising" if bank_g >= 50 else "active", summary="Weak banks and NPLs choke credit and investment.", evidence=cites),
-                PressureItem(id="eco_external", title="Exports/remittances & jobs", intensity=export_g, status="active", summary="RMG orders and remittance swings shape growth and employment.", evidence=cites),
-            ]
-            upcoming = [
-                RiskItem(id="risk_food_fuel", title="Food–fuel price spike", likelihood="high" if infl_g >= 50 else "medium", horizon="3–12 months", summary="Global commodities or domestic supply shocks can re-accelerate inflation.", early_signals=["fuel hikes", "food stock stress", "taka weakness"]),
-                RiskItem(id="risk_banking", title="Banking liquidity stress", likelihood="medium", horizon="6–24 months", summary="NPLs and weak governance can erode depositor confidence and credit.", early_signals=["NPL rise", "liquidity support demand", "merger pressure"]),
-                RiskItem(id="risk_rmg", title="RMG order/competitiveness pressure", likelihood="medium", horizon="1–3 years", summary="Weaker global demand can cut export earnings and jobs.", early_signals=["order cancellations", "factory closures", "relocation to rivals"]),
-            ]
-            prices = [
-                PriceOutlookItem(item="Rice/staples", direction="up", magnitude="moderate", reason="Supply/logistics costs + currency pressure", confidence="medium"),
-                PriceOutlookItem(item="Fuel/power", direction="up", magnitude="moderate" if energy_g >= 40 else "mild", reason="Import dependence and subsidy realignment", confidence="medium"),
-                PriceOutlookItem(item="Apparel export unit prices", direction="stable", magnitude="mild", reason="Buyer pressure vs rising costs — mixed", confidence="low"),
-                PriceOutlookItem(item="Construction materials", direction="up", magnitude="mild", reason="USD and import costs", confidence="medium"),
-                PriceOutlookItem(item="Remittance inflows", direction="up", magnitude="mild", reason="Incentives and formal channels — still volatile", confidence="medium"),
-                PriceOutlookItem(item="Bank lending rates", direction="stable", magnitude="mild", reason="Inflation control vs growth objectives", confidence="low"),
-            ]
-            gdp = [
-                GdpLever(sector="RMG & export diversification", action="New products/markets + compliance", gdp_impact="High — FX and jobs", feasibility="high", score=82),
-                GdpLever(sector="Remittances", action="Formal channels + skills export", gdp_impact="High — current-account buffer", feasibility="high", score=78),
-                GdpLever(sector="Agro-processing", action="Cold chain & agri-export", gdp_impact="Medium–high — rural incomes", feasibility="medium", score=70),
-                GdpLever(sector="Digital/IT services", action="Freelance/BPO/software exports", gdp_impact="Medium–high — FX", feasibility="high", score=74),
-                GdpLever(sector="Power & logistics", action="Cut costs + port/rail efficiency", gdp_impact="High — productivity", feasibility="medium", score=68),
-                GdpLever(sector="Banking reform", action="Cut NPLs + governance", gdp_impact="Medium — investment capacity", feasibility="medium", score=65),
-            ]
-            invest = [
-                InvestmentItem(sector="Compliant export manufacturing", outlook="profit", rationale="FX earnings and jobs — stronger if policy support holds", risk="Global demand and labor unrest", horizon="2–5 years"),
-                InvestmentItem(sector="Agro-processing & cold storage", outlook="profit", rationale="Cut waste, stabilize prices, enable exports", risk="Power/logistics costs", horizon="3–7 years"),
-                InvestmentItem(sector="Renewables", outlook="mixed", rationale="Lowers long-run costs; high upfront capex", risk="Tariff/policy uncertainty", horizon="5–10 years"),
-                InvestmentItem(sector="Opaque/weak financial products", outlook="loss", rationale="NPL and governance risk can destroy capital", risk="Defaults and liquidity", horizon="1–3 years"),
-                InvestmentItem(sector="IT/BPO/freelance ecosystem", outlook="profit", rationale="Low capex, high export potential", risk="Skills gap and connectivity", horizon="1–4 years"),
-                InvestmentItem(sector="Speculative real estate", outlook="mixed", rationale="May hedge inflation but liquidity/regulation risk", risk="Price correction", horizon="3–8 years"),
-            ]
-            solutions = [
-                SolutionItem(id="eco_sol_infl", title="Targeted inflation control package", targets=["eco_inflation", "risk_food_fuel"], steps=["Food stock & market monitoring", "Targeted fuel subsidy", "Monetary–fiscal coordination"], expected_effect="Ease living-cost and social stress.", timeframe="3–12 months"),
-                SolutionItem(id="eco_sol_bank", title="Banking clean-up & supervision", targets=["eco_banking", "risk_banking"], steps=["NPL recognition & recovery", "Weak-bank merger/recap", "Credit governance"], expected_effect="Restore credit and investor confidence.", timeframe="1–3 years"),
-                SolutionItem(id="eco_sol_gdp", title="GDP driver package", targets=["eco_external"], steps=["Export diversification", "Remittance channels", "Logistics cost cut", "Skills"], expected_effect="More durable growth and jobs.", timeframe="2–5 years"),
-            ]
-            prevention = [
-                PreventionItem(id="eco_prev_shock", title="Price-shock buffers", actions=["Strategic food stocks", "Fuel hedging/alternatives", "Targeted social protection"], owner_hint="Finance/Food/Energy"),
-                PreventionItem(id="eco_prev_fx", title="FX resilience", actions=["Push exports & remittances", "Prioritize essential imports", "Meet IMF program terms"], owner_hint="Bangladesh Bank / Finance"),
-                PreventionItem(id="eco_prev_invest", title="Investment risk gatekeeping", actions=["Sector risk scorecards", "Transparent project appraisal", "FDI one-stop support"], owner_hint="BOI / Planning"),
-            ]
-            narrative = (
-                f"Economic pressure centers on inflation, reserves/currency, banking and the export cycle. "
-                f"Trajectory: {(eco_dir.trajectory if eco_dir else 'uncertain')}. "
-                "Raise GDP via RMG diversification, remittances, agro-processing, IT and logistics; "
-                "prefer compliant export/agri/IT investments over weak financial products and opaque speculation."
-            )
-
-        gauges = [
-            GaugeItem(id="g_infl", label="মূল্যস্ফীতি চাপ" if bn else "Inflation pressure", value=infl_g, tone="bad" if infl_g >= 60 else "warn"),
-            GaugeItem(id="g_fx", label="রিজার্ভ/মুদ্রা চাপ" if bn else "FX/reserve pressure", value=reserve_g, tone="bad" if reserve_g >= 60 else "warn"),
-            GaugeItem(id="g_bank", label="ব্যাংকিং চাপ" if bn else "Banking pressure", value=bank_g, tone="warn"),
-            GaugeItem(id="g_export", label="রপ্তানি চাপ" if bn else "Export pressure", value=export_g, tone="neutral"),
-        ]
-        return EconomyDeep(
-            narrative=narrative,
-            gauges=gauges,
-            current_pressures=pressures,
-            upcoming_issues=upcoming,
-            price_outlook=prices,
-            gdp_levers=gdp,
-            investments=invest,
-            solutions=solutions,
-            prevention=prevention,
-        )
 
     async def _llm_polish(
         self,
@@ -997,18 +417,15 @@ class OutlookService:
         bn: bool,
     ) -> str | None:
         system = (
-            "তুমি GeoInsight BD এর কৌশলগত বিশ্লেষক। প্রসঙ্গ: ফেব্রুয়ারি ২০২৬ জাতীয় নির্বাচনের পরবর্তী বর্তমান সরকার (BNP)। "
-            "অন্তর্বর্তী সরকার/পুরনো যুগের কাহিনি লিখবে না। নিচের JSON-এ challenges, direction, scenarios আছে — "
+            "তুমি GeoInsight BD এর কৌশলগত বিশ্লেষক। নিচের JSON-এ ইতিমধ্যে challenges, direction, scenarios তৈরি আছে। "
             "শুধু সেগুলো ব্যবহার করে বাংলায় ১২–১৮ লাইনের নির্বাহী সারাংশ লেখো। "
-            "নতুন পরিসংখ্যান/থিসিস/লেখক বানাবে না।"
+            "নতুন পরিসংখ্যান/থিসিস/লেখক বানাবে না। সোর্স তালিকা বর্ণনা করবে না — সরাসরি চ্যালেঞ্জ, দিক ও ৩–৫ বছরের দৃশ্যপট লেখো।"
             if bn
-            else "You are GeoInsight BD strategic analyst. Context: current government after the February 2026 national election (BNP). "
-            "Do not frame this as an interim/caretaker era. The JSON already contains challenges, direction, and scenarios. "
+            else "You are GeoInsight BD strategic analyst. The JSON already contains challenges, direction, and scenarios. "
             "Write a 12–18 line executive summary in English using ONLY those fields. "
-            "Do not invent stats/papers/authors."
+            "Do not invent stats/papers/authors. Do not describe the source list — cover challenges, direction, and 3–5 year scenarios directly."
         )
         slim = {
-            "government": req.government_context,
             "challenges": [c.model_dump() for c in challenges],
             "direction": [d.model_dump() for d in direction],
             "scenarios": [s.model_dump() for s in scenarios],

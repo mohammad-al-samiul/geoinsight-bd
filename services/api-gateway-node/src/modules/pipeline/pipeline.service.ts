@@ -94,6 +94,7 @@ export class PipelineService {
       ["hazard", () => this.refreshHazardSignals()],
       ["weather", () => this.syncWeatherData()],
       ["unrest", () => this.refreshUnrestPulse()],
+      ["narrative", () => this.refreshNarrativeShield()],
       ["outlook", () => this.refreshStrategicOutlook()],
       ["briefing", () => this.refreshMorningBriefing()],
       ["signals", () => this.extractLiveSignals()],
@@ -132,17 +133,15 @@ export class PipelineService {
     return result as unknown as Record<string, unknown>;
   }
 
-  /** Refresh briefing/outlook when news lands so narrative sections stay populated. */
+  /** Refresh briefing when news lands so narrative sections stay populated. */
   private async refreshIntelAfterNews(): Promise<void> {
     const { getLatestIntelSnapshot } = await import("../intel/intel-snapshot.service");
     const { isUsableIntelPayload } = await import("../intel/intel-snapshot.service");
     const { briefingService } = await import("../briefing/briefing.service");
-    const { outlookService } = await import("../outlook/outlook.service");
 
-    const [briefBn, briefEn, outlookBn] = await Promise.all([
+    const [briefBn, briefEn] = await Promise.all([
       getLatestIntelSnapshot("BRIEFING", "bn", "national"),
       getLatestIntelSnapshot("BRIEFING", "en", "national"),
-      getLatestIntelSnapshot("OUTLOOK", "bn", null),
     ]);
 
     const tasks: Array<Promise<unknown>> = [];
@@ -151,9 +150,6 @@ export class PipelineService {
     }
     if (!briefEn || !isUsableIntelPayload("BRIEFING", briefEn)) {
       tasks.push(briefingService.refreshMorningBriefing("en"));
-    }
-    if (!outlookBn || !isUsableIntelPayload("OUTLOOK", outlookBn)) {
-      tasks.push(outlookService.refresh());
     }
     if (tasks.length) await Promise.all(tasks);
   }
@@ -624,6 +620,11 @@ export class PipelineService {
   async refreshUnrestPulse(): Promise<Record<string, unknown>> {
     const { unrestService } = await import("../unrest/unrest.service");
     return unrestService.refreshPulse();
+  }
+
+  async refreshNarrativeShield(): Promise<Record<string, unknown>> {
+    const { narrativeShieldService } = await import("../narrative-shield/narrative-shield.service");
+    return narrativeShieldService.refresh(20);
   }
 
   async refreshStrategicOutlook(): Promise<Record<string, unknown>> {

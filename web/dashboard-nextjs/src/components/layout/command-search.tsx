@@ -25,9 +25,7 @@ const TYPE_ICONS: Record<SearchResult["type"], typeof Search> = {
 const PAGE_HREF_TO_NAV: Record<string, string> = {
   "/": "nationalOverview",
   "/briefing": "briefing",
-  "/outlook": "outlook",
-  "/outlook/politics": "outlookPolitics",
-  "/outlook/economy": "outlookEconomy",
+  "/narrative-shield": "narrativeShield",
   "/sovereign-ai": "sovereignAi",
   "/digital-twin": "digitalTwin",
   "/sentiment": "sentiment",

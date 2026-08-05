@@ -13,7 +13,7 @@ function hasText(value: unknown, minLen = 40): boolean {
   return typeof value === "string" && value.trim().length >= minLen;
 }
 
-/** Reject empty/stale snapshots so the UI never shows a blank briefing/outlook. */
+/** Reject empty/stale snapshots so the UI never shows a blank briefing/unrest. */
 export function isUsableIntelPayload(
   kind: IntelSnapshotKind,
   payload: Record<string, unknown>,

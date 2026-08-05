@@ -1,5 +1,5 @@
--- Persist PM briefing / political & economic outlook / unrest analysis snapshots
-CREATE TYPE "IntelSnapshotKind" AS ENUM ('BRIEFING', 'OUTLOOK', 'UNREST');
+-- Persist PM briefing / unrest analysis snapshots
+CREATE TYPE "IntelSnapshotKind" AS ENUM ('BRIEFING', 'UNREST');
 
 CREATE TABLE IF NOT EXISTS "intel_analysis_snapshots" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -130,6 +130,8 @@ export function installPrismaMocks(): void {
     client.kpiRecord.findMany.mockResolvedValue([]);
     client.redFlagAlert.findMany.mockResolvedValue([]);
     client.redFlagAlert.findUnique.mockResolvedValue(null);
+    client.liveSignal.findMany.mockResolvedValue([]);
+    client.liveSignal.findUnique.mockResolvedValue(null);
     client.refreshToken.create.mockResolvedValue({});
     client.refreshToken.findUnique.mockResolvedValue(null);
     client.refreshToken.update.mockResolvedValue({});

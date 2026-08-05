@@ -86,6 +86,7 @@ interface StatCardProps {
   value: string | number;
   hint?: string;
   accent?: "default" | "success" | "warning" | "danger";
+  icon?: ReactNode;
 }
 
 const ACCENT: Record<NonNullable<StatCardProps["accent"]>, string> = {
@@ -95,7 +96,7 @@ const ACCENT: Record<NonNullable<StatCardProps["accent"]>, string> = {
   danger: "text-red-400",
 };
 
-export function StatCard({ label, value, hint, accent = "default" }: StatCardProps) {
+export function StatCard({ label, value, hint, accent = "default", icon }: StatCardProps) {
   const intelAccent =
     accent === "danger"
       ? "danger"
@@ -107,9 +108,12 @@ export function StatCard({ label, value, hint, accent = "default" }: StatCardPro
 
   return (
     <IntelCard accent={intelAccent} className="!p-4">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-        {label}
-      </p>
+      <div className="flex items-start justify-between">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          {label}
+        </p>
+        {icon && <div className="text-muted-foreground/50">{icon}</div>}
+      </div>
       <motion.p
         className={cn(
           "mt-2.5 font-display text-2xl font-semibold tabular-nums tracking-tight",

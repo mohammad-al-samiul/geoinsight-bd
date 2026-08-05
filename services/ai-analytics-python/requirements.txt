@@ -12,7 +12,7 @@ prometheus-fastapi-instrumentator==7.1.0
 
 # ML (CPU inference — Docker installs torch from https://download.pytorch.org/whl/cpu
 # so builds do NOT pull multi‑GB NVIDIA CUDA packages from default PyPI)
-torch==2.6.0
+torch==2.13.0
 transformers==4.51.3
 sentencepiece==0.2.0
 

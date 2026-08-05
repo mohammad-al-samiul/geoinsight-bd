@@ -7,6 +7,7 @@ const mockClient = () => ({
   kpiRecord: { findMany: jest.fn(), create: jest.fn() },
   representative: { findUnique: jest.fn() },
   redFlagAlert: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+  liveSignal: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
   refreshToken: {
     create: jest.fn(),
     findUnique: jest.fn(),

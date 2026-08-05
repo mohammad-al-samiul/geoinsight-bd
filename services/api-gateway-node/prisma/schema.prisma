@@ -545,6 +545,29 @@ enum IntelSnapshotKind {
   UNREST
 }
 
+enum NarrativeThreatLevel {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum NarrativeCategory {
+  ANTI_GOVT_INCITEMENT
+  SOVEREIGNTY_THREAT
+  ECONOMIC_DISINFO
+  SOCIAL_UNREST
+  RELIGIOUS_EXTREMISM
+  ELECTORAL_MANIPULATION
+}
+
+enum NarrativeSignalStatus {
+  ACTIVE
+  DEBUNKED
+  ESCALATED
+  DISMISSED
+}
+
 /// Persisted AI / pipeline analysis for PM briefing, political & economic outlook, unrest
 model IntelAnalysisSnapshot {
   id          String            @id @default(uuid()) @db.Uuid
@@ -591,4 +614,61 @@ model IngestionSyncRun {
 
   @@index([completedAt(sort: Desc)])
   @@map("ingestion_sync_runs")
+}
+
+// ── Narrative Shield (Counter-Disinformation) ─────────────────────────────────
+
+/// Detected disinformation / hostile-narrative signal ingested from open sources
+model NarrativeSignal {
+  id                String               @id @default(uuid()) @db.Uuid
+  fingerprint       String               @unique @db.VarChar(64)
+  title             String               @db.Text
+  titleBn           String?              @map("title_bn") @db.Text
+  body              String?              @db.Text
+  sourceUrl         String?              @map("source_url") @db.VarChar(2048)
+  sourceName        String               @map("source_name") @db.VarChar(128)
+  sourcePlatform    String               @map("source_platform") @db.VarChar(64)
+  speakerName       String?              @map("speaker_name") @db.VarChar(255)
+  organization      String?              @db.VarChar(255)
+  district          String?              @db.VarChar(64)
+  division          String?              @db.VarChar(64)
+  threatLevel       NarrativeThreatLevel @map("threat_level")
+  category          NarrativeCategory
+  status            NarrativeSignalStatus @default(ACTIVE)
+  confidenceScore   Decimal              @default(0) @map("confidence_score") @db.Decimal(5, 4)
+  ragDebunk         String?              @map("rag_debunk") @db.Text
+  ragConfidence     Decimal?             @map("rag_confidence") @db.Decimal(5, 4)
+  ragPolicyRef      String?              @map("rag_policy_ref") @db.VarChar(512)
+  ragSourceRef      String?              @map("rag_source_ref") @db.VarChar(512)
+  escalatedAt       DateTime?            @map("escalated_at") @db.Timestamptz
+  debunkedAt        DateTime?            @map("debunked_at") @db.Timestamptz
+  dismissedAt       DateTime?            @map("dismissed_at") @db.Timestamptz
+  actionByUserId    String?              @map("action_by_user_id") @db.Uuid
+  actionAuditHash   String?              @map("action_audit_hash") @db.VarChar(64)
+  publishedAt       DateTime?            @map("published_at") @db.Timestamptz
+  fetchedAt         DateTime             @default(now()) @map("fetched_at") @db.Timestamptz
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status, threatLevel, fetchedAt(sort: Desc)])
+  @@index([category, status])
+  @@index([district, threatLevel])
+  @@index([organization, status])
+  @@index([fetchedAt(sort: Desc)])
+  @@map("narrative_signals")
+}
+
+/// Immutable audit ledger for every Narrative Shield operator action
+model NarrativeAuditLog {
+  id          BigInt   @id @default(autoincrement())
+  signalId    String   @map("signal_id") @db.Uuid
+  action      String   @db.VarChar(32)
+  operatorRole String? @map("operator_role") @db.VarChar(32)
+  ipAddress   String?  @map("ip_address") @db.VarChar(45)
+  payloadHash String   @map("payload_hash") @db.VarChar(64)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([signalId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("narrative_audit_logs")
 }

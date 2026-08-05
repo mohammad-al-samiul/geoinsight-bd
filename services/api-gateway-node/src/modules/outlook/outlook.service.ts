@@ -3,29 +3,16 @@ import { prismaRead } from "../../core/database/prisma.client";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
 import { broadcastDashboardRefresh } from "../pipeline/pipeline.broadcast";
 import { unrestService } from "../unrest/unrest.service";
-import {
-  getCurrentMandate,
-  mandateAnalysisSince,
-  mandatePublicMeta,
-} from "../../shared/gov/current-mandate";
-import { AI_FETCH_LLM_MS, fetchAi } from "../../shared/http/fetch-ai";
-import {
-  getLatestIntelSnapshot,
-  getStaleIntelFallback,
-  isUsableIntelPayload,
-  saveIntelSnapshot,
-} from "../intel/intel-snapshot.service";
 
-const OUTLOOK_CACHE_KEY = "outlook:strategic:v3";
+const OUTLOOK_CACHE_KEY = "outlook:strategic:v1";
 const OUTLOOK_TTL_SEC = 1800;
-/** Rolling cap inside the current mandate window */
-const LOOKBACK_DAYS = 90;
+const LOOKBACK_DAYS = 21;
 
 const POLITICS_KW = [
-  "politics", "election", "parliament", "cabinet", "minister", "party",
-  "protest", "governance", "opposition", "bnp", "manifesto", "reform",
-  "রাজনীতি", "নির্বাচন", "সংসদ", "মন্ত্রিসভা", "মন্ত্রী", "দল",
-  "আন্দোলন", "শাসন", "বিরোধী", "বিএনপি", "ইশতেহার", "সংস্কার", "সরকার",
+  "politics", "election", "interim", "reform", "constitution", "democracy",
+  "parliament", "cabinet", "minister", "party", "protest", "governance",
+  "রাজনীতি", "নির্বাচন", "অন্তর্বর্তী", "সংস্কার", "সংবিধান", "সরকার",
+  "মন্ত্রিসভা", "দল", "আন্দোলন", "শাসন",
 ];
 
 const ECONOMY_KW = [
@@ -61,33 +48,10 @@ export class OutlookService {
     const cacheKey = `${OUTLOOK_CACHE_KEY}:${lang}`;
     if (isRedisEnabled()) {
       const cached = await getRedisClient().get(cacheKey);
-      if (cached) {
-        const parsed = JSON.parse(cached) as Record<string, unknown>;
-        if (isUsableIntelPayload("OUTLOOK", parsed)) return parsed;
-      }
+      if (cached) return JSON.parse(cached) as Record<string, unknown>;
     }
 
-    const fromDb = await getLatestIntelSnapshot("OUTLOOK", lang, null);
-    if (fromDb) {
-      if (isRedisEnabled()) {
-        await getRedisClient().setex(cacheKey, OUTLOOK_TTL_SEC, JSON.stringify(fromDb));
-      }
-      return fromDb;
-    }
-
-    let data: Record<string, unknown>;
-    try {
-      data = await this.buildStrategic(lang);
-    } catch (err) {
-      console.warn(
-        "[outlook] build failed, trying DB stale fallback:",
-        err instanceof Error ? err.message : err,
-      );
-      const stale = await getStaleIntelFallback("OUTLOOK", lang, null);
-      if (stale) return stale;
-      throw err;
-    }
-    await this.persistOutlook(lang, data);
+    const data = await this.buildStrategic(lang);
     if (isRedisEnabled()) {
       await getRedisClient().setex(cacheKey, OUTLOOK_TTL_SEC, JSON.stringify(data));
     }
@@ -96,7 +60,6 @@ export class OutlookService {
 
   async refresh(): Promise<Record<string, unknown>> {
     const [bn, en] = await Promise.all([this.buildStrategic("bn"), this.buildStrategic("en")]);
-    await Promise.all([this.persistOutlook("bn", bn), this.persistOutlook("en", en)]);
     if (isRedisEnabled()) {
       const redis = getRedisClient();
       await redis.setex(`${OUTLOOK_CACHE_KEY}:bn`, OUTLOOK_TTL_SEC, JSON.stringify(bn));
@@ -113,40 +76,15 @@ export class OutlookService {
         (s) => (s as { domain: string }).domain !== "politics",
       ).length,
       challenges,
-      persisted: true,
     };
   }
 
-  private async persistOutlook(lang: "bn" | "en", data: Record<string, unknown>) {
-    const sources = Array.isArray(data.sources) ? data.sources.length : 0;
-    try {
-      await saveIntelSnapshot({
-        kind: "OUTLOOK",
-        lang,
-        scopeKey: null,
-        payload: data,
-        sourceCount: typeof data.source_count === "number" ? data.source_count : sources,
-        llmUsed: Boolean(data.llm_used),
-      });
-    } catch (err) {
-      console.warn(
-        "[outlook] snapshot persist failed:",
-        err instanceof Error ? err.message : err,
-      );
-    }
-  }
-
   private async buildStrategic(lang: "bn" | "en"): Promise<Record<string, unknown>> {
-    const mandate = getCurrentMandate({
-      CURRENT_GOVERNMENT_SINCE: env.CURRENT_GOVERNMENT_SINCE,
-      CURRENT_GOVERNMENT_PARTY: env.CURRENT_GOVERNMENT_PARTY,
-    });
-    const since = mandateAnalysisSince(LOOKBACK_DAYS, mandate);
-
+    const since = new Date(Date.now() - LOOKBACK_DAYS * 86400 * 1000);
     const articles = await prismaRead.externalArticle.findMany({
       where: { fetchedAt: { gte: since } },
       orderBy: { fetchedAt: "desc" },
-      take: 800,
+      take: 400,
       select: {
         title: true,
         summary: true,
@@ -168,8 +106,6 @@ export class OutlookService {
     }> = [];
 
     for (const a of articles) {
-      const published = a.publishedAt ?? a.fetchedAt;
-      if (published < mandate.termStartedAt) continue;
       const text = `${a.title} ${a.summary ?? ""}`;
       const domain = classifyDomain(text);
       if (!domain) continue;
@@ -178,14 +114,15 @@ export class OutlookService {
         source: a.sourceName,
         url: a.url,
         domain,
-        published_at: published.toISOString(),
+        published_at: (a.publishedAt ?? a.fetchedAt).toISOString(),
         summary: a.summary,
         analyst_like: isAnalystLike(a.sourceName, text),
       });
     }
 
+    // Prefer analyst-like pieces first, then recent
     sources.sort((a, b) => Number(b.analyst_like) - Number(a.analyst_like));
-    const trimmed = sources.slice(0, 80);
+    const trimmed = sources.slice(0, 60);
 
     let unrestSummary: Record<string, unknown> = {};
     try {
@@ -200,11 +137,8 @@ export class OutlookService {
       unrestSummary = {};
     }
 
-    const government = mandatePublicMeta(mandate);
-
     const aiPayload = {
       lang,
-      government_context: government,
       sources: trimmed.map((s) => ({
         title: s.title,
         source: s.source,
@@ -219,15 +153,11 @@ export class OutlookService {
 
     let aiResult: Record<string, unknown>;
     try {
-      const res = await fetchAi(
-        `/api/v1/outlook/generate`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(aiPayload),
-        },
-        { timeoutMs: AI_FETCH_LLM_MS },
-      );
+      const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/outlook/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(aiPayload),
+      });
       if (!res.ok) throw new Error(`outlook AI ${res.status}`);
       aiResult = (await res.json()) as Record<string, unknown>;
     } catch (err) {
@@ -255,9 +185,7 @@ export class OutlookService {
       ...aiResult,
       sources: trimmed,
       unrest: unrestSummary,
-      government,
       lookback_days: LOOKBACK_DAYS,
-      analysis_since: since.toISOString(),
       refreshed_at: new Date().toISOString(),
     };
   }
