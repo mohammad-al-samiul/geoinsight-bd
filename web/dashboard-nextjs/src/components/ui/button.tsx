@@ -13,6 +13,8 @@ const buttonVariants = cva(
           "relative overflow-hidden btn-gradient text-primary-foreground shadow-soft hover:shadow-glow border border-white/10",
         secondary:
           "bg-secondary text-secondary-foreground border border-border/70 hover:border-border hover:bg-secondary/85",
+        destructive:
+          "bg-destructive text-destructive-foreground border border-destructive/40 hover:bg-destructive/90",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         outline:
           "border border-border/80 bg-transparent hover:border-primary/40 hover:bg-primary/10",
