@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 export interface AccountabilityScore {
   representative_id: string;
@@ -52,6 +53,7 @@ export function useAccountabilityScores(lang: "bn" | "en" = "bn") {
   useEffect(() => {
     void load();
   }, [load]);
+  useRealtimeRefresh(load);
 
   return { scores, loading, error, reload: load };
 }

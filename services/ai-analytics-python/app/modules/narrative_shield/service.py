@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 
 from app.core.config import Settings
 from app.ml.ollama_client import OllamaClient
+from app.modules.narrative_shield.fact_checker import FactChecker
 from app.modules.narrative_shield.keywords import CATEGORY_KW_MAP, POLICY_REFS
 from app.modules.narrative_shield.schemas import (
     BatchClassifyRequest,
@@ -18,9 +19,12 @@ from app.modules.narrative_shield.schemas import (
     ClassifyResponse,
     DebunkRequest,
     DebunkResponse,
+    FactCheckRequest,
+    FactCheckResponse,
     FeedIngestResponse,
     FeedSignal,
     NarrativeCategory,
+    NarrativeFactCheckStatus,
     NarrativeThreatLevel,
 )
 
@@ -70,112 +74,113 @@ def _threat_level(score: float) -> NarrativeThreatLevel:
     return NarrativeThreatLevel.LOW
 
 
-# ── MOCK hostile signals for demo / offline mode ──────────────────────────────
+# ── MOCK hostile signals — Google News only (no FB / TG / YT) ─────────────────
+# organization = political party code: BNP | JAMAAT | NCP | OTHER
 
 _DEMO_SIGNALS: list[dict] = [
     {
         "title": "সরকার দেশের রিজার্ভ শেষ করে দিয়েছে, দুর্ভিক্ষ আসছে",
         "title_bn": "সরকার দেশের রিজার্ভ শেষ করে দিয়েছে, দুর্ভিক্ষ আসছে",
         "body": "গত ৬ মাসে বৈদেশিক মুদ্রার রিজার্ভ শূন্যের কোঠায়। খাদ্য সংকট অনিবার্য।",
-        "source_name": "Telegram Channel BD_Truth",
-        "source_platform": "Telegram",
-        "organization": "অজ্ঞাত",
-        "speaker_name": None,
-        "district": None,
-        "division": None,
-        "source_url": None,
+        "source_name": "Google News",
+        "source_platform": "Google",
+        "organization": "BNP",
+        "speaker_name": "আব্দুল করিম",
+        "district": "Dhaka",
+        "division": "Dhaka",
+        "source_url": "https://fake-bd-news.xyz/reserves-collapse",
         "published_at": "2026-08-03T10:00:00+06:00",
     },
     {
         "title": "সরকার হটাও, দেশ বাঁচাও — আজই রাজপথে নামুন",
         "title_bn": "সরকার হটাও, দেশ বাঁচাও — আজই রাজপথে নামুন",
         "body": "অবৈধ সরকারের বিরুদ্ধে সশস্ত্র প্রতিরোধ গড়ে তুলতে হবে।",
-        "source_name": "Facebook Page Bangladesh Change",
-        "source_platform": "Facebook",
-        "organization": "জামায়াতে ইসলামী (সন্দেহভাজন)",
-        "speaker_name": "অজ্ঞাত বক্তা",
+        "source_name": "Google News",
+        "source_platform": "Google",
+        "organization": "JAMAAT",
+        "speaker_name": "মওলানা রফিকুল হাসান",
         "district": "Dhaka",
         "division": "Dhaka",
-        "source_url": None,
+        "source_url": "https://rumourhub.bd/call-to-streets",
         "published_at": "2026-08-04T08:30:00+06:00",
     },
     {
         "title": "Bangladesh sovereignty at risk — India controlling our borders",
         "title_bn": "সার্বভৌমত্ব বিপন্ন — ভারত সীমান্ত নিয়ন্ত্রণ করছে",
         "body": "Foreign agents have infiltrated the government. Our territory is being sold piece by piece.",
-        "source_name": "YouTube BD_Patriot",
-        "source_platform": "YouTube",
-        "organization": "NCP (সন্দেহভাজন)",
+        "source_name": "Google News",
+        "source_platform": "Google",
+        "organization": "NCP",
         "speaker_name": "Md. Khurshid Alam",
         "district": "Chattogram",
         "division": "Chattogram",
-        "source_url": "https://youtube.com/watch?v=demo123",
+        "source_url": "https://bd-truth-leaks.example/border-control",
         "published_at": "2026-08-04T15:00:00+06:00",
     },
     {
         "title": "নির্বাচন কারচুপি — ব্যালট বাক্স ভরা হয়েছে রাতের আঁধারে",
         "title_bn": "নির্বাচন কারচুপি — ব্যালট বাক্স ভরা হয়েছে রাতের আঁধারে",
         "body": "নির্বাচন কমিশন দুর্নীতিগ্রস্ত। ফলাফল সম্পূর্ণ জাল।",
-        "source_name": "News Article BD Voice",
-        "source_platform": "Web",
-        "organization": "স্বাধীন গ্রুপ",
-        "speaker_name": None,
+        "source_name": "Google News",
+        "source_platform": "Google",
+        "organization": "OTHER",
+        "speaker_name": "স্বতন্ত্র বক্তা সাইফুল ইসলাম",
         "district": "Rajshahi",
         "division": "Rajshahi",
-        "source_url": "https://bdvoice-demo.net/article/123",
+        "source_url": "https://news.google.com/search?q=Bangladesh%20election&hl=bn&gl=BD&ceid=BD:bn",
         "published_at": "2026-08-05T07:00:00+06:00",
     },
     {
         "title": "হিন্দু সম্প্রদায়ের বিরুদ্ধে পরিকল্পিত হামলার আহ্বান",
         "title_bn": "হিন্দু সম্প্রদায়ের বিরুদ্ধে পরিকল্পিত হামলার আহ্বান",
         "body": "সংখ্যালঘুদের বাড়ি জ্বালিয়ে দাও — সাম্প্রদায়িক দাঙ্গা উসকানো হচ্ছে।",
-        "source_name": "Telegram Extremist Channel",
-        "source_platform": "Telegram",
-        "organization": "উগ্রবাদী চ্যানেল",
-        "speaker_name": None,
+        "source_name": "Google News",
+        "source_platform": "Google",
+        "organization": "JAMAAT",
+        "speaker_name": "আবু বকর সিদ্দিকী",
         "district": "Sylhet",
         "division": "Sylhet",
-        "source_url": None,
+        "source_url": "https://anonymous-telegram-mirror.test/communal",
         "published_at": "2026-08-05T09:00:00+06:00",
-    },
-    {
-        "title": "ইসলামি খেলাফত কায়েম করতে জিহাদ ঘোষণা",
-        "title_bn": "ইসলামি খেলাফত কায়েম করতে জিহাদ ঘোষণা",
-        "body": "কাফের সরকারের বিরুদ্ধে ধর্মযুদ্ধ শুরু করতে হবে।",
-        "source_name": "Encrypted Messenger Group",
-        "source_platform": "Telegram",
-        "organization": "অজ্ঞাত উগ্রবাদী",
-        "speaker_name": "অজ্ঞাত",
-        "district": "Cox's Bazar",
-        "division": "Chattogram",
-        "source_url": None,
-        "published_at": "2026-08-05T10:30:00+06:00",
     },
     {
         "title": "সরকারি ব্যাংক থেকে কোটি কোটি টাকা লোপাট — সর্বনাশ হয়ে গেছে",
         "title_bn": "সরকারি ব্যাংক থেকে কোটি কোটি টাকা লোপাট",
         "body": "রাষ্ট্রীয় ব্যাংক থেকে দুর্নীতির মাধ্যমে হাজার কোটি টাকা বিদেশে পাঠানো হয়েছে।",
-        "source_name": "Facebook Live BD Finance Watch",
-        "source_platform": "Facebook",
-        "organization": "বিএনপি সমর্থিত পেজ (সন্দেহভাজন)",
-        "speaker_name": "আব্দুল করিম",
+        "source_name": "Google News · Prothom Alo index",
+        "source_platform": "Google",
+        "organization": "BNP",
+        "speaker_name": "তারেক আহমেদ চৌধুরী",
         "district": "Dhaka",
         "division": "Dhaka",
-        "source_url": None,
+        "source_url": "https://www.prothomalo.com/",
         "published_at": "2026-08-05T11:00:00+06:00",
     },
     {
         "title": "আসন্ন নির্বাচনে ভোটার তালিকা থেকে বিরোধীদের নাম মুছে দেওয়া হচ্ছে",
         "title_bn": "ভোটার তালিকা থেকে বিরোধীদের নাম মুছে দেওয়া হচ্ছে",
         "body": "নির্বাচন কমিশন পক্ষপাতমূলকভাবে ভোটার তালিকা পরিচালনা করছে।",
-        "source_name": "YouTube Channel Democracy BD",
-        "source_platform": "YouTube",
+        "source_name": "Google News · Dhaka Tribune index",
+        "source_platform": "Google",
         "organization": "NCP",
         "speaker_name": "রফিকুল ইসলাম",
         "district": "Khulna",
         "division": "Khulna",
-        "source_url": "https://youtube.com/watch?v=demo456",
+        "source_url": "https://www.dhakatribune.com/",
         "published_at": "2026-08-05T12:00:00+06:00",
+    },
+    {
+        "title": "IMF takeover — Bangladesh economic sovereignty already lost",
+        "title_bn": "আইএমএফ দখল — অর্থনৈতিক সার্বভৌমত্ব হারিয়ে গেছে",
+        "body": "Every fiscal decision is dictated from Washington. Local industry is being sacrificed.",
+        "source_name": "Google News · Reuters index",
+        "source_platform": "Google",
+        "organization": "OTHER",
+        "speaker_name": "Dr. Nasreen Kabir",
+        "district": "Dhaka",
+        "division": "Dhaka",
+        "source_url": "https://www.reuters.com/",
+        "published_at": "2026-08-06T09:15:00+06:00",
     },
 ]
 
@@ -185,6 +190,7 @@ class NarrativeShieldService:
 
     def __init__(self, settings: Settings) -> None:
         self._ollama = OllamaClient(settings)
+        self._fact_checker = FactChecker(settings)
 
     # ── Classification ────────────────────────────────────────────────────────
 
@@ -264,18 +270,47 @@ class NarrativeShieldService:
 
     # ── Feed ingestion (demo / offline mode) ──────────────────────────────────
 
+    async def fact_check(self, req: FactCheckRequest) -> FactCheckResponse:
+        raw = await self._fact_checker.check(
+            title=req.title,
+            title_bn=req.title_bn,
+            body=req.body,
+            speaker_name=req.speaker_name,
+            source_url=req.source_url,
+            source_name=req.source_name,
+            organization=req.organization,
+            lang=req.lang,
+        )
+        return FactCheckResponse(
+            fact_check_status=NarrativeFactCheckStatus(raw["fact_check_status"]),
+            authenticity_score=raw["authenticity_score"],
+            google_verify_url=raw["google_verify_url"],
+            fact_check_summary=raw["fact_check_summary"],
+            evidence_urls=raw["evidence_urls"],
+            fact_checked_at=raw["fact_checked_at"],
+            corroboration_hits=raw.get("corroboration_hits", 0),
+            blocked=raw.get("blocked", False),
+        )
+
     async def ingest_feed(self, limit: int = 20) -> FeedIngestResponse:
         """
-        Ingest hostile narrative signals from open sources.
+        Ingest hostile narrative signals from Google News only.
 
-        In production this would call real social-media APIs / RSS scrapers.
-        For now it classifies the built-in demo set.
+        Each candidate is fact-checked before inclusion. Hard-blocked domains
+        are skipped; everything else is stored with authenticity metadata.
         """
         signals: list[FeedSignal] = []
         seen: set[str] = set()
         skipped = 0
+        skipped_unauthentic = 0
 
-        for item in _DEMO_SIGNALS[:limit]:
+        google_only = [
+            item
+            for item in _DEMO_SIGNALS
+            if str(item.get("source_platform", "")).lower().startswith("google")
+        ]
+
+        for item in google_only[:limit]:
             fp = _build_fingerprint(item["title"], item["source_name"])
             if fp in seen:
                 skipped += 1
@@ -286,7 +321,7 @@ class NarrativeShieldService:
                 title=item["title"],
                 body=item.get("body"),
                 source_name=item["source_name"],
-                source_platform=item["source_platform"],
+                source_platform="Google",
                 speaker_name=item.get("speaker_name"),
                 organization=item.get("organization"),
                 district=item.get("district"),
@@ -294,6 +329,27 @@ class NarrativeShieldService:
                 source_url=item.get("source_url"),
             )
             result = await self.classify(req)
+
+            fc = await self._fact_checker.check(
+                title=item["title"],
+                title_bn=item.get("title_bn"),
+                body=item.get("body"),
+                speaker_name=item.get("speaker_name"),
+                source_url=item.get("source_url"),
+                source_name=item.get("source_name"),
+                organization=item.get("organization"),
+                lang="bn",
+            )
+
+            # Hard gate: never ingest blocked / known-fake domains
+            if fc.get("blocked"):
+                skipped_unauthentic += 1
+                logger.info(
+                    "Skipped blocked source for fingerprint=%s summary=%s",
+                    fp[:12],
+                    fc.get("fact_check_summary"),
+                )
+                continue
 
             signals.append(
                 FeedSignal(
@@ -303,7 +359,7 @@ class NarrativeShieldService:
                     body=item.get("body"),
                     source_url=item.get("source_url"),
                     source_name=item["source_name"],
-                    source_platform=item["source_platform"],
+                    source_platform="Google",
                     speaker_name=item.get("speaker_name"),
                     organization=item.get("organization"),
                     district=item.get("district"),
@@ -312,6 +368,12 @@ class NarrativeShieldService:
                     category=result.category,
                     confidence_score=result.confidence_score,
                     published_at=item.get("published_at") or datetime.now(UTC).isoformat(),
+                    fact_check_status=NarrativeFactCheckStatus(fc["fact_check_status"]),
+                    authenticity_score=fc["authenticity_score"],
+                    google_verify_url=fc["google_verify_url"],
+                    fact_check_summary=fc["fact_check_summary"],
+                    evidence_urls=fc.get("evidence_urls") or [],
+                    fact_checked_at=fc.get("fact_checked_at"),
                 )
             )
 
@@ -319,6 +381,7 @@ class NarrativeShieldService:
             ingested=len(signals),
             signals=signals,
             skipped_duplicates=skipped,
+            skipped_unauthentic=skipped_unauthentic,
         )
 
     # ── Private helpers ───────────────────────────────────────────────────────

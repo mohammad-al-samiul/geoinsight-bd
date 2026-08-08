@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 export interface BriefingBullet {
   text: string;
@@ -61,6 +62,7 @@ export function useMorningBriefing(lang: "bn" | "en") {
   useEffect(() => {
     void load();
   }, [load]);
+  useRealtimeRefresh(load, true, true);
 
   return { briefing, loading, error, reload: load };
 }

@@ -33,6 +33,8 @@ const BD_ANCHOR_KW = [
   "কক্সবাজার",
   "cox's bazar",
   "coxs bazar",
+  "নিলফামারী",
+  "nilphamari",
   "বিএনপি",
   "bnp",
   "আওয়ামী",
@@ -47,6 +49,13 @@ const BD_ANCHOR_KW = [
   "hasina",
   "অন্তর্বর্তী সরকার",
   "interim government",
+  "প্রধানমন্ত্রী",
+  "পুলিশ",
+  "র‌্যাব",
+  "সংসদ",
+  "নির্বাচন",
+  "হরতাল",
+  "বিক্ষোভ",
 ];
 
 const FOREIGN_UNREST_KW = [
@@ -103,6 +112,35 @@ const FOREIGN_UNREST_KW = [
   "kabul",
 ];
 
+/** Sports / entertainment / foreign lifestyle — never PM briefing material */
+const REJECT_NOISE_KW = [
+  "real madrid",
+  "vinicius",
+  "vini jr",
+  "premier league",
+  "la liga",
+  "champions league",
+  "uefa",
+  "fifa",
+  "manchester united",
+  "manchester city",
+  "liverpool",
+  "chelsea",
+  "arsenal",
+  "barcelona",
+  "psg",
+  "football club",
+  "ফুটবল",
+  "ক্রিকেট বিশ্বকাপ",
+  "ipl ",
+  "bollywood",
+  "hollywood",
+  "k-pop",
+  "netflix",
+  "tehelka",
+  "tejpal",
+];
+
 const BD_PUBLISHER_MARKERS = [
   "prothomalo",
   "thedailystar",
@@ -126,6 +164,43 @@ const BD_PUBLISHER_MARKERS = [
   "tbsnews",
   "bonikbarta",
   "bangla.bdnews24",
+];
+
+const GOV_PROJECT_KW = [
+  "প্রকল্প",
+  "project",
+  "উন্নয়ন",
+  "development",
+  "সড়ক",
+  "মহাসড়ক",
+  "সেতু",
+  "bridge",
+  "বিদ্যুৎ",
+  "গ্যাস",
+  "পানি",
+  "হাসপাতাল",
+  "স্কুল",
+  "কলেজ",
+  "বিশ্ববিদ্যালয়",
+  "বাঁধ",
+  "অবকাঠামো",
+  "infrastructure",
+  "নির্মাণ",
+  "construction",
+  "metro",
+  "মেট্রো",
+  "রেল",
+  "railway",
+  "বন্দর",
+  "port",
+  "বিমানবন্দর",
+  "airport",
+  "বাজেট",
+  "budget",
+  "এডিপি",
+  "adp",
+  "উপজেলা",
+  "জেলা পরিষদ",
 ];
 
 function includesAny(text: string, keywords: string[]): boolean {
@@ -157,6 +232,7 @@ export function isBangladeshRelevantArticle(input: {
   const meta = `${input.sourceName ?? ""} ${input.url ?? ""}`.toLowerCase();
   const hasBdAnchor = includesAny(text, BD_ANCHOR_KW);
   const hasForeign = includesAny(text, FOREIGN_UNREST_KW);
+  const hasNoise = includesAny(text, REJECT_NOISE_KW);
   const hasBdPublisher = BD_PUBLISHER_MARKERS.some((m) => meta.includes(m));
 
   const district = (input.district ?? "").trim();
@@ -164,6 +240,9 @@ export function isBangladeshRelevantArticle(input: {
     Boolean(district) &&
     district !== "National" &&
     !/^জাতীয়$/i.test(district);
+
+  // Football / entertainment / foreign celebrity — never briefing intel.
+  if (hasNoise && !hasBdAnchor) return false;
 
   // Foreign crisis / war copy without a clear BD angle — drop.
   if (hasForeign && !hasBdAnchor) return false;
@@ -182,7 +261,7 @@ export function isBangladeshRelevantArticle(input: {
 
   // BD outlet world desk (e.g. BBC Bangla ME) still needs a BD anchor.
   // English wire via BSS/Star can still be India/world — require BD angle.
-  if (hasBdPublisher && !hasForeign) {
+  if (hasBdPublisher && !hasForeign && !hasNoise) {
     const isBbc = /bbc/i.test(meta);
     if (isBbc) return false;
     const hasBengali = /[\u0980-\u09FF]/.test(text);
@@ -191,4 +270,12 @@ export function isBangladeshRelevantArticle(input: {
   }
 
   return false;
+}
+
+/** Live “projects” that are actually gov/infra — not random news headlines. */
+export function looksLikeGovProject(title: string): boolean {
+  const t = title.trim();
+  if (t.length < 8) return false;
+  if (includesAny(t, REJECT_NOISE_KW)) return false;
+  return includesAny(t, GOV_PROJECT_KW);
 }

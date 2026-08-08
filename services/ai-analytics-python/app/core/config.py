@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     redis_max_connections: int = Field(default=32, alias="REDIS_MAX_CONNECTIONS")
     arbitrage_cache_ttl_seconds: int = Field(default=3600, alias="ARBITRAGE_CACHE_TTL_SECONDS")
 
+    # Optional live corroboration for Narrative Shield fact-checker
+    serper_api_key: str | None = Field(default=None, alias="SERPER_API_KEY")
+    google_cse_api_key: str | None = Field(default=None, alias="GOOGLE_CSE_API_KEY")
+    google_cse_cx: str | None = Field(default=None, alias="GOOGLE_CSE_CX")
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

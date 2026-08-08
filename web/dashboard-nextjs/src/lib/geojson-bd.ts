@@ -1,11 +1,51 @@
-import type { Feature, FeatureCollection, Polygon } from "geojson";
+import type { Feature, FeatureCollection, Geometry, Polygon } from "geojson";
 import type { AdminFilterState, AdminUnit } from "@/types";
 import { getDrillChildType, getDrillParentId } from "@/lib/filter-utils";
 import { resolveBnLabel } from "@/lib/admin-labels";
 import { getCachedAdminUnits } from "@/lib/admin-hierarchy";
 import type { GeoFeatureProperties } from "@/types/dashboard";
+import divisionBoundaries from "@/lib/bd-divisions.json";
+import districtBoundaries from "@/lib/bd-districts.json";
 
 type Ring = [number, number][];
+
+type DivisionBoundaryFeature = {
+  properties: { shapeName: string };
+  geometry: Geometry;
+};
+
+const DIVISION_BOUNDARIES =
+  (divisionBoundaries.features as unknown as DivisionBoundaryFeature[]).filter(
+    (feature) =>
+      feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon",
+  );
+
+const DISTRICT_BOUNDARIES =
+  (districtBoundaries.features as unknown as DivisionBoundaryFeature[]).filter(
+    (feature) =>
+      feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon",
+  );
+
+function canonicalDivisionName(name: string): string {
+  return name.toLowerCase().replace("chittagong", "chattogram").trim();
+}
+
+function realUnitGeometry(unit: AdminUnit): Geometry | null {
+  const boundaries =
+    unit.type === "DIVISION"
+      ? DIVISION_BOUNDARIES
+      : unit.type === "DISTRICT"
+        ? DISTRICT_BOUNDARIES
+        : null;
+  if (!boundaries) return null;
+
+  const canonical = canonicalDivisionName(unit.name);
+  return (
+    boundaries.find(
+      (feature) => canonicalDivisionName(feature.properties.shapeName) === canonical,
+    )?.geometry ?? null
+  );
+}
 
 function box(west: number, south: number, east: number, north: number): Ring {
   return [
@@ -113,8 +153,8 @@ function ringForUnit(unit: AdminUnit): Ring {
 
 function toFeature(
   unit: AdminUnit,
-  ring: Ring,
-): Feature<Polygon, GeoFeatureProperties> {
+  geometry: Geometry,
+): Feature<Geometry, GeoFeatureProperties> {
   const nameBn = resolveBnLabel(unit.name, unit.nameBn) ?? unit.name;
   const overlay = unitScoreOverlay.get(unit.id);
   return {
@@ -128,7 +168,7 @@ function toFeature(
       performanceScore: overlay?.performanceScore ?? pseudoScore(unit.id, 1),
       riskScore: overlay?.riskScore ?? pseudoScore(unit.id, 2),
     },
-    geometry: { type: "Polygon", coordinates: [ring] },
+    geometry,
   };
 }
 
@@ -148,13 +188,18 @@ function allMapUnits(): AdminUnit[] {
 
 export function getVisibleGeoJson(
   filter: AdminFilterState,
-): FeatureCollection<Polygon, GeoFeatureProperties> {
+): FeatureCollection<Geometry, GeoFeatureProperties> {
   const childType = getDrillChildType(filter);
   const parentId = getDrillParentId(filter);
 
   const features = allMapUnits()
     .filter((u) => u.type === childType && u.parentId === parentId)
-    .map((u) => toFeature(u, ringForUnit(u)));
+    .map((u) =>
+      toFeature(
+        u,
+        realUnitGeometry(u) ?? { type: "Polygon", coordinates: [ringForUnit(u)] },
+      ),
+    );
 
   return { type: "FeatureCollection", features };
 }
@@ -198,12 +243,22 @@ export function getMapBoundsForFilter(
   let minLng = Infinity;
   let maxLng = -Infinity;
 
-  for (const f of fc.features) {
-    for (const [lng, lat] of f.geometry.coordinates[0]) {
+  const visitCoordinate = (value: unknown): void => {
+    if (!Array.isArray(value)) return;
+    if (typeof value[0] === "number" && typeof value[1] === "number") {
+      const [lng, lat] = value;
       minLat = Math.min(minLat, lat);
       maxLat = Math.max(maxLat, lat);
       minLng = Math.min(minLng, lng);
       maxLng = Math.max(maxLng, lng);
+      return;
+    }
+    for (const child of value) visitCoordinate(child);
+  };
+
+  for (const feature of fc.features) {
+    if ("coordinates" in feature.geometry) {
+      visitCoordinate(feature.geometry.coordinates);
     }
   }
 

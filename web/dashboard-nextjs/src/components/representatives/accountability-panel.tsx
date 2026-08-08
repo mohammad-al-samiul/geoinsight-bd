@@ -14,7 +14,7 @@ export function AccountabilityPanel() {
   const [lang, setLang] = useState<"bn" | "en">("bn");
   const { scores, loading, error, reload } = useAccountabilityScores(lang);
 
-  if (loading) {
+  if (loading && scores.length === 0) {
     return (
       <IntelCard hoverLift={false} className="text-sm text-muted-foreground">
         Scoring representative accountability…

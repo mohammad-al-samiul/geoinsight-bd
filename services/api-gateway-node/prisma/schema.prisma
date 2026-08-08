@@ -568,6 +568,13 @@ enum NarrativeSignalStatus {
   DISMISSED
 }
 
+enum NarrativeFactCheckStatus {
+  AUTHENTIC
+  NEEDS_REVIEW
+  LIKELY_DISINFO
+  UNVERIFIED
+}
+
 /// Persisted AI / pipeline analysis for PM briefing, political & economic outlook, unrest
 model IntelAnalysisSnapshot {
   id          String            @id @default(uuid()) @db.Uuid
@@ -636,6 +643,13 @@ model NarrativeSignal {
   category          NarrativeCategory
   status            NarrativeSignalStatus @default(ACTIVE)
   confidenceScore   Decimal              @default(0) @map("confidence_score") @db.Decimal(5, 4)
+  /// Automatic fact-checker verdict (source trust + corroboration)
+  factCheckStatus   NarrativeFactCheckStatus @default(UNVERIFIED) @map("fact_check_status")
+  authenticityScore Decimal              @default(0) @map("authenticity_score") @db.Decimal(5, 4)
+  googleVerifyUrl   String?              @map("google_verify_url") @db.VarChar(2048)
+  factCheckSummary  String?              @map("fact_check_summary") @db.Text
+  evidenceUrls      Json?                @map("evidence_urls")
+  factCheckedAt     DateTime?            @map("fact_checked_at") @db.Timestamptz
   ragDebunk         String?              @map("rag_debunk") @db.Text
   ragConfidence     Decimal?             @map("rag_confidence") @db.Decimal(5, 4)
   ragPolicyRef      String?              @map("rag_policy_ref") @db.VarChar(512)
@@ -654,6 +668,7 @@ model NarrativeSignal {
   @@index([category, status])
   @@index([district, threatLevel])
   @@index([organization, status])
+  @@index([factCheckStatus, status])
   @@index([fetchedAt(sort: Desc)])
   @@map("narrative_signals")
 }

@@ -104,6 +104,8 @@ export function DivisionalCrisisPanel() {
   const bn = locale === "bn";
 
   const {
+    loading,
+    livePulse,
     divisions,
     filteredDivisions,
     filters,
@@ -122,7 +124,6 @@ export function DivisionalCrisisPanel() {
     setSelectedDistrict,
     reallocation,
     setReallocation,
-    liveAlerts,
     addCitizenReport,
     playVoiceBriefing,
     stopVoiceBriefing,
@@ -210,6 +211,8 @@ export function DivisionalCrisisPanel() {
           ? "বাংলাদেশের ৮টি বিভাগের সাম্প্রতিক অপরাধের ধরন, জিও-হিটম্যাপ, এআই ভয়েস ব্রিপিং, নাগরিক রিপোর্ট ও অটোমেটিক ইমার্জেন্সি অ্যালার্ট ডিসপ্যাচ ইনটেল।"
           : "Comprehensive visual analytics on crime distribution, geo-heatmap, AI voice briefing, citizen reports & automated emergency alert dispatch."
       }
+      loading={loading && !livePulse}
+      loadingLabel={bn ? "৮ বিভাগের সর্বশেষ ঝুঁকি সংকেত সিঙ্ক হচ্ছে…" : "Syncing the latest divisional risk signals…"}
       stats={
         <StatGrid>
           <StatCard
@@ -293,7 +296,7 @@ export function DivisionalCrisisPanel() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="glass-panel p-4 rounded-xl border border-red-500/40 space-y-4 bg-background/90 backdrop-blur-md"
+              className="glass-panel shield-float-slow shield-shimmer-wrap shield-glow-danger p-4 rounded-xl border border-red-500/40 space-y-4 bg-background/90 backdrop-blur-md"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-red-400 flex items-center gap-1.5">
@@ -343,24 +346,6 @@ export function DivisionalCrisisPanel() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Live Field Alert Stream Ticker */}
-        <div className="glass-panel flex items-center gap-3 p-3 rounded-xl border border-red-500/30 bg-red-500/5 overflow-hidden">
-          <div className="flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold font-mono uppercase tracking-wider">
-            <Radio className="h-3.5 w-3.5 animate-pulse" />
-            <span>{bn ? "লাইভ ফিল্ড ইনটেল" : "Live Alert Stream"}</span>
-          </div>
-
-          <div className="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 text-xs">
-            {liveAlerts.map((alert) => (
-              <div key={alert.id} className="flex items-center gap-2 shrink-0 bg-background/60 px-3 py-1 rounded-md border border-border/40">
-                <span className="font-semibold text-red-400">[{alert.divisionNameBn}]</span>
-                <span className="text-foreground font-medium">{bn ? alert.titleBn : alert.titleEn}</span>
-                <span className="text-[10px] text-muted-foreground font-mono">({alert.timestamp})</span>
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* Secondary Bar: Tactical Simulators Toggles */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-amber-500/10 via-primary/10 to-purple-500/10 border border-primary/20 rounded-xl p-3 shadow-sm">
@@ -419,7 +404,7 @@ export function DivisionalCrisisPanel() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="glass-panel p-4 rounded-xl border border-purple-500/30 space-y-4 bg-background/90 backdrop-blur-md"
+              className="glass-panel shield-float-slow shield-float-delay-1 shield-shimmer-wrap p-4 rounded-xl border border-purple-500/30 space-y-4 bg-background/90 backdrop-blur-md"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-purple-300 flex items-center gap-1.5">
@@ -518,7 +503,7 @@ export function DivisionalCrisisPanel() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="glass-panel p-4 rounded-xl border border-amber-500/30 space-y-3 bg-background/80 backdrop-blur-md"
+              className="glass-panel shield-float-slow shield-float-delay-2 shield-shimmer-wrap p-4 rounded-xl border border-amber-500/30 space-y-3 bg-background/80 backdrop-blur-md"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-amber-400 flex items-center gap-1.5">
@@ -680,7 +665,7 @@ export function DivisionalCrisisPanel() {
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
-              className="glass-panel p-5 rounded-2xl border-2 border-primary/40 space-y-4 bg-background/95 shadow-xl relative print:hidden"
+              className="glass-panel shield-float-slow shield-shimmer-wrap shield-glow p-5 rounded-2xl border-2 border-primary/40 space-y-4 bg-background/95 shadow-xl relative print:hidden"
             >
               <button
                 onClick={() => setCompareDivisionIds(null)}
@@ -1195,7 +1180,7 @@ export function DivisionalCrisisPanel() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-            {filteredDivisions.map((div) => {
+            {filteredDivisions.map((div, idx) => {
               const isSelected = selectedDivision?.id === div.id;
               const isComparing = compareDivisionIds && (compareDivisionIds[0] === div.id || compareDivisionIds[1] === div.id);
               const severityColor =
@@ -1213,6 +1198,7 @@ export function DivisionalCrisisPanel() {
                   className="cursor-pointer"
                 >
                   <IntelCard
+                    index={idx}
                     accent={
                       div.overallSeverityScore >= 80
                         ? "danger"

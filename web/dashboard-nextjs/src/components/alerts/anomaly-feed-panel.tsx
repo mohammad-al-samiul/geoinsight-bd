@@ -11,6 +11,7 @@ import type { AnomalyAlert } from "@/types/alerts";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 import { AlertTriangle, ChevronRight, Radio, RefreshCw } from "lucide-react";
+import { ModuleCinematicLoader } from "@/components/ui/module-motion";
 
 const SEVERITY_STYLES: Record<AnomalyAlert["severity"], string> = {
   LOW: "border-sky-500/30 bg-sky-500/5",
@@ -22,9 +23,15 @@ const SEVERITY_STYLES: Record<AnomalyAlert["severity"], string> = {
 interface AnomalyFeedPanelProps {
   className?: string;
   compact?: boolean;
+  /** Used by the dedicated alerts route; embedded feeds retain their compact skeleton. */
+  fullScreenLoading?: boolean;
 }
 
-export function AnomalyFeedPanel({ className, compact = false }: AnomalyFeedPanelProps) {
+export function AnomalyFeedPanel({
+  className,
+  compact = false,
+  fullScreenLoading = false,
+}: AnomalyFeedPanelProps) {
   const t = useTranslations("modules.alerts");
   const tc = useTranslations("common");
   const ts = useTranslations("status");
@@ -48,6 +55,13 @@ export function AnomalyFeedPanel({ className, compact = false }: AnomalyFeedPane
 
   return (
     <>
+      {fullScreenLoading && loading && (
+        <ModuleCinematicLoader
+          bn
+          fullScreen
+          label="সতর্কতা ও ঝুঁকির ডেটা সিঙ্ক হচ্ছে…"
+        />
+      )}
       <section
         className={cn(
           "glass-panel flex flex-col overflow-hidden rounded-xl shadow-panel",

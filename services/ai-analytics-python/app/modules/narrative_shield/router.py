@@ -11,6 +11,8 @@ from app.modules.narrative_shield.schemas import (
     ClassifyResponse,
     DebunkRequest,
     DebunkResponse,
+    FactCheckRequest,
+    FactCheckResponse,
     FeedIngestResponse,
 )
 from app.modules.narrative_shield.service import NarrativeShieldService
@@ -50,10 +52,20 @@ async def debunk_signal(body: DebunkRequest, req: Request) -> DebunkResponse:
     return await _svc(req).debunk(body)
 
 
+@router.post("/fact-check", response_model=FactCheckResponse)
+async def fact_check_claim(body: FactCheckRequest, req: Request) -> FactCheckResponse:
+    """
+    Run the automatic fact-checker: Google verify URL + domain trust +
+    optional live corroboration (Serper / Google CSE).
+    """
+    return await _svc(req).fact_check(body)
+
+
 @router.post("/ingest-feed", response_model=FeedIngestResponse)
 async def ingest_feed(req: Request, limit: int = 20) -> FeedIngestResponse:
     """
-    Pull the latest hostile narrative signals from open-source feeds.
+    Pull hostile narrative signals from Google News only
+    (Facebook / Telegram / YouTube excluded). Fact-checks each item first.
 
     `limit` controls how many new signals to ingest per call (max 50).
     """

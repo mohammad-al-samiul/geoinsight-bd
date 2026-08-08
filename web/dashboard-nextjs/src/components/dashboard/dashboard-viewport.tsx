@@ -13,6 +13,7 @@ import type { SocketConnectionStatus } from "@/hooks/use-socket";
 import { useTranslations } from "next-intl";
 import { Radio, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ModuleCinematicLoader } from "@/components/ui/module-motion";
 
 export function DashboardViewport() {
   const t = useTranslations("modules.dashboard");
@@ -69,6 +70,10 @@ export function DashboardViewport() {
     },
     [drillToUnit],
   );
+
+  if (loading) {
+    return <ModuleCinematicLoader bn fullScreen label="জাতীয় পরিস্থিতির ডেটা সিঙ্ক হচ্ছে…" />;
+  }
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-5 animate-fade-in">

@@ -27,6 +27,7 @@ import { unrestModule } from "./unrest/unrest.module";
 import { intelModule } from "./intel/intel.module";
 import { narrativeShieldModule } from "./narrative-shield/narrative-shield.module";
 import { outlookModule } from "./outlook/outlook.module";
+import { divisionalCrisisModule } from "./divisional-crisis/divisional-crisis.module";
 
 const modules: AppModule[] = [
   healthModule,
@@ -49,6 +50,7 @@ const modules: AppModule[] = [
   unrestModule,
   narrativeShieldModule,
   outlookModule,
+  divisionalCrisisModule,
   simulatorModule,
   procurementModule,
   sovereignModule,

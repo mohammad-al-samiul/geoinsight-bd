@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { apiClient } from "@/lib/api-client";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 export interface AuditTimelineItem {
   type: "ai_alert" | "audit";
@@ -35,6 +36,7 @@ export function useAuditTrail() {
   useEffect(() => {
     void load();
   }, [load]);
+  useRealtimeRefresh(load);
 
   return { timeline, loading, error, reload: load };
 }

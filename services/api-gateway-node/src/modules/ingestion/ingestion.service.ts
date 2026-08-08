@@ -6,6 +6,7 @@ import {
 import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
 import { redisCacheService } from "../../infrastructure/cache/redis-cache.service";
 import { fetchAi } from "../../shared/http/fetch-ai";
+import { isBangladeshRelevantArticle } from "../../shared/geo/bangladesh-relevance";
 import { logIngestionSyncRun } from "../intel/pipeline-run-log.service";
 
 const HEATMAP_TTL_SEC = 120;
@@ -257,13 +258,14 @@ export class IngestionService {
 
   async getBriefingHeadlines(limit = 6, days = 3) {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const pool = Math.max(limit * 4, 24);
     const grievance = await prismaRead.externalArticle.findMany({
       where: {
         fetchedAt: { gte: since },
         sentimentCategory: IngestionSentiment.Grievance,
       },
       orderBy: { publishedAt: "desc" },
-      take: Math.ceil(limit / 2),
+      take: Math.ceil(pool / 2),
       select: {
         title: true,
         sourceName: true,
@@ -273,7 +275,7 @@ export class IngestionService {
       },
     });
 
-    const remaining = limit - grievance.length;
+    const remaining = pool - grievance.length;
     const other =
       remaining > 0
         ? await prismaRead.externalArticle.findMany({
@@ -293,7 +295,16 @@ export class IngestionService {
           })
         : [];
 
-    return [...grievance, ...other].slice(0, limit);
+    return [...grievance, ...other]
+      .filter((n) =>
+        isBangladeshRelevantArticle({
+          title: n.title,
+          district: n.district,
+          sourceName: n.sourceName,
+          url: n.url,
+        }),
+      )
+      .slice(0, limit);
   }
 
   async searchArticles(query: string, limit = 8) {

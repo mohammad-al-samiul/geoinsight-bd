@@ -14,7 +14,7 @@ export function AuditTrailPanel() {
     <ModuleShell
       title={t("title")}
       description={t("description")}
-      loading={loading}
+      loading={loading && timeline.length === 0}
       error={error}
       onRetry={reload}
     >

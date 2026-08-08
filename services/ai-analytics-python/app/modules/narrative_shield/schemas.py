@@ -33,6 +33,13 @@ class NarrativeSignalStatus(str, Enum):
     DISMISSED = "DISMISSED"
 
 
+class NarrativeFactCheckStatus(str, Enum):
+    AUTHENTIC = "AUTHENTIC"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
+    LIKELY_DISINFO = "LIKELY_DISINFO"
+    UNVERIFIED = "UNVERIFIED"
+
+
 # ── Incoming classification request ──────────────────────────────────────────
 
 class ClassifyRequest(BaseModel):
@@ -110,12 +117,41 @@ class FeedSignal(BaseModel):
     category: NarrativeCategory
     confidence_score: float
     published_at: str | None = None
+    fact_check_status: NarrativeFactCheckStatus = NarrativeFactCheckStatus.UNVERIFIED
+    authenticity_score: float = 0.0
+    google_verify_url: str | None = None
+    fact_check_summary: str | None = None
+    evidence_urls: list[str] = Field(default_factory=list)
+    fact_checked_at: str | None = None
+
+
+class FactCheckRequest(BaseModel):
+    title: str = Field(min_length=5, max_length=2000)
+    title_bn: str | None = Field(default=None, max_length=2000)
+    body: str | None = Field(default=None, max_length=10000)
+    speaker_name: str | None = None
+    source_url: str | None = None
+    source_name: str | None = None
+    organization: str | None = None
+    lang: str = Field(default="bn", pattern="^(bn|en)$")
+
+
+class FactCheckResponse(BaseModel):
+    fact_check_status: NarrativeFactCheckStatus
+    authenticity_score: float
+    google_verify_url: str
+    fact_check_summary: str
+    evidence_urls: list[str]
+    fact_checked_at: str
+    corroboration_hits: int = 0
+    blocked: bool = False
 
 
 class FeedIngestResponse(BaseModel):
     ingested: int
     signals: list[FeedSignal]
     skipped_duplicates: int
+    skipped_unauthentic: int = 0
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────

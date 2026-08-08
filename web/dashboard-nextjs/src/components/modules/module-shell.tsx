@@ -2,13 +2,17 @@
 
 import { motion } from "framer-motion";
 import { useAdminHierarchy } from "@/hooks/use-admin-hierarchy";
-import { ScorecardSkeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IntelCard } from "@/components/ui/intel-card";
-import { useTranslations } from "next-intl";
-import type { ReactNode } from "react";
+import {
+  AnimatedContent,
+  ModuleCinematicLoader,
+  ModulePageAura,
+} from "@/components/ui/module-motion";
+import { useLocale, useTranslations } from "next-intl";
+import { Children, type ReactNode } from "react";
 
 interface ModuleShellProps {
   title: string;
@@ -18,6 +22,8 @@ interface ModuleShellProps {
   onRetry?: () => void;
   stats?: ReactNode;
   children: ReactNode;
+  /** Override loading copy */
+  loadingLabel?: string;
 }
 
 export function ModuleShell({
@@ -28,13 +34,36 @@ export function ModuleShell({
   onRetry,
   stats,
   children,
+  loadingLabel,
 }: ModuleShellProps) {
   useAdminHierarchy();
   const t = useTranslations("common");
+  const locale = useLocale();
+  const bn = locale === "bn";
+
+  // Initial payloads should feel intentional, not like an empty page with a
+  // small spinner. Every module that uses ModuleShell inherits this screen.
+  if (loading) {
+    return (
+      <ModuleCinematicLoader
+        bn={bn}
+        active
+        fullScreen
+        label={loadingLabel ?? (bn ? "লাইভ ডেটা প্রস্তুত হচ্ছে…" : "Preparing live data…")}
+      />
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-7xl animate-rise space-y-7">
-      <div className="surface-hero intel-rail px-5 py-5 sm:px-7 sm:py-6">
+    <div className="relative mx-auto max-w-7xl space-y-7">
+      <ModulePageAura />
+
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="surface-hero intel-rail relative z-10 px-5 py-5 sm:px-7 sm:py-6"
+      >
         <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="pl-3">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/80">
@@ -48,35 +77,35 @@ export function ModuleShell({
             </p>
           </div>
           {onRetry && (
-            <Button variant="outline" size="sm" onClick={onRetry} className="gap-2 self-start sm:self-auto">
-              <RefreshCw className="h-3.5 w-3.5" />
-              {t("refresh")}
-            </Button>
+            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+              <Button variant="outline" size="sm" onClick={onRetry} className="gap-2 self-start sm:self-auto">
+                <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+                {t("refresh")}
+              </Button>
+            </motion.div>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {error && (
-        <div className="flex items-start gap-3 rounded-xl border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive animate-fade-in">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative z-10 flex items-start gap-3 rounded-xl border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive"
+        >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <p className="font-medium">{t("loadFailed")}</p>
             <p className="mt-1 text-destructive/80">{error}</p>
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {stats}
+      {stats && <div className="relative z-10">{stats}</div>}
 
-      {loading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <ScorecardSkeleton key={i} />
-          ))}
-        </div>
-      ) : (
-        <div className="animate-rise-delay-1 space-y-6">{children}</div>
-      )}
+      <div className="relative z-10">
+        <AnimatedContent>{children}</AnimatedContent>
+      </div>
     </div>
   );
 }
@@ -107,7 +136,7 @@ export function StatCard({ label, value, hint, accent = "default", icon }: StatC
           : "default";
 
   return (
-    <IntelCard accent={intelAccent} className="!p-4">
+    <IntelCard accent={intelAccent} className="!p-4" hoverLift={false} float={false} shimmer={false}>
       <div className="flex items-start justify-between">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {label}
@@ -115,13 +144,14 @@ export function StatCard({ label, value, hint, accent = "default", icon }: StatC
         {icon && <div className="text-muted-foreground/50">{icon}</div>}
       </div>
       <motion.p
+        key={String(value)}
         className={cn(
           "mt-2.5 font-display text-2xl font-semibold tabular-nums tracking-tight",
           ACCENT[accent],
         )}
-        initial={{ opacity: 0, scale: 0.94 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        initial={{ opacity: 0, scale: 0.86, y: 6 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       >
         {value}
       </motion.p>
@@ -131,7 +161,27 @@ export function StatCard({ label, value, hint, accent = "default", icon }: StatC
 }
 
 export function StatGrid({ children }: { children: ReactNode }) {
-  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>;
+  const items = Children.toArray(children);
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {items.map((child, i) => (
+        <motion.div
+          key={i}
+          className="relative isolate overflow-hidden rounded-xl"
+          initial={{ opacity: 0, y: 16, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{
+            delay: i * 0.07,
+            duration: 0.45,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          whileHover={{ y: -4, scale: 1.02, transition: { duration: 0.2 } }}
+        >
+          {child}
+        </motion.div>
+      ))}
+    </div>
+  );
 }
 
 interface DataTableProps<T extends { id?: string }> {
@@ -176,8 +226,11 @@ export function DataTable<T extends { id?: string }>({
           </thead>
           <tbody>
             {rows.map((row, i) => (
-              <tr
+              <motion.tr
                 key={row.id ?? i}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: Math.min(i * 0.04, 0.5), duration: 0.35 }}
                 className={cn(
                   "border-b border-border/30 transition-colors",
                   onRowClick ? "cursor-pointer hover:bg-primary/5" : "hover:bg-secondary/25",
@@ -191,7 +244,7 @@ export function DataTable<T extends { id?: string }>({
                       : String((row as Record<string, unknown>)[col.key] ?? "—")}
                   </td>
                 ))}
-              </tr>
+              </motion.tr>
             ))}
           </tbody>
         </table>

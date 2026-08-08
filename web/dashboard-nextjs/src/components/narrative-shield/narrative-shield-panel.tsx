@@ -1,26 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  AlertTriangle, CheckCircle2, ChevronDown, Database, Download,
-  ExternalLink, Eye, EyeOff, Loader2, Radio, RefreshCw,
-  Send, Shield, ShieldOff, Square, SquareCheck, Trash2, X, Zap,
+  AlertTriangle, BadgeCheck, CheckCircle2, ChevronDown, Clock3, Database, Download,
+  ExternalLink, Eye, EyeOff, Loader2, Mic2, Radio, RefreshCw, Search,
+  Send, Shield, ShieldAlert, ShieldOff, Square, SquareCheck, Trash2, Users, X, Zap,
 } from "lucide-react";
-import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-shell";
+import { ModuleShell, StatCard } from "@/components/modules/module-shell";
 import { IntelCard } from "@/components/ui/intel-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { chartTooltipProps } from "@/lib/chart-tooltip";
 import {
-  CATEGORY_LABELS_BN, CATEGORY_LABELS_EN, THREAT_LEVEL_ORDER,
-  downloadNarrativeShieldCsv, useNarrativeActions, useNarrativeShield,
-  type NarrativeCategory, type NarrativeSignal,
-  type NarrativeSignalStatus, type NarrativeThreatLevel,
+  CATEGORY_LABELS_BN, CATEGORY_LABELS_EN, FACT_CHECK_LABELS_BN, FACT_CHECK_LABELS_EN,
+  PARTY_LABELS_BN, PARTY_LABELS_EN, PARTY_ORDER, THREAT_LEVEL_ORDER,
+  buildGoogleVerifyUrl, downloadNarrativeShieldCsv, normalizeParty,
+  useNarrativeActions, useNarrativeShield,
+  type NarrativeCategory, type NarrativeFactCheckStatus, type NarrativeParty,
+  type NarrativeSignal, type NarrativeSignalStatus, type NarrativeThreatLevel,
 } from "@/hooks/use-narrative-shield";
 
 // ── Colour maps ───────────────────────────────────────────────────────────────
@@ -44,17 +47,40 @@ const THREAT_ACCENT: Record<NarrativeThreatLevel, "danger"|"warning"|"default"> 
 };
 const CAT_BG: Record<NarrativeCategory, string> = {
   ANTI_GOVT_INCITEMENT: "bg-red-500/15 text-red-300",
-  SOVEREIGNTY_THREAT: "bg-purple-500/15 text-purple-300",
+  SOVEREIGNTY_THREAT: "bg-sky-500/15 text-sky-300",
   ECONOMIC_DISINFO: "bg-amber-500/15 text-amber-300",
   SOCIAL_UNREST: "bg-orange-500/15 text-orange-300",
   RELIGIOUS_EXTREMISM: "bg-rose-500/15 text-rose-300",
-  ELECTORAL_MANIPULATION: "bg-sky-500/15 text-sky-300",
+  ELECTORAL_MANIPULATION: "bg-teal-500/15 text-teal-300",
 };
 const CAT_COLORS: Record<NarrativeCategory, string> = {
-  ANTI_GOVT_INCITEMENT: "#ef4444", SOVEREIGNTY_THREAT: "#a855f7",
+  ANTI_GOVT_INCITEMENT: "#ef4444", SOVEREIGNTY_THREAT: "#38bdf8",
   ECONOMIC_DISINFO: "#eab308", SOCIAL_UNREST: "#f97316",
-  RELIGIOUS_EXTREMISM: "#f43f5e", ELECTORAL_MANIPULATION: "#38bdf8",
+  RELIGIOUS_EXTREMISM: "#f43f5e", ELECTORAL_MANIPULATION: "#2dd4bf",
 };
+const PARTY_COLORS: Record<NarrativeParty, string> = {
+  BNP: "#f59e0b", JAMAAT: "#22c55e", NCP: "#38bdf8", OTHER: "#94a3b8",
+};
+const PARTY_BG: Record<NarrativeParty, string> = {
+  BNP: "bg-amber-500/15 text-amber-300 border-amber-500/35",
+  JAMAAT: "bg-emerald-500/15 text-emerald-300 border-emerald-500/35",
+  NCP: "bg-sky-500/15 text-sky-300 border-sky-500/35",
+  OTHER: "bg-slate-500/15 text-slate-300 border-slate-500/35",
+};
+const FACT_BG: Record<NarrativeFactCheckStatus, string> = {
+  AUTHENTIC: "bg-emerald-500/20 text-emerald-200 border-emerald-400/40",
+  NEEDS_REVIEW: "bg-amber-500/20 text-amber-200 border-amber-400/40",
+  LIKELY_DISINFO: "bg-red-500/20 text-red-200 border-red-400/45",
+  UNVERIFIED: "bg-slate-500/20 text-slate-200 border-slate-400/35",
+};
+
+function formatSaidAt(iso: string | null, locale: string): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString(locale === "bn" ? "bn-BD" : undefined, {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
 
 // ── Filter chip ───────────────────────────────────────────────────────────────
 function Chip({ active, onClick, children, className }: {
@@ -62,37 +88,70 @@ function Chip({ active, onClick, children, className }: {
   children: React.ReactNode; className?: string;
 }) {
   return (
-    <button type="button" onClick={onClick}
+    <motion.button type="button" onClick={onClick}
+      whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
       className={cn(
-        "inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold tracking-wide transition-all",
+        "inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold tracking-wide transition-colors",
         active
-          ? "border-primary/60 bg-primary/15 text-primary"
+          ? "border-primary/60 bg-primary/15 text-primary shadow-[0_0_20px_-8px] shadow-primary/50"
           : "border-border/50 bg-secondary/30 text-muted-foreground hover:border-border hover:text-foreground",
         className,
       )}
-    >{children}</button>
+    >{children}</motion.button>
   );
 }
 
-// ── Threat gauge bar ──────────────────────────────────────────────────────────
 function ThreatGauge({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
-    <div className="h-2 w-full rounded-full bg-secondary/40 overflow-hidden">
-      <div className="h-full rounded-full transition-all duration-700"
-        style={{ width: `${pct}%`, backgroundColor: color }} />
+    <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/40">
+      <motion.div
+        className="h-full rounded-full"
+        initial={{ width: 0 }}
+        animate={{ width: `${pct}%` }}
+        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+        style={{ backgroundColor: color }}
+      />
     </div>
   );
 }
 
-// ── Charts section ────────────────────────────────────────────────────────────
+function LiveScanBanner({ bn, active }: { bn: boolean; active: boolean }) {
+  return (
+    <AnimatePresence>
+      {active && (
+        <motion.div
+          initial={{ opacity: 0, y: -8, height: 0 }}
+          animate={{ opacity: 1, y: 0, height: "auto" }}
+          exit={{ opacity: 0, y: -8, height: 0 }}
+          className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3"
+        >
+          <motion.div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/15 to-transparent"
+            initial={{ x: "-100%" }}
+            animate={{ x: "100%" }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}
+          />
+          <div className="relative z-10 flex items-center gap-3">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-70" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
+            </span>
+            <p className="text-sm font-semibold text-amber-200">
+              {bn ? "লাইভ স্ক্যান চলছে" : "Live scan in progress"}
+            </p>
+            <Loader2 className="ml-auto h-4 w-4 animate-spin text-amber-300" />
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function ShieldCharts({ signals, bn }: { signals: NarrativeSignal[]; bn: boolean }) {
-  // Category bar chart data
   const catData = useMemo(() => {
     const counts: Partial<Record<NarrativeCategory, number>> = {};
-    for (const s of signals) {
-      counts[s.category] = (counts[s.category] ?? 0) + 1;
-    }
+    for (const s of signals) counts[s.category] = (counts[s.category] ?? 0) + 1;
     return Object.entries(counts)
       .map(([cat, count]) => ({
         name: bn
@@ -104,170 +163,271 @@ function ShieldCharts({ signals, bn }: { signals: NarrativeSignal[]; bn: boolean
       .sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
   }, [signals, bn]);
 
-  // Threat level donut data
   const threatData = useMemo(() => {
     const counts: Partial<Record<NarrativeThreatLevel, number>> = {};
     for (const s of signals) {
       if (s.status === "ACTIVE") counts[s.threatLevel] = (counts[s.threatLevel] ?? 0) + 1;
     }
     return THREAT_LEVEL_ORDER
-      .filter(lvl => (counts[lvl] ?? 0) > 0)
-      .map(lvl => ({ name: lvl, value: counts[lvl] ?? 0, color: THREAT_COLORS[lvl] }));
+      .filter((lvl) => (counts[lvl] ?? 0) > 0)
+      .map((lvl) => ({ name: lvl, value: counts[lvl] ?? 0, color: THREAT_COLORS[lvl] }));
   }, [signals]);
 
-  // Platform bar
-  const platformData = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const s of signals) {
-      counts[s.sourcePlatform] = (counts[s.sourcePlatform] ?? 0) + 1;
-    }
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 6);
-  }, [signals]);
+  const partyData = useMemo(() => {
+    const counts: Record<NarrativeParty, number> = { BNP: 0, JAMAAT: 0, NCP: 0, OTHER: 0 };
+    for (const s of signals) counts[normalizeParty(s.organization)] += 1;
+    return PARTY_ORDER
+      .filter((p) => counts[p] > 0)
+      .map((p) => ({
+        name: bn ? PARTY_LABELS_BN[p] : PARTY_LABELS_EN[p],
+        count: counts[p],
+        color: PARTY_COLORS[p],
+      }));
+  }, [signals, bn]);
 
   if (signals.length === 0) return null;
 
   return (
     <div className="grid gap-4 md:grid-cols-3">
-
-      {/* Threat level donut */}
-      <IntelCard accent="danger" padding="sm">
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-          {bn ? "ঝুঁকির মাত্রা বিতরণ" : "Threat Level Distribution"}
-        </p>
-        <ResponsiveContainer width="100%" height={220}>
-          <PieChart>
-            <Pie data={threatData} dataKey="value" cx="50%" cy="50%"
-              innerRadius={55} outerRadius={82} paddingAngle={4}
-              label={({ name, percent }) => `${name} ${Math.round((percent ?? 0) * 100)}%`}
-              labelLine={false}>
-              {threatData.map(entry => (
-                <Cell key={entry.name} fill={entry.color} opacity={0.9} />
-              ))}
-            </Pie>
-            <Tooltip {...chartTooltipProps}
-              formatter={(v, n) => [v, n]} />
-            <Legend iconType="circle" iconSize={9}
-              formatter={(v) => <span className="text-[11px] text-muted-foreground">{v}</span>} />
-          </PieChart>
-        </ResponsiveContainer>
-      </IntelCard>
-
-      {/* Category bar chart */}
-      <IntelCard padding="sm" className="md:col-span-2">
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-          {bn ? "ক্যাটাগরি অনুযায়ী সংকেত" : "Signals by Category"}
-        </p>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={catData} layout="vertical"
-            margin={{ top: 0, right: 16, left: 4, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" horizontal={false} />
-            <XAxis type="number" allowDecimals={false}
-              tick={{ fill: "#64748b", fontSize: 11 }} />
-            <YAxis type="category" dataKey="name" width={130}
-              tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <Tooltip {...chartTooltipProps} />
-            <Bar dataKey="count" radius={[0, 5, 5, 0]} maxBarSize={36}>
-              {catData.map((entry, i) => (
-                <Cell key={i} fill={entry.color} fillOpacity={0.82} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </IntelCard>
-
-      {/* Platform bar */}
-      {platformData.length > 1 && (
-        <IntelCard padding="sm" className="md:col-span-3">
+      <motion.div
+        className="shield-float-slow"
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15, duration: 0.55 }}
+        whileHover={{ scale: 1.02 }}
+      >
+        <IntelCard accent="danger" padding="sm" index={0} float={false} shimmer={false} className="h-full !overflow-visible">
           <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-            {bn ? "প্ল্যাটফর্ম অনুযায়ী সংকেত" : "Signals by Platform"}
+            {bn ? "ঝুঁকির মাত্রা বিতরণ" : "Threat Level Distribution"}
           </p>
-          <ResponsiveContainer width="100%" height={130}>
-            <BarChart data={platformData}
-              margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart margin={{ top: 18, right: 18, bottom: 8, left: 18 }}>
+              <Pie
+                data={threatData}
+                dataKey="value"
+                cx="50%"
+                cy="48%"
+                innerRadius={48}
+                outerRadius={70}
+                paddingAngle={4}
+                label={({ name, percent }) => `${name} ${Math.round((percent ?? 0) * 100)}%`}
+                labelLine={{ stroke: "#64748b", strokeWidth: 1 }}
+                isAnimationActive
+                animationDuration={1200}
+                animationBegin={200}
+              >
+                {threatData.map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} opacity={0.9} />
+                ))}
+              </Pie>
+              <Tooltip {...chartTooltipProps} formatter={(v, n) => [v, n]} />
+              <Legend iconType="circle" iconSize={9}
+                formatter={(v) => <span className="text-[11px] text-muted-foreground">{v}</span>} />
+            </PieChart>
+          </ResponsiveContainer>
+        </IntelCard>
+      </motion.div>
+
+      <motion.div
+        className="shield-float-slow shield-float-delay-1 shield-shimmer-wrap md:col-span-2"
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25, duration: 0.55 }}
+        whileHover={{ scale: 1.015 }}
+      >
+        <IntelCard padding="sm" index={1} className="h-full">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+            {bn ? "ক্যাটাগরি অনুযায়ী সংকেত" : "Signals by Category"}
+          </p>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={catData} layout="vertical"
+              margin={{ top: 0, right: 16, left: 4, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" horizontal={false} />
+              <XAxis type="number" allowDecimals={false} tick={{ fill: "#64748b", fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" width={130} tick={{ fill: "#94a3b8", fontSize: 11 }} />
+              <Tooltip {...chartTooltipProps} />
+              <Bar dataKey="count" radius={[0, 5, 5, 0]} maxBarSize={36}
+                isAnimationActive animationDuration={1100} animationBegin={280}>
+                {catData.map((entry, i) => (
+                  <Cell key={i} fill={entry.color} fillOpacity={0.82} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </IntelCard>
+      </motion.div>
+
+      <motion.div
+        className="shield-float-slow shield-float-delay-2 shield-shimmer-wrap md:col-span-3"
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35, duration: 0.55 }}
+        whileHover={{ scale: 1.01 }}
+      >
+        <IntelCard padding="sm" accent="info" index={2}>
+          <p className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+            <Users className="h-3.5 w-3.5 text-sky-400" />
+            {bn ? "দল অনুযায়ী সংকেত" : "Signals by Party"}
+          </p>
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={partyData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" vertical={false} />
               <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} />
               <YAxis allowDecimals={false} tick={{ fill: "#64748b", fontSize: 11 }} width={26} />
               <Tooltip {...chartTooltipProps} />
-              <Bar dataKey="count" fill="#7c3aed" fillOpacity={0.78} radius={[5, 5, 0, 0]} maxBarSize={52} />
+              <Bar dataKey="count" radius={[5, 5, 0, 0]} maxBarSize={56}
+                isAnimationActive animationDuration={1000} animationBegin={360}>
+                {partyData.map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} fillOpacity={0.85} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </IntelCard>
-      )}
+      </motion.div>
     </div>
   );
 }
 
-// ── Threat summary row ────────────────────────────────────────────────────────
 function ThreatSummaryRow({ signals }: { signals: NarrativeSignal[] }) {
   const counts = useMemo(() => {
     const c: Partial<Record<NarrativeThreatLevel, number>> = {};
-    for (const s of signals.filter(s => s.status === "ACTIVE")) {
+    for (const s of signals.filter((x) => x.status === "ACTIVE")) {
       c[s.threatLevel] = (c[s.threatLevel] ?? 0) + 1;
     }
     return c;
   }, [signals]);
   const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      {THREAT_LEVEL_ORDER.map(lvl => (
-        <div key={lvl}
-          className="rounded-xl border border-border/40 bg-secondary/20 p-4 space-y-2">
-          <div className="flex items-center justify-between">
+      {THREAT_LEVEL_ORDER.map((lvl, i) => (
+        <motion.div
+          key={lvl}
+          initial={{ opacity: 0, y: 24, scale: 0.92 }}
+          animate={{
+            opacity: 1,
+            scale: 1,
+            y: [0, -6, 0],
+          }}
+          transition={{
+            opacity: { delay: 0.08 + i * 0.1, duration: 0.55 },
+            scale: { delay: 0.08 + i * 0.1, duration: 0.55 },
+            y: {
+              delay: 0.6 + i * 0.12,
+              duration: 3.2 + i * 0.4,
+              repeat: Infinity,
+              ease: "easeInOut",
+            },
+          }}
+          whileHover={{ scale: 1.05, y: -8, transition: { duration: 0.2 } }}
+          className={cn(
+            "shield-shimmer-wrap relative space-y-2 rounded-xl border border-border/40 bg-secondary/25 p-4",
+            lvl === "CRITICAL" && "shield-glow-danger border-red-500/35",
+            lvl === "HIGH" && "border-orange-500/30",
+          )}
+        >
+          <div
+            className="pointer-events-none absolute -right-4 -top-4 h-16 w-16 rounded-full opacity-40 blur-2xl"
+            style={{ backgroundColor: THREAT_COLORS[lvl] }}
+          />
+          <div className="relative flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider"
               style={{ color: THREAT_COLORS[lvl] }}>{lvl}</span>
-            <span className="text-2xl font-bold tabular-nums" style={{ color: THREAT_COLORS[lvl] }}>
+            <motion.span
+              key={counts[lvl] ?? 0}
+              initial={{ scale: 0.5, opacity: 0, rotate: -8 }}
+              animate={{ scale: [1, 1.12, 1], opacity: 1, rotate: 0 }}
+              transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+              className="text-2xl font-bold tabular-nums"
+              style={{ color: THREAT_COLORS[lvl] }}
+            >
               {counts[lvl] ?? 0}
-            </span>
+            </motion.span>
           </div>
           <ThreatGauge value={counts[lvl] ?? 0} max={total} color={THREAT_COLORS[lvl]} />
-          <p className="text-[10px] text-muted-foreground/60">
+          <p className="relative text-[10px] text-muted-foreground/60">
             {total > 1 ? `${Math.round(((counts[lvl] ?? 0) / total) * 100)}% of active` : "—"}
           </p>
-        </div>
+        </motion.div>
       ))}
     </div>
   );
 }
 
-// ── Signal card ───────────────────────────────────────────────────────────────
 function SignalCard({
-  signal, selected, onSelect, onDebunk, onEscalate, onDismiss, pending, bn, t,
+  signal, selected, onSelect, onDebunk, onEscalate, onDismiss, pending, bn, locale, t, index,
 }: {
-  signal: NarrativeSignal; selected: boolean;
+  signal: NarrativeSignal; selected: boolean; index: number;
   onSelect: (id: string) => void; onDebunk: (id: string) => void;
   onEscalate: (id: string) => void; onDismiss: (id: string) => void;
-  pending: Record<string, boolean>; bn: boolean;
+  pending: Record<string, boolean>; bn: boolean; locale: string;
   t: ReturnType<typeof useTranslations>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const isLoading = pending[signal.id] ?? false;
   const isDone = signal.status !== "ACTIVE";
   const catLabel = bn ? CATEGORY_LABELS_BN[signal.category] : CATEGORY_LABELS_EN[signal.category];
+  const party = normalizeParty(signal.organization);
+  const partyLabel = bn ? PARTY_LABELS_BN[party] : PARTY_LABELS_EN[party];
+  const factStatus = (signal.factCheckStatus ?? "UNVERIFIED") as NarrativeFactCheckStatus;
+  const factLabel = bn ? FACT_CHECK_LABELS_BN[factStatus] : FACT_CHECK_LABELS_EN[factStatus];
+  const authPct = Math.round(Number(signal.authenticityScore ?? 0) * 100);
+  const googleUrl =
+    signal.googleVerifyUrl ||
+    buildGoogleVerifyUrl(signal.title, signal.speakerName, signal.titleBn);
   const confidence = Math.round(Number(signal.confidenceScore) * 100);
   const title = bn && signal.titleBn ? signal.titleBn : signal.title;
 
   return (
-    <IntelCard accent={THREAT_ACCENT[signal.threatLevel]} hoverLift={false} padding="sm"
-      className={cn("transition-all duration-200",
-        selected && "ring-2 ring-primary/50 bg-primary/5",
-        isDone && "opacity-55")}>
-      {/* Left accent strip */}
+    <motion.div
+      initial={{ opacity: 0, y: 32, scale: 0.96 }}
+      animate={{
+        opacity: 1,
+        y: [0, -5, 0],
+        scale: 1,
+      }}
+      transition={{
+        opacity: { delay: Math.min(index * 0.09, 0.8), duration: 0.5 },
+        scale: { delay: Math.min(index * 0.09, 0.8), duration: 0.5 },
+        y: {
+          delay: Math.min(index * 0.09, 0.8) + 0.5,
+          duration: 3.4 + (index % 3) * 0.35,
+          repeat: Infinity,
+          ease: "easeInOut",
+        },
+      }}
+      whileHover={{ y: -8, scale: 1.015, transition: { duration: 0.22 } }}
+      className={cn(
+        "shield-shimmer-wrap",
+        signal.threatLevel === "CRITICAL" && !isDone && "shield-glow-danger",
+      )}
+    >
+    <IntelCard
+      accent={THREAT_ACCENT[signal.threatLevel]}
+      hoverLift={false}
+      padding="sm"
+      index={index}
+      float={false}
+      shimmer={false}
+      className={cn(
+        "relative overflow-hidden",
+        selected && "ring-2 ring-primary/50 bg-primary/5 shadow-[0_0_32px_-12px] shadow-primary/40",
+        isDone && "opacity-55",
+        signal.threatLevel === "CRITICAL" && !isDone && "border-red-500/40",
+        factStatus === "LIKELY_DISINFO" && "ring-1 ring-red-500/30",
+      )}
+    >
       <div className="flex items-start gap-3">
-        {/* Checkbox */}
         <button type="button" onClick={() => onSelect(signal.id)}
-          className="mt-0.5 shrink-0 text-muted-foreground hover:text-primary transition-colors"
+          className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-primary"
           aria-label="Select">
           {selected
             ? <SquareCheck className="h-4 w-4 text-primary" />
             : <Square className="h-4 w-4" />}
         </button>
 
-        {/* Content */}
-        <div className="min-w-0 flex-1 space-y-2">
-          {/* Badges row */}
+        <div className="min-w-0 flex-1 space-y-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className={cn("inline-flex rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider", THREAT_BG[signal.threatLevel])}>
               {signal.threatLevel}
@@ -275,64 +435,107 @@ function SignalCard({
             <span className={cn("inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold", STATUS_BG[signal.status])}>
               {signal.status}
             </span>
+            <span className={cn("rounded border px-1.5 py-0.5 text-[10px] font-bold", PARTY_BG[party])}>
+              {partyLabel}
+            </span>
+            <span className={cn("inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-bold", FACT_BG[factStatus])}>
+              {factStatus === "AUTHENTIC" ? <BadgeCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
+              {factLabel}
+              <span className="font-mono opacity-80">{authPct}%</span>
+            </span>
             <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", CAT_BG[signal.category])}>
               {catLabel}
             </span>
-            {/* Confidence bar */}
             <span className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground">
               <span className="font-mono">{confidence}%</span>
-              <div className="h-1.5 w-12 rounded-full bg-secondary/60 overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${confidence}%`, backgroundColor: THREAT_COLORS[signal.threatLevel] }} />
+              <div className="h-1.5 w-12 overflow-hidden rounded-full bg-secondary/60">
+                <motion.div
+                  className="h-full rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${confidence}%` }}
+                  transition={{ duration: 0.8, delay: 0.1 }}
+                  style={{ backgroundColor: THREAT_COLORS[signal.threatLevel] }}
+                />
               </div>
             </span>
           </div>
 
-          {/* Title */}
           <p className="text-sm font-semibold leading-snug text-foreground/95">{title}</p>
 
-          {/* Meta — who, when, where */}
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Radio className="h-3 w-3 text-emerald-400 animate-pulse" />
-              <span className="font-medium text-foreground/70">{signal.sourceName}</span>
-              <span className="text-muted-foreground/50">·</span>
-              <span>{signal.sourcePlatform}</span>
-            </span>
-            {signal.speakerName && (
-              <span className="flex items-center gap-1">
-                <span className="text-primary/60">👤</span>
-                <span className="font-medium text-foreground/80">{signal.speakerName}</span>
+          {/* Speaker + time — primary intel row */}
+          <div className="grid gap-2 rounded-lg border border-border/35 bg-secondary/15 p-2.5 sm:grid-cols-2">
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10">
+                <Mic2 className="h-3.5 w-3.5 text-primary" />
               </span>
-            )}
-            {signal.organization && (
-              <span className="flex items-center gap-1">
-                <span className="text-amber-400/70">🏢</span>
-                <span className="italic text-muted-foreground/80">{signal.organization}</span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {t("speaker")}
+                </p>
+                <p className="truncate text-sm font-semibold text-foreground/90">
+                  {signal.speakerName || (bn ? "অজ্ঞাত বক্তা" : "Unknown speaker")}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {partyLabel}
+                  {signal.district ? ` · ${signal.district}` : ""}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10">
+                <Clock3 className="h-3.5 w-3.5 text-amber-300" />
               </span>
-            )}
-            {signal.district && (
-              <span className="flex items-center gap-1">
-                <span>📍</span>
-                <span>{signal.district}{signal.division ? `, ${signal.division}` : ""}</span>
-              </span>
-            )}
-            {signal.publishedAt && (
-              <span className="flex items-center gap-1 ml-auto">
-                <span>🕐</span>
-                <span className="tabular-nums">
-                  {new Date(signal.publishedAt).toLocaleString(undefined, {
-                    year: "numeric", month: "short", day: "numeric",
-                    hour: "2-digit", minute: "2-digit",
-                  })}
-                </span>
-              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {t("speakerSaidAt")}
+                </p>
+                <p className="text-sm font-semibold tabular-nums text-foreground/90">
+                  {formatSaidAt(signal.publishedAt, locale)}
+                </p>
+                <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <Radio className="h-3 w-3 text-emerald-400" />
+                  Google News
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {signal.factCheckSummary && (
+            <p className="rounded-lg border border-border/30 bg-secondary/10 px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground">
+              <span className="font-semibold text-foreground/80">{t("factCheck")}: </span>
+              {signal.factCheckSummary}
+            </p>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={googleUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/35 bg-sky-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-sky-300 transition hover:bg-sky-500/20"
+            >
+              <Search className="h-3.5 w-3.5" />
+              {t("googleVerify")}
+            </a>
+            {signal.sourceUrl && (
+              <a
+                href={signal.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border/40 bg-secondary/20 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition hover:text-foreground"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                {t("actionEvidence")}
+              </a>
             )}
           </div>
 
-          {/* RAG debunk */}
           {signal.status === "DEBUNKED" && signal.ragDebunk && (
-            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-2.5 space-y-1">
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="space-y-1 rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-2.5"
+            >
               <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
                 <CheckCircle2 className="h-3 w-3" />
                 {t("ragDebunkTitle")}
@@ -343,61 +546,65 @@ function SignalCard({
                 )}
               </div>
               <p className="text-xs leading-relaxed text-emerald-200">{signal.ragDebunk}</p>
-              {signal.ragPolicyRef && (
-                <p className="text-[11px] text-emerald-400/60">📋 {signal.ragPolicyRef}</p>
-              )}
-              {signal.ragSourceRef && (
-                <p className="text-[11px] text-emerald-400/60">🔗 {signal.ragSourceRef}</p>
-              )}
-            </div>
+            </motion.div>
           )}
 
-          {/* Expand body */}
           {signal.body && (
             <div>
-              <button type="button" onClick={() => setExpanded(v => !v)}
-                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+              <button type="button" onClick={() => setExpanded((v) => !v)}
+                className="flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground">
                 <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", expanded && "rotate-180")} />
                 {expanded ? (bn ? "বিস্তারিত লুকান" : "Hide body") : (bn ? "বিস্তারিত দেখুন" : "Show body")}
               </button>
-              {expanded && (
-                <p className="mt-1.5 rounded-lg bg-secondary/20 p-2.5 text-xs leading-relaxed text-muted-foreground border border-border/30">
-                  {signal.body}
-                </p>
-              )}
+              <AnimatePresence>
+                {expanded && (
+                  <motion.p
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-1.5 overflow-hidden rounded-lg border border-border/30 bg-secondary/20 p-2.5 text-xs leading-relaxed text-muted-foreground"
+                  >
+                    {signal.body}
+                  </motion.p>
+                )}
+              </AnimatePresence>
             </div>
           )}
         </div>
 
-        {/* Action buttons */}
         {!isDone && (
           <div className="flex shrink-0 flex-col gap-1.5">
-            <button type="button" onClick={() => onDebunk(signal.id)} disabled={isLoading}
+            <motion.button type="button" whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}
+              onClick={() => onDebunk(signal.id)} disabled={isLoading}
               title={t("actionDebunk")}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 transition-all hover:bg-emerald-500/25 hover:scale-105 disabled:opacity-40">
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 transition-colors hover:bg-emerald-500/25 disabled:opacity-40">
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
-            </button>
-            <button type="button" onClick={() => onEscalate(signal.id)} disabled={isLoading}
+            </motion.button>
+            <motion.button type="button" whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}
+              onClick={() => onEscalate(signal.id)} disabled={isLoading}
               title={t("actionEscalate")}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-violet-500/30 bg-violet-500/10 text-violet-400 transition-all hover:bg-violet-500/25 hover:scale-105 disabled:opacity-40">
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-violet-500/30 bg-violet-500/10 text-violet-400 transition-colors hover:bg-violet-500/25 disabled:opacity-40">
               <Send className="h-4 w-4" />
-            </button>
+            </motion.button>
             {signal.sourceUrl && (
-              <a href={signal.sourceUrl} target="_blank" rel="noopener noreferrer"
+              <motion.a href={signal.sourceUrl} target="_blank" rel="noopener noreferrer"
+                whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}
                 title={t("actionEvidence")}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10 text-sky-400 transition-all hover:bg-sky-500/25 hover:scale-105">
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10 text-sky-400 transition-colors hover:bg-sky-500/25">
                 <ExternalLink className="h-4 w-4" />
-              </a>
+              </motion.a>
             )}
-            <button type="button" onClick={() => onDismiss(signal.id)} disabled={isLoading}
+            <motion.button type="button" whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}
+              onClick={() => onDismiss(signal.id)} disabled={isLoading}
               title={t("actionDismiss")}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/40 text-muted-foreground transition-all hover:border-red-500/30 hover:text-red-400 hover:scale-105 disabled:opacity-40">
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/40 text-muted-foreground transition-colors hover:border-red-500/30 hover:text-red-400 disabled:opacity-40">
               <X className="h-4 w-4" />
-            </button>
+            </motion.button>
           </div>
         )}
       </div>
     </IntelCard>
+    </motion.div>
   );
 }
 
@@ -409,6 +616,7 @@ export function NarrativeShieldPanel() {
 
   const [threatFilter, setThreatFilter] = useState<NarrativeThreatLevel | undefined>(undefined);
   const [catFilter, setCatFilter] = useState<NarrativeCategory | undefined>(undefined);
+  const [partyFilter, setPartyFilter] = useState<NarrativeParty | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [showDebunked, setShowDebunked] = useState(false);
   const [showCharts, setShowCharts] = useState(true);
@@ -417,17 +625,20 @@ export function NarrativeShieldPanel() {
   const [csvLoading, setCsvLoading] = useState(false);
 
   const query = useMemo(() => ({
-    threatLevel: threatFilter, category: catFilter,
-    search: search.length >= 2 ? search : undefined, limit: 100,
-  }), [threatFilter, catFilter, search]);
+    threatLevel: threatFilter,
+    category: catFilter,
+    organization: partyFilter,
+    search: search.length >= 2 ? search : undefined,
+    limit: 100,
+  }), [threatFilter, catFilter, partyFilter, search]);
 
-  const { data, loading, error, reload } = useNarrativeShield(query);
+  const { data, loading, refreshing, error, reload } = useNarrativeShield(query);
   const actions = useNarrativeActions();
+  const ingesting = !!actions.pending["refresh"];
 
-  // Auto-ingest on first mount if DB is empty — brings in demo signals
   useEffect(() => {
     if (!loading && !error && data && data.total === 0) {
-      void actions.refresh(20).catch(() => null);
+      void actions.refresh(20).then(() => reload()).catch(() => null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, error, data?.total]);
@@ -435,18 +646,18 @@ export function NarrativeShieldPanel() {
   const signals = useMemo(() => {
     const all = data?.signals ?? [];
     if (showDebunked) return all;
-    return all.filter(s => s.status !== "DEBUNKED" && s.status !== "DISMISSED");
+    return all.filter((s) => s.status !== "DEBUNKED" && s.status !== "DISMISSED");
   }, [data?.signals, showDebunked]);
 
   const toggleSelect = useCallback((id: string) => {
-    setSelected(prev => {
+    setSelected((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
   }, []);
 
-  const selectAll = useCallback(() => setSelected(new Set(signals.map(s => s.id))), [signals]);
+  const selectAll = useCallback(() => setSelected(new Set(signals.map((s) => s.id))), [signals]);
   const deselectAll = useCallback(() => setSelected(new Set()), []);
   const isAllSelected = signals.length > 0 && selected.size === signals.length;
 
@@ -473,7 +684,7 @@ export function NarrativeShieldPanel() {
     () => actions.bulk(Array.from(selected), action, bn ? "bn" : "en"),
     bn ? `✓ ${selected.size}টি সম্পন্ন` : `✓ ${selected.size} processed`);
   const handleFetch = () => act(() => actions.refresh(20),
-    bn ? "✓ নতুন ফিড আনা হয়েছে" : "✓ Feed ingested");
+    bn ? "✓ Google ফিড আনা হয়েছে" : "✓ Google feed ingested");
   const handleDedup = () => act(() => actions.dedup(),
     bn ? "✓ ডুপ্লিকেট মুছে ফেলা হয়েছে" : "✓ Duplicates removed");
   const handleCsv = async () => {
@@ -482,86 +693,179 @@ export function NarrativeShieldPanel() {
   };
 
   const stats = data?.stats;
+  const busy = ingesting || refreshing;
+  const showBootLoader =
+    (loading && !data) || (ingesting && signals.length === 0);
 
   return (
-    <ModuleShell title={t("title")} description={t("description")}
-      loading={loading} error={error} onRetry={reload}
-      stats={stats ? (
-        <StatGrid>
-          <StatCard label={t("totalActive")} value={stats.total_active} accent="danger" />
-          <StatCard label={t("criticalCount")} value={stats.critical_count} accent="danger" />
-          <StatCard label={t("highCount")} value={stats.high_count} accent="warning" />
-          <StatCard label={t("debunkedToday")} value={stats.debunked_today} accent="success" />
-        </StatGrid>
-      ) : null}>
+    <ModuleShell
+      title={t("title")}
+      description={t("description")}
+      loading={showBootLoader}
+      loadingLabel={ingesting ? t("fetching") : t("loadingSignals")}
+      error={error}
+      onRetry={reload}
+      stats={stats && !showBootLoader ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: t("totalActive"), value: stats.total_active, accent: "danger" as const, delay: 0 },
+            { label: t("criticalCount"), value: stats.critical_count, accent: "danger" as const, delay: 0.08 },
+            { label: t("highCount"), value: stats.high_count, accent: "warning" as const, delay: 0.16 },
+            { label: t("debunkedToday"), value: stats.debunked_today, accent: "success" as const, delay: 0.24 },
+          ].map((s, i) => (
+            <motion.div
+              key={s.label}
+              className={cn(
+                "shield-shimmer-wrap",
+                s.accent === "danger" && "shield-glow",
+              )}
+              initial={{ opacity: 0, y: 22, scale: 0.94 }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                y: [0, -5, 0],
+              }}
+              transition={{
+                opacity: { delay: s.delay, duration: 0.5 },
+                scale: { delay: s.delay, duration: 0.5 },
+                y: {
+                  delay: s.delay + 0.45,
+                  duration: 3.4 + i * 0.35,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                },
+              }}
+              whileHover={{ scale: 1.05, y: -8, transition: { duration: 0.2 } }}
+            >
+              <StatCard label={s.label} value={s.value} accent={s.accent} />
+            </motion.div>
+          ))}
+        </div>
+      ) : null}
+    >
+      {/* Source badge + live pulse */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-wrap items-center gap-2"
+      >
+        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold text-emerald-300">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+          </span>
+          {t("sourceGoogleOnly")}
+        </span>
+        {busy && (
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-amber-300/90">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            {t("loadingSignals")}
+          </span>
+        )}
+      </motion.div>
 
-      {/* ── Threat summary gauges ── */}
+      <LiveScanBanner bn={bn} active={ingesting} />
+
       {signals.length > 0 && <ThreatSummaryRow signals={signals} />}
 
-      {/* ── Charts toggle + charts ── */}
       {signals.length > 0 && (
         <div className="space-y-2">
-          <button type="button" onClick={() => setShowCharts(v => !v)}
-            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+          <button type="button" onClick={() => setShowCharts((v) => !v)}
+            className="flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground">
             <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showCharts && "rotate-180")} />
             {showCharts ? (bn ? "চার্ট লুকান" : "Hide charts") : (bn ? "চার্ট দেখুন" : "Show charts")}
           </button>
-          {showCharts && <ShieldCharts signals={signals} bn={bn} />}
+          <AnimatePresence>
+            {showCharts && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+              >
+                <ShieldCharts signals={signals} bn={bn} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
-      {/* ── Toolbar ── */}
       <div className="space-y-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          <input type="search" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder={t("searchPlaceholder")}
-            className="h-9 flex-1 min-w-[200px] rounded-lg border border-border/60 bg-secondary/30 px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all" />
+          <div className="relative min-w-[200px] flex-1 overflow-hidden rounded-lg">
+            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder={t("searchPlaceholder")}
+              className="relative z-10 h-9 w-full rounded-lg border border-border/60 bg-secondary/30 px-3 text-sm outline-none transition-all placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/20" />
+            {busy && (
+              <motion.div
+                className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-r from-transparent via-primary/15 to-transparent"
+                initial={{ x: "-100%" }}
+                animate={{ x: "100%" }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: "linear" }}
+              />
+            )}
+          </div>
           <Button size="sm" variant="outline" onClick={handleFetch}
-            disabled={!!actions.pending["refresh"]} className="gap-1.5 text-xs h-9">
-            {actions.pending["refresh"]
+            disabled={ingesting} className="h-9 gap-1.5 text-xs">
+            {ingesting
               ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
               : <Zap className="h-3.5 w-3.5 text-amber-400" />}
-            {actions.pending["refresh"] ? t("fetching") : t("fetchNow")}
+            {ingesting ? t("fetching") : t("fetchNow")}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setShowDebunked(v => !v)}
-            className="gap-1.5 text-xs text-muted-foreground h-9">
+          <Button size="sm" variant="ghost" onClick={() => setShowDebunked((v) => !v)}
+            className="h-9 gap-1.5 text-xs text-muted-foreground">
             {showDebunked ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             {showDebunked ? t("hideDebunked") : t("showDebunked")}
           </Button>
           <Button size="sm" variant="ghost" onClick={handleDedup}
-            className="gap-1.5 text-xs text-muted-foreground h-9">
+            className="h-9 gap-1.5 text-xs text-muted-foreground">
             <Database className="h-3.5 w-3.5" />
             {t("dedup")}
           </Button>
           <Button size="sm" variant="ghost" onClick={handleCsv} disabled={csvLoading}
-            className="gap-1.5 text-xs text-muted-foreground h-9">
+            className="h-9 gap-1.5 text-xs text-muted-foreground">
             {csvLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
             {t("exportCsv")}
           </Button>
           <Button size="sm" variant="ghost" onClick={reload}
-            className="gap-1.5 text-xs text-muted-foreground h-9 px-2">
-            <RefreshCw className="h-3.5 w-3.5" />
+            className="h-9 gap-1.5 px-2 text-xs text-muted-foreground">
+            <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
           </Button>
         </div>
 
-        {/* Threat filters */}
+        {/* Party filters */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+            {t("filterParty")}
+          </span>
+          <Chip active={!partyFilter} onClick={() => setPartyFilter(undefined)}>
+            {t("filterAll")}
+          </Chip>
+          {PARTY_ORDER.map((party) => (
+            <Chip key={party} active={partyFilter === party}
+              onClick={() => setPartyFilter(partyFilter === party ? undefined : party)}>
+              <span className="mr-1 inline-block h-2 w-2 rounded-full"
+                style={{ backgroundColor: PARTY_COLORS[party] }} />
+              {bn ? PARTY_LABELS_BN[party] : PARTY_LABELS_EN[party]}
+            </Chip>
+          ))}
+        </div>
+
         <div className="flex flex-wrap gap-1.5">
           <Chip active={!threatFilter} onClick={() => setThreatFilter(undefined)}>
             {t("filterAll")}
           </Chip>
-          {THREAT_LEVEL_ORDER.map(lvl => (
+          {THREAT_LEVEL_ORDER.map((lvl) => (
             <Chip key={lvl} active={threatFilter === lvl}
               onClick={() => setThreatFilter(threatFilter === lvl ? undefined : lvl)}>
-              <span className="mr-1 h-2 w-2 rounded-full inline-block"
+              <span className="mr-1 inline-block h-2 w-2 rounded-full"
                 style={{ backgroundColor: THREAT_COLORS[lvl] }} />
               {lvl}
             </Chip>
           ))}
         </div>
 
-        {/* Category filters */}
         <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(CATEGORY_LABELS_EN) as NarrativeCategory[]).map(cat => (
+          {(Object.keys(CATEGORY_LABELS_EN) as NarrativeCategory[]).map((cat) => (
             <Chip key={cat} active={catFilter === cat}
               onClick={() => setCatFilter(catFilter === cat ? undefined : cat)}
               className={catFilter !== cat ? CAT_BG[cat] : undefined}>
@@ -571,50 +875,63 @@ export function NarrativeShieldPanel() {
         </div>
       </div>
 
-      {/* ── Bulk action bar ── */}
-      {selected.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/8 px-4 py-2.5">
-          <span className="text-sm font-semibold text-primary">
-            {t("selectedCount", { count: selected.size })}
-          </span>
-          <div className="ml-auto flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => void handleBulk("DEBUNK")}
-              className="gap-1.5 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 text-xs">
-              <Shield className="h-3.5 w-3.5" />{t("bulkDebunk")}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => void handleBulk("ESCALATE")}
-              className="gap-1.5 border-violet-500/40 text-violet-400 hover:bg-violet-500/10 text-xs">
-              <Send className="h-3.5 w-3.5" />{t("bulkEscalate")}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => void handleBulk("DISMISS")}
-              className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs">
-              <Trash2 className="h-3.5 w-3.5" />{t("bulkDismiss")}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={deselectAll} className="text-xs text-muted-foreground px-2">
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {selected.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/8 px-4 py-2.5"
+          >
+            <span className="text-sm font-semibold text-primary">
+              {t("selectedCount", { count: selected.size })}
+            </span>
+            <div className="ml-auto flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => void handleBulk("DEBUNK")}
+                className="gap-1.5 border-emerald-500/40 text-xs text-emerald-400 hover:bg-emerald-500/10">
+                <Shield className="h-3.5 w-3.5" />{t("bulkDebunk")}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => void handleBulk("ESCALATE")}
+                className="gap-1.5 border-violet-500/40 text-xs text-violet-400 hover:bg-violet-500/10">
+                <Send className="h-3.5 w-3.5" />{t("bulkEscalate")}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => void handleBulk("DISMISS")}
+                className="gap-1.5 border-red-500/40 text-xs text-red-400 hover:bg-red-500/10">
+                <Trash2 className="h-3.5 w-3.5" />{t("bulkDismiss")}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={deselectAll} className="px-2 text-xs text-muted-foreground">
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* ── Action toast ── */}
-      {actionMsg && (
-        <div className={cn("flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium animate-fade-in",
-          actionMsg.ok
-            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-            : "border-red-500/30 bg-red-500/10 text-red-300")}>
-          {actionMsg.ok
-            ? <CheckCircle2 className="h-4 w-4 shrink-0" />
-            : <AlertTriangle className="h-4 w-4 shrink-0" />}
-          {actionMsg.text}
-        </div>
-      )}
+      <AnimatePresence>
+        {actionMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className={cn(
+              "flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium",
+              actionMsg.ok
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                : "border-red-500/30 bg-red-500/10 text-red-300",
+            )}
+          >
+            {actionMsg.ok
+              ? <CheckCircle2 className="h-4 w-4 shrink-0" />
+              : <AlertTriangle className="h-4 w-4 shrink-0" />}
+            {actionMsg.text}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* ── Select-all row ── */}
       {signals.length > 0 && (
-        <div className="flex items-center gap-3 text-xs text-muted-foreground border-b border-border/30 pb-2">
+        <div className="flex items-center gap-3 border-b border-border/30 pb-2 text-xs text-muted-foreground">
           <button type="button" onClick={isAllSelected ? deselectAll : selectAll}
-            className="flex items-center gap-1.5 hover:text-foreground transition-colors">
+            className="flex items-center gap-1.5 transition-colors hover:text-foreground">
             {isAllSelected
               ? <SquareCheck className="h-3.5 w-3.5 text-primary" />
               : <Square className="h-3.5 w-3.5" />}
@@ -624,40 +941,56 @@ export function NarrativeShieldPanel() {
         </div>
       )}
 
-      {/* ── Signals list ── */}
       {signals.length === 0 && !loading ? (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-border/40 bg-secondary/10 py-16 text-center">
-          <div className="rounded-full border border-border/40 bg-secondary/30 p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center gap-4 rounded-2xl border border-border/40 bg-secondary/10 py-16 text-center"
+        >
+          <motion.div
+            animate={{ rotate: [0, 4, -4, 0], scale: [1, 1.04, 1] }}
+            transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+            className="rounded-full border border-border/40 bg-secondary/30 p-4"
+          >
             <ShieldOff className="h-10 w-10 text-muted-foreground/40" />
-          </div>
+          </motion.div>
           <div className="space-y-1">
             <p className="font-semibold text-foreground/80">
-              {search || threatFilter || catFilter ? t("noFilterResults") : t("noSignals")}
+              {search || threatFilter || catFilter || partyFilter ? t("noFilterResults") : t("noSignals")}
             </p>
             <p className="text-sm text-muted-foreground">
-              {bn ? "নতুন ফিড আনতে নিচের বাটন চাপুন" : "Click below to ingest new signals"}
+              {bn ? "Google News থেকে নতুন ফিড আনতে বাটন চাপুন" : "Click below to ingest Google News signals"}
             </p>
           </div>
-          {!search && !threatFilter && !catFilter && (
+          {!search && !threatFilter && !catFilter && !partyFilter && (
             <Button size="sm" variant="outline" onClick={handleFetch} className="gap-1.5 text-xs">
               <Zap className="h-3.5 w-3.5 text-amber-400" />{t("fetchNow")}
             </Button>
           )}
-        </div>
+        </motion.div>
       ) : (
-        <div className="space-y-2">
-          {signals.map(signal => (
-            <SignalCard key={signal.id} signal={signal}
-              selected={selected.has(signal.id)} onSelect={toggleSelect}
-              onDebunk={handleDebunk} onEscalate={handleEscalate}
-              onDismiss={handleDismiss} pending={actions.pending} bn={bn} t={t} />
+        <div className="space-y-2.5">
+          {signals.map((signal, i) => (
+            <SignalCard
+              key={signal.id}
+              signal={signal}
+              index={i}
+              selected={selected.has(signal.id)}
+              onSelect={toggleSelect}
+              onDebunk={handleDebunk}
+              onEscalate={handleEscalate}
+              onDismiss={handleDismiss}
+              pending={actions.pending}
+              bn={bn}
+              locale={locale}
+              t={t}
+            />
           ))}
         </div>
       )}
 
-      {/* ── Audit trail hint ── */}
       {signals.length > 0 && (
-        <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50 border-t border-border/20 pt-3">
+        <p className="flex items-center gap-1.5 border-t border-border/20 pt-3 text-[11px] text-muted-foreground/50">
           <AlertTriangle className="h-3 w-3 shrink-0" />
           {t("auditTrailHint")}
         </p>

@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
 import { getUnitById } from "@/lib/admin-units";
+import { apiClient } from "@/lib/api-client";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import {
   BANGLADESH_DIVISIONS_DATA,
   LIVE_INCIDENT_ALERTS,
@@ -40,6 +42,20 @@ export interface CitizenReportPayload {
   urgency: "critical" | "warning" | "info";
 }
 
+export interface DivisionalLivePulse {
+  generatedAt: string;
+  lookbackHours: number;
+  sources: string[];
+  divisions: Array<{
+    division: string;
+    riskScore: number;
+  }>;
+}
+
+function canonicalDivisionName(name: string): string {
+  return name.toLowerCase().replace("chittagong", "chattogram").trim();
+}
+
 export function useDivisionalCrisis() {
   const { filter: globalAdminFilter } = useAdminFilter();
 
@@ -56,6 +72,30 @@ export function useDivisionalCrisis() {
   const [compareDivisionIds, setCompareDivisionIds] = useState<[string, string] | null>(null);
   const [selectedDistrict, setSelectedDistrict] = useState<DistrictInfo | null>(null);
   const [alertsList, setAlertsList] = useState<LiveIncidentAlert[]>(LIVE_INCIDENT_ALERTS);
+  const [livePulse, setLivePulse] = useState<DivisionalLivePulse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [liveError, setLiveError] = useState<string | null>(null);
+
+  const loadLivePulse = useCallback(async () => {
+    setLoading(true);
+    setLiveError(null);
+    try {
+      const response = await apiClient<{ success: boolean; data: DivisionalLivePulse }>(
+        "divisional-crisis/pulse",
+      );
+      setLivePulse(response.data);
+    } catch (error) {
+      setLivePulse(null);
+      setLiveError(error instanceof Error ? error.message : "Live crisis data unavailable");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLivePulse();
+  }, [loadLivePulse]);
+  useRealtimeRefresh(loadLivePulse, true, true);
 
   // Speech synthesis state
   const [isSpeechPlaying, setIsSpeechPlaying] = useState(false);
@@ -68,7 +108,25 @@ export function useDivisionalCrisis() {
     gasUnitsShifted: 10,
   });
 
-  const divisions = BANGLADESH_DIVISIONS_DATA;
+  const divisions = useMemo(
+    () =>
+      BANGLADESH_DIVISIONS_DATA.map((division) => {
+        const live = livePulse?.divisions.find(
+          (item) => canonicalDivisionName(item.division) === canonicalDivisionName(division.nameEn),
+        );
+        if (!live) return division;
+
+        return {
+          ...division,
+          // Live score derives from current weather, verified signals and
+          // grievance news; baseline crime/resource values stay labelled estimates.
+          overallSeverityScore: Math.round(
+            division.overallSeverityScore * 0.7 + live.riskScore * 0.3,
+          ),
+        };
+      }),
+    [livePulse],
+  );
 
   // Resolve global top bar division selection if active
   const globalDivisionUnit = useMemo(() => {
@@ -400,6 +458,10 @@ export function useDivisionalCrisis() {
   }, [compareDivisionIds, divisionsWithModifiers]);
 
   return {
+    loading,
+    livePulse,
+    liveError,
+    reloadLivePulse: loadLivePulse,
     divisions,
     filteredDivisions,
     filters,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
@@ -14,6 +14,38 @@ export type NarrativeCategory =
   | "RELIGIOUS_EXTREMISM"
   | "ELECTORAL_MANIPULATION";
 export type NarrativeSignalStatus = "ACTIVE" | "DEBUNKED" | "ESCALATED" | "DISMISSED";
+export type NarrativeFactCheckStatus =
+  | "AUTHENTIC"
+  | "NEEDS_REVIEW"
+  | "LIKELY_DISINFO"
+  | "UNVERIFIED";
+
+/** Political party affiliation for the speaker / claim origin */
+export type NarrativeParty = "BNP" | "JAMAAT" | "NCP" | "OTHER";
+
+export const PARTY_ORDER: NarrativeParty[] = ["BNP", "JAMAAT", "NCP", "OTHER"];
+
+export const PARTY_LABELS_BN: Record<NarrativeParty, string> = {
+  BNP: "বিএনপি",
+  JAMAAT: "জামায়াত",
+  NCP: "এনসিপি",
+  OTHER: "অন্যান্য",
+};
+
+export const PARTY_LABELS_EN: Record<NarrativeParty, string> = {
+  BNP: "BNP",
+  JAMAAT: "Jamaat",
+  NCP: "NCP",
+  OTHER: "Other",
+};
+
+export function normalizeParty(org: string | null | undefined): NarrativeParty {
+  const v = (org ?? "").trim().toUpperCase();
+  if (v === "BNP" || v.includes("বিএনপি")) return "BNP";
+  if (v === "JAMAAT" || v.includes("জামা") || v.includes("JAMAAT")) return "JAMAAT";
+  if (v === "NCP" || v.includes("এনসিপি")) return "NCP";
+  return "OTHER";
+}
 
 // ── Data shapes ───────────────────────────────────────────────────────────────
 export interface NarrativeSignal {
@@ -33,6 +65,12 @@ export interface NarrativeSignal {
   category: NarrativeCategory;
   status: NarrativeSignalStatus;
   confidenceScore: string;
+  factCheckStatus?: NarrativeFactCheckStatus;
+  authenticityScore?: string;
+  googleVerifyUrl?: string | null;
+  factCheckSummary?: string | null;
+  evidenceUrls?: string[] | null;
+  factCheckedAt?: string | null;
   ragDebunk: string | null;
   ragConfidence: string | null;
   ragPolicyRef: string | null;
@@ -90,22 +128,28 @@ function buildQs(q: FeedQuery): string {
 export function useNarrativeShield(query: FeedQuery = {}) {
   const [data, setData] = useState<ShieldFeed | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasDataRef = useRef(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError(null);
+    if (hasDataRef.current) setRefreshing(true);
+    else setLoading(true);
     try {
       const qs = buildQs(query);
       const json = await apiClient<{ success: boolean; data: ShieldFeed }>(
         `narrative-shield/feed${qs}`,
       );
       setData(json.data);
+      hasDataRef.current = true;
     } catch (err) {
       setData(null);
+      hasDataRef.current = false;
       setError(err instanceof Error ? err.message : "Narrative Shield feed unavailable");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -124,13 +168,7 @@ export function useNarrativeShield(query: FeedQuery = {}) {
 
   useRealtimeRefresh(load);
 
-  // Poll every 30 s so new signals ingested by pipeline appear automatically
-  useEffect(() => {
-    const timer = setInterval(() => { void load(); }, 30_000);
-    return () => clearInterval(timer);
-  }, [load]);
-
-  return { data, loading, error, reload: load };
+  return { data, loading, refreshing, error, reload: load };
 }
 
 // ── Action hooks ──────────────────────────────────────────────────────────────
@@ -244,6 +282,33 @@ export const CATEGORY_LABELS_EN: Record<NarrativeCategory, string> = {
   RELIGIOUS_EXTREMISM: "Religious Extremism",
   ELECTORAL_MANIPULATION: "Electoral Manipulation",
 };
+
+export const FACT_CHECK_LABELS_BN: Record<NarrativeFactCheckStatus, string> = {
+  AUTHENTIC: "যাচাইকৃত",
+  NEEDS_REVIEW: "পর্যালোচনা প্রয়োজন",
+  LIKELY_DISINFO: "সম্ভাব্য অপপ্রচার",
+  UNVERIFIED: "অযাচাইকৃত",
+};
+
+export const FACT_CHECK_LABELS_EN: Record<NarrativeFactCheckStatus, string> = {
+  AUTHENTIC: "Authentic",
+  NEEDS_REVIEW: "Needs review",
+  LIKELY_DISINFO: "Likely disinfo",
+  UNVERIFIED: "Unverified",
+};
+
+/** Client-side Google News (Bangla) verify URL — prefers Bengali title. */
+export function buildGoogleVerifyUrl(
+  title: string,
+  speakerName?: string | null,
+  titleBn?: string | null,
+): string {
+  const claim = (titleBn?.trim() || title.trim());
+  const parts = [claim];
+  if (speakerName?.trim()) parts.push(speakerName.trim());
+  const q = encodeURIComponent(parts.join(" "));
+  return `https://news.google.com/search?q=${q}&hl=bn&gl=BD&ceid=BD:bn`;
+}
 
 export const PLATFORM_LABELS: Record<string, string> = {
   Facebook: "Facebook",

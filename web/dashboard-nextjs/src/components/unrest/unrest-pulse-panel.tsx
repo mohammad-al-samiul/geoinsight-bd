@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useUnrestPulse, type ProtestMovement } from "@/hooks/use-unrest-pulse";
 import { IntelCard } from "@/components/ui/intel-card";
+import { FloatCard } from "@/components/ui/module-motion";
 import { SourceLink } from "@/components/ui/source-link";
 import { cn } from "@/lib/utils";
 import { chartTooltipProps } from "@/lib/chart-tooltip";
@@ -300,8 +301,8 @@ export function UnrestPulsePanel() {
                         </span>
                       </div>
                       <div className="grid gap-3 lg:grid-cols-2">
-                        {group.items.map((m) => (
-                          <MovementCard key={m.id} movement={m} locale={locale} t={t} />
+                        {group.items.map((m, idx) => (
+                          <MovementCard key={m.id} movement={m} locale={locale} t={t} index={idx} />
                         ))}
                       </div>
                     </div>
@@ -349,10 +350,12 @@ function MovementCard({
   movement,
   locale,
   t,
+  index = 0,
 }: {
   movement: ProtestMovement;
   locale: string;
   t: (key: string) => string;
+  index?: number;
 }) {
   const bn = locale === "bn";
   const statusClass =
@@ -367,10 +370,13 @@ function MovementCard({
     movement.impact.homes_damaged > 0 || movement.impact.damage_mentions > 0;
 
   return (
+    <FloatCard index={index} danger={movement.status === "active"}>
     <IntelCard
       accent={movement.status === "active" ? "danger" : hasCasualties ? "warning" : "default"}
       padding="md"
       hoverLift={false}
+      float={false}
+      shimmer={false}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -449,6 +455,7 @@ function MovementCard({
         </ul>
       )}
     </IntelCard>
+    </FloatCard>
   );
 }
 

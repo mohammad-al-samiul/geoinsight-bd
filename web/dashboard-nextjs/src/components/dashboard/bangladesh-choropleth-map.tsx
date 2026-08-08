@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
-import { MapPin } from "lucide-react";
+import { CircleAlert, Layers3, MapPin } from "lucide-react";
 import { MapSkeleton } from "@/components/ui/skeleton";
 import { getVisibleGeoJson, getUnitScoreOverlayVersion } from "@/lib/geojson-bd";
 import { getDrillChildType } from "@/lib/filter-utils";
@@ -46,7 +46,7 @@ export function BangladeshChoroplethMap({
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold text-foreground">
-            Geospatial Performance Map
+            জাতীয় কর্মদক্ষতা ও ঝুঁকি মানচিত্র
           </h3>
         </div>
         <Badge variant="outline" className="border-primary/30 text-[10px] text-primary">
@@ -64,24 +64,19 @@ export function BangladeshChoroplethMap({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-border/60 px-4 py-2.5 text-[10px] text-muted-foreground">
-        <span className="font-medium text-foreground">Performance</span>
-        {[
-          { label: "≥75%", color: "#10b981" },
-          { label: "60–74%", color: "#34d399" },
-          { label: "45–59%", color: "#fbbf24" },
-          { label: "30–44%", color: "#f97316" },
-          { label: "<30%", color: "#ef4444" },
-        ].map((item) => (
-          <span key={item.label} className="flex items-center gap-1">
-            <span
-              className="inline-block h-2.5 w-2.5 rounded-sm"
-              style={{ backgroundColor: item.color }}
-            />
-            {item.label}
-          </span>
-        ))}
-        <span className="ml-auto">Click boundary to drill down</span>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/60 px-4 py-2.5 text-[10px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+          <Layers3 className="h-3.5 w-3.5 text-primary" />
+          এলাকা সীমা
+        </span>
+        <span className="inline-flex items-center gap-1 text-sky-200">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm border border-sky-300/80 bg-sky-500/15" />
+          নিরপেক্ষ এলাকা সীমানা
+        </span>
+        <span className="inline-flex items-center gap-1 text-orange-200">
+          <CircleAlert className="h-3 w-3" /> কমলা/লাল marker = সমস্যা ক্লাস্টার
+        </span>
+        <span className="ml-auto">marker-এ ক্লিক করে সব সমস্যা দেখুন · এলাকায় ক্লিক করে drill-down</span>
       </div>
     </div>
   );

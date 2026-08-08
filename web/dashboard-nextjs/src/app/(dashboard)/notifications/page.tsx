@@ -10,7 +10,7 @@ export default function NotificationsPage() {
         </p>
       </div>
       <div className="rounded-2xl border border-border/80 bg-background/70 p-4 shadow-sm">
-        <NotificationCenter inline />
+        <NotificationCenter inline fullScreenLoading />
       </div>
     </div>
   );

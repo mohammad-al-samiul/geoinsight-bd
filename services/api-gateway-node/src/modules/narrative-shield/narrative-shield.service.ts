@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import {
   NarrativeCategory,
+  NarrativeFactCheckStatus,
   NarrativeSignalStatus,
   NarrativeThreatLevel,
   type NarrativeSignal,
@@ -12,7 +13,7 @@ import { broadcastDashboardRefresh } from "../pipeline/pipeline.broadcast";
 import { fetchAi, AI_FETCH_LLM_MS } from "../../shared/http/fetch-ai";
 
 // ── Cache config ──────────────────────────────────────────────────────────────
-const FEED_CACHE_KEY = "narrative-shield:feed:v2";
+const FEED_CACHE_KEY = "narrative-shield:feed:v3";
 const STATS_CACHE_KEY = "narrative-shield:stats:v1";
 const STATS_TTL_SEC = 60;
 
@@ -48,6 +49,12 @@ export type NarrativeSignalRow = Pick<
   | "category"
   | "status"
   | "confidenceScore"
+  | "factCheckStatus"
+  | "authenticityScore"
+  | "googleVerifyUrl"
+  | "factCheckSummary"
+  | "evidenceUrls"
+  | "factCheckedAt"
   | "ragDebunk"
   | "ragConfidence"
   | "ragPolicyRef"
@@ -100,8 +107,15 @@ interface AiIngestResult {
     category: string;
     confidence_score: number;
     published_at: string | null;
+    fact_check_status?: string;
+    authenticity_score?: number;
+    google_verify_url?: string | null;
+    fact_check_summary?: string | null;
+    evidence_urls?: string[];
+    fact_checked_at?: string | null;
   }>;
   skipped_duplicates: number;
+  skipped_unauthentic?: number;
 }
 
 interface AiDebunkResult {
@@ -148,12 +162,15 @@ export class NarrativeShieldService {
     const limit = Math.min(query.limit ?? FEED_PAGE_SIZE, 200);
     const offset = query.offset ?? 0;
 
-    const where: Prisma.NarrativeSignalWhereInput = {};
+    const where: Prisma.NarrativeSignalWhereInput = {
+      // Product rule: Narrative Shield feed is Google-sourced only
+      sourcePlatform: { contains: "Google", mode: "insensitive" },
+    };
     if (query.status) where.status = query.status;
     if (query.threatLevel) where.threatLevel = query.threatLevel;
     if (query.category) where.category = query.category;
     if (query.organization) {
-      where.organization = { contains: query.organization, mode: "insensitive" };
+      where.organization = { equals: query.organization, mode: "insensitive" };
     }
     if (query.search) {
       where.OR = [
@@ -175,6 +192,8 @@ export class NarrativeShieldService {
           sourceUrl: true, sourceName: true, sourcePlatform: true,
           speakerName: true, organization: true, district: true, division: true,
           threatLevel: true, category: true, status: true, confidenceScore: true,
+          factCheckStatus: true, authenticityScore: true, googleVerifyUrl: true,
+          factCheckSummary: true, evidenceUrls: true, factCheckedAt: true,
           ragDebunk: true, ragConfidence: true, ragPolicyRef: true, ragSourceRef: true,
           escalatedAt: true, debunkedAt: true, dismissedAt: true,
           publishedAt: true, fetchedAt: true, createdAt: true,
@@ -196,15 +215,16 @@ export class NarrativeShieldService {
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
+    const googleOnly = { sourcePlatform: { contains: "Google", mode: "insensitive" as const } };
 
     const [active, critical, high, debunkedToday, escalated, byCat, byOrg] = await Promise.all([
-      prismaRead.narrativeSignal.count({ where: { status: "ACTIVE" } }),
-      prismaRead.narrativeSignal.count({ where: { status: "ACTIVE", threatLevel: "CRITICAL" } }),
-      prismaRead.narrativeSignal.count({ where: { status: "ACTIVE", threatLevel: "HIGH" } }),
-      prismaRead.narrativeSignal.count({ where: { status: "DEBUNKED", debunkedAt: { gte: todayStart } } }),
-      prismaRead.narrativeSignal.count({ where: { status: "ESCALATED", escalatedAt: { not: null } } }),
-      prismaRead.narrativeSignal.groupBy({ by: ["category"], where: { status: "ACTIVE" }, _count: { id: true }, orderBy: { _count: { id: "desc" } }, take: 1 }),
-      prismaRead.narrativeSignal.groupBy({ by: ["organization"], where: { status: "ACTIVE", organization: { not: null } }, _count: { id: true }, orderBy: { _count: { id: "desc" } }, take: 1 }),
+      prismaRead.narrativeSignal.count({ where: { status: "ACTIVE", ...googleOnly } }),
+      prismaRead.narrativeSignal.count({ where: { status: "ACTIVE", threatLevel: "CRITICAL", ...googleOnly } }),
+      prismaRead.narrativeSignal.count({ where: { status: "ACTIVE", threatLevel: "HIGH", ...googleOnly } }),
+      prismaRead.narrativeSignal.count({ where: { status: "DEBUNKED", debunkedAt: { gte: todayStart }, ...googleOnly } }),
+      prismaRead.narrativeSignal.count({ where: { status: "ESCALATED", escalatedAt: { not: null }, ...googleOnly } }),
+      prismaRead.narrativeSignal.groupBy({ by: ["category"], where: { status: "ACTIVE", ...googleOnly }, _count: { id: true }, orderBy: { _count: { id: "desc" } }, take: 1 }),
+      prismaRead.narrativeSignal.groupBy({ by: ["organization"], where: { status: "ACTIVE", organization: { not: null }, ...googleOnly }, _count: { id: true }, orderBy: { _count: { id: "desc" } }, take: 1 }),
     ]);
 
     const stats: ShieldFeed["stats"] = {
@@ -234,12 +254,23 @@ export class NarrativeShieldService {
     }
 
     let upserted = 0;
+    let skippedNonGoogle = 0;
     for (const s of aiResult.signals) {
+      if (!String(s.source_platform ?? "").toLowerCase().includes("google")) {
+        skippedNonGoogle += 1;
+        continue;
+      }
+
       // Validate enum values before upsert
       const threatLevel = Object.values(NarrativeThreatLevel).includes(s.threat_level as NarrativeThreatLevel)
         ? (s.threat_level as NarrativeThreatLevel) : NarrativeThreatLevel.MEDIUM;
       const category = Object.values(NarrativeCategory).includes(s.category as NarrativeCategory)
         ? (s.category as NarrativeCategory) : NarrativeCategory.ANTI_GOVT_INCITEMENT;
+      const factCheckStatus = Object.values(NarrativeFactCheckStatus).includes(
+        s.fact_check_status as NarrativeFactCheckStatus,
+      )
+        ? (s.fact_check_status as NarrativeFactCheckStatus)
+        : NarrativeFactCheckStatus.UNVERIFIED;
 
       try {
         await prismaWrite.narrativeSignal.upsert({
@@ -250,8 +281,8 @@ export class NarrativeShieldService {
             titleBn: s.title_bn,
             body: s.body,
             sourceUrl: s.source_url,
-            sourceName: s.source_name,
-            sourcePlatform: s.source_platform,
+            sourceName: s.source_name || "Google News",
+            sourcePlatform: "Google",
             speakerName: s.speaker_name,
             organization: s.organization,
             district: s.district,
@@ -259,13 +290,30 @@ export class NarrativeShieldService {
             threatLevel,
             category,
             confidenceScore: s.confidence_score,
+            factCheckStatus,
+            authenticityScore: s.authenticity_score ?? 0,
+            googleVerifyUrl: s.google_verify_url ?? null,
+            factCheckSummary: s.fact_check_summary ?? null,
+            evidenceUrls: s.evidence_urls ?? [],
+            factCheckedAt: s.fact_checked_at ? new Date(s.fact_checked_at) : new Date(),
             publishedAt: s.published_at ? new Date(s.published_at) : null,
           },
           update: {
             titleBn: s.title_bn ?? undefined,
+            sourceName: s.source_name || "Google News",
+            sourcePlatform: "Google",
+            speakerName: s.speaker_name ?? undefined,
+            organization: s.organization ?? undefined,
+            publishedAt: s.published_at ? new Date(s.published_at) : undefined,
             threatLevel,
             category,
             confidenceScore: s.confidence_score,
+            factCheckStatus,
+            authenticityScore: s.authenticity_score ?? 0,
+            googleVerifyUrl: s.google_verify_url ?? undefined,
+            factCheckSummary: s.fact_check_summary ?? undefined,
+            evidenceUrls: s.evidence_urls ?? undefined,
+            factCheckedAt: s.fact_checked_at ? new Date(s.fact_checked_at) : new Date(),
           },
         });
         upserted += 1;
@@ -283,6 +331,8 @@ export class NarrativeShieldService {
     return {
       ingested: upserted,
       skipped_duplicates: aiResult.skipped_duplicates,
+      skipped_non_google: skippedNonGoogle,
+      skipped_unauthentic: aiResult.skipped_unauthentic ?? 0,
       ai_total: aiResult.ingested,
     };
   }
@@ -454,6 +504,7 @@ export class NarrativeShieldService {
         id: true, title: true, titleBn: true, sourceName: true, sourcePlatform: true,
         speakerName: true, organization: true, district: true, division: true,
         threatLevel: true, category: true, status: true, confidenceScore: true,
+        factCheckStatus: true, authenticityScore: true, googleVerifyUrl: true,
         ragDebunk: true, ragConfidence: true, ragPolicyRef: true,
         publishedAt: true, fetchedAt: true,
       },
@@ -466,6 +517,7 @@ export class NarrativeShieldService {
       "id", "title", "title_bn", "source_name", "source_platform",
       "speaker_name", "organization", "district", "division",
       "threat_level", "category", "status", "confidence_score",
+      "fact_check_status", "authenticity_score", "google_verify_url",
       "rag_debunk", "rag_confidence", "rag_policy_ref",
       "published_at", "fetched_at",
     ].map(esc).join(",");
@@ -475,6 +527,7 @@ export class NarrativeShieldService {
         s.id, s.title, s.titleBn, s.sourceName, s.sourcePlatform,
         s.speakerName, s.organization, s.district, s.division,
         s.threatLevel, s.category, s.status, s.confidenceScore,
+        s.factCheckStatus, s.authenticityScore, s.googleVerifyUrl,
         s.ragDebunk, s.ragConfidence, s.ragPolicyRef,
         s.publishedAt?.toISOString(), s.fetchedAt.toISOString(),
       ].map(esc).join(","),

@@ -1,9 +1,9 @@
 "use client";
 
 import { Suspense, type ReactNode } from "react";
-import { useTranslations } from "next-intl";
 import { AuthProvider } from "@/hooks/use-auth";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { ModuleCinematicLoader } from "@/components/ui/module-motion";
 
 function DashboardLayoutInner({ children }: { children: ReactNode }) {
   return (
@@ -14,11 +14,12 @@ function DashboardLayoutInner({ children }: { children: ReactNode }) {
 }
 
 function LoadingFallback() {
-  const t = useTranslations("shell");
   return (
-    <div className="flex h-screen items-center justify-center bg-background text-muted-foreground">
-      {t("loadingShell")}
-    </div>
+    <ModuleCinematicLoader
+      bn
+      fullScreen
+      label="কমান্ড সেন্টার প্রস্তুত হচ্ছে…"
+    />
   );
 }
 

@@ -15,12 +15,17 @@ import {
   saveIntelSnapshot,
 } from "../intel/intel-snapshot.service";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
+import {
+  isBangladeshRelevantArticle,
+  looksLikeGovProject,
+} from "../../shared/geo/bangladesh-relevance";
 
 export interface MorningBriefingQuery extends DashboardScopeQuery {
   lang?: "bn" | "en";
 }
 
 const BRIEFING_TTL_SEC = 900;
+const BRIEFING_CACHE_VER = "v3";
 
 const COMMODITY_BN: Record<string, string> = {
   Rice: "চাল",
@@ -99,7 +104,7 @@ export class BriefingService {
     const lang = query.lang ?? "bn";
     const unitId = scopeUnitId(query);
     const scopeKey = unitId ?? "national";
-    const cacheKey = `briefing:morning:v2:${lang}:${scopeKey}`;
+    const cacheKey = `briefing:morning:${BRIEFING_CACHE_VER}:${lang}:${scopeKey}`;
 
     if (isRedisEnabled()) {
       const cached = await getRedisClient().get(cacheKey);
@@ -153,8 +158,11 @@ export class BriefingService {
   async refreshMorningBriefing(lang: "bn" | "en" = "bn"): Promise<Record<string, unknown>> {
     if (isRedisEnabled()) {
       const redis = getRedisClient();
-      const keys = await redis.keys(`briefing:morning:v2:${lang}:*`);
+      const keys = await redis.keys(`briefing:morning:${BRIEFING_CACHE_VER}:${lang}:*`);
       if (keys.length) await redis.del(...keys);
+      // Also clear prior cache versions so football/world noise cannot linger.
+      const legacy = await redis.keys(`briefing:morning:v2:${lang}:*`);
+      if (legacy.length) await redis.del(...legacy);
     }
     const data = await this.buildMorningBriefing({ lang });
     await saveIntelSnapshot({
@@ -169,7 +177,7 @@ export class BriefingService {
     });
     if (isRedisEnabled()) {
       await getRedisClient().setex(
-        `briefing:morning:v2:${lang}:national`,
+        `briefing:morning:${BRIEFING_CACHE_VER}:${lang}:national`,
         BRIEFING_TTL_SEC,
         JSON.stringify(data),
       );
@@ -182,9 +190,9 @@ export class BriefingService {
     const metrics = await dashboardService.getNationalMetrics(query);
     const unitId = scopeUnitId(query);
 
-    const [recentAlerts, overrunProjects, scopeUnit, newsHeadlines] = await Promise.all([
+    const [recentAlertsRaw, overrunProjectsRaw, scopeUnit, newsHeadlinesRaw] = await Promise.all([
       env.LIVE_DATA_ONLY
-        ? liveDataService.listAlerts({ unitId, limit: 5, unresolvedOnly: true })
+        ? liveDataService.listAlerts({ unitId, limit: 20, unresolvedOnly: true })
         : prismaRead.redFlagAlert.findMany({
             where: {
               resolvedAt: null,
@@ -194,10 +202,10 @@ export class BriefingService {
               project: { select: { title: true } },
             },
             orderBy: { createdAt: "desc" },
-            take: 5,
+            take: 20,
           }),
       env.LIVE_DATA_ONLY
-        ? liveDataService.listProjects({ ...(unitId && { districtId: unitId }), limit: 50 })
+        ? liveDataService.listProjects({ ...(unitId && { districtId: unitId }), limit: 80 })
         : prismaRead.project.findMany({
             where: {
               status: { in: [ProjectStatus.ONGOING, ProjectStatus.STALLED] },
@@ -218,8 +226,53 @@ export class BriefingService {
             select: { name: true, nameBn: true },
           })
         : Promise.resolve(null),
-      ingestionService.getBriefingHeadlines(6, 3),
+      ingestionService.getBriefingHeadlines(16, 3),
     ]);
+
+    // Bangladesh-only: drop football / foreign / lifestyle noise from briefing inputs.
+    const recentAlerts = recentAlertsRaw.filter((a) => {
+      const alert = a as {
+        title?: string;
+        aiExplanation?: string | null;
+        sourceName?: string | null;
+        sourceUrl?: string | null;
+        district?: string | null;
+        project?: { title?: string };
+      };
+      const title = alert.project?.title ?? alert.title ?? alert.aiExplanation ?? "";
+      return isBangladeshRelevantArticle({
+        title,
+        summary: alert.aiExplanation,
+        district: alert.district,
+        sourceName: alert.sourceName,
+        url: alert.sourceUrl,
+      });
+    }).slice(0, 5);
+
+    const overrunProjects = overrunProjectsRaw.filter((p) => {
+      const title = String((p as { title?: string }).title ?? "");
+      const src = p as { sourceName?: string; sourceUrl?: string; district?: string };
+      const bd = isBangladeshRelevantArticle({
+        title,
+        district: src.district,
+        sourceName: src.sourceName,
+        url: src.sourceUrl,
+      });
+      // Live signals are often news — only keep real gov/infra project language.
+      if (env.LIVE_DATA_ONLY) return bd && looksLikeGovProject(title);
+      return bd || looksLikeGovProject(title);
+    });
+
+    const newsHeadlines = newsHeadlinesRaw
+      .filter((n) =>
+        isBangladeshRelevantArticle({
+          title: n.title,
+          district: n.district,
+          sourceName: n.sourceName,
+          url: n.url,
+        }),
+      )
+      .slice(0, 6);
 
     // Deterministic “pressure drop” from riskScore (no Math.random)
     const completionDrops = metrics.unitScores
