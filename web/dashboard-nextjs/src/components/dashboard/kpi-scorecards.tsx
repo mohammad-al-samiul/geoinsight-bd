@@ -41,17 +41,17 @@ function ScorecardShell({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {label}
           </p>
           <p
-            className="mt-1.5 text-2xl font-bold tabular-nums text-foreground transition-all duration-500 sm:mt-2 sm:text-3xl"
+            className="mt-1.5 text-3xl font-extrabold tabular-nums text-foreground transition-all duration-500 sm:mt-2 sm:text-4xl"
             key={value}
           >
             {value}
           </p>
           {sub && (
-            <p className="mt-1 truncate text-xs text-primary sm:whitespace-normal">
+            <p className="mt-1 truncate text-sm text-primary sm:whitespace-normal">
               {sub}
             </p>
           )}

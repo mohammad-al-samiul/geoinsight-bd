@@ -4,20 +4,25 @@ import type { CSSProperties } from "react";
 export const CHART_TOOLTIP_CONTENT_STYLE: CSSProperties = {
   background: "#0f172a",
   border: "1px solid #334155",
-  borderRadius: 8,
-  fontSize: 12,
+  borderRadius: 10,
+  fontSize: 14,
+  lineHeight: 1.45,
   color: "#f1f5f9",
   boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+  padding: "10px 12px",
 };
 
 export const CHART_TOOLTIP_LABEL_STYLE: CSSProperties = {
   color: "#f8fafc",
-  fontWeight: 600,
-  marginBottom: 4,
+  fontWeight: 700,
+  fontSize: 14,
+  marginBottom: 6,
 };
 
 export const CHART_TOOLTIP_ITEM_STYLE: CSSProperties = {
   color: "#e2e8f0",
+  fontSize: 13,
+  fontWeight: 600,
 };
 
 export const chartTooltipProps = {

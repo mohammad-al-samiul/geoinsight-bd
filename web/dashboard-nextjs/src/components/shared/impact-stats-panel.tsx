@@ -14,6 +14,8 @@ import {
 import { IntelCard } from "@/components/ui/intel-card";
 import { cn } from "@/lib/utils";
 import { chartTooltipProps } from "@/lib/chart-tooltip";
+import { chartLayout } from "@/lib/chart-theme";
+import { useBreakpoint } from "@/hooks/use-breakpoint";
 import {
   AlertTriangle,
   Home,
@@ -185,6 +187,8 @@ export function ImpactStatsPanel({
     else setInternalWindowDays(days);
   };
   const [showAllPlaces, setShowAllPlaces] = useState(false);
+  const bp = useBreakpoint();
+  const layout = chartLayout(bp);
 
   const active = useMemo(() => {
     const fromWindow = stats.windows?.[String(windowDays)];
@@ -208,9 +212,10 @@ export function ImpactStatsPanel({
 
   const placeChart = useMemo(() => {
     const rows = showAllPlaces ? placeRows : placeRows.slice(0, 20);
+    const maxLen = layout.narrow ? 10 : layout.tablet ? 14 : 18;
     return rows
       .map((d) => ({
-        name: d.district.length > 18 ? `${d.district.slice(0, 16)}…` : d.district,
+        name: d.district.length > maxLen ? `${d.district.slice(0, maxLen - 1)}…` : d.district,
         fullName: d.district,
         [labels.deaths]: d.deaths,
         [labels.injuries]: d.injuries,
@@ -222,15 +227,18 @@ export function ImpactStatsPanel({
         livestock: d.livestock_lost ?? 0,
       }))
       .reverse();
-  }, [placeRows, showAllPlaces, labels.deaths, labels.injuries, labels.homes, labels.livestock]);
+  }, [placeRows, showAllPlaces, labels.deaths, labels.injuries, labels.homes, labels.livestock, layout.narrow, layout.tablet]);
 
-  const chartHeight = Math.max(260, placeChart.length * 36);
+  const chartHeight = Math.max(
+    layout.chartHeightMd,
+    placeChart.length * (layout.narrow ? 36 : 48),
+  );
 
   return (
     <IntelCard accent="danger" padding="lg" hoverLift={false} className={className}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="font-display text-sm font-semibold tracking-tight">{title}</h3>
+          <h3 className="font-display text-sm font-semibold tracking-tight text-foreground">{title}</h3>
           {subtitle && <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>}
           <p className="mt-1.5 text-[10px] text-muted-foreground/90">
             {labels.methodHint ??
@@ -401,23 +409,23 @@ export function ImpactStatsPanel({
 
       {placeChart.length > 0 && (
         <div className="mt-5">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-sm font-semibold tracking-tight text-muted-foreground">
             {locale === "bn" ? "তুলনামূলক চার্ট (৪ সূচক)" : "Comparison chart (4 metrics)"}
           </p>
-          <div className="mt-3 rounded-xl border border-border/50 bg-background/30 p-2 sm:p-3">
+          <div className="mt-3 min-w-0 rounded-xl border border-border/50 bg-background/30 p-3 sm:p-4">
             <ResponsiveContainer width="100%" height={chartHeight}>
               <BarChart
                 data={placeChart}
                 layout="vertical"
-                margin={{ left: 8, right: 16, top: 8, bottom: 8 }}
+                margin={{ left: 4, right: layout.narrow ? 12 : 20, top: 12, bottom: 12 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                <XAxis type="number" allowDecimals={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                <XAxis type="number" allowDecimals={false} tick={layout.tick} />
                 <YAxis
                   type="category"
                   dataKey="name"
-                  width={110}
-                  tick={{ fill: "#cbd5e1", fontSize: 10 }}
+                  width={layout.yAxisCategoryWidth}
+                  tick={layout.tick}
                 />
                 <Tooltip
                   {...chartTooltipProps}
@@ -426,15 +434,15 @@ export function ImpactStatsPanel({
                     return row?.fullName ?? "";
                   }}
                 />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey={labels.deaths} fill="#ef4444" radius={[0, 3, 3, 0]} maxBarSize={12} />
-                <Bar dataKey={labels.injuries} fill="#f59e0b" radius={[0, 3, 3, 0]} maxBarSize={12} />
-                <Bar dataKey={labels.homes} fill="#38bdf8" radius={[0, 3, 3, 0]} maxBarSize={12} />
+                <Legend wrapperStyle={layout.legend} />
+                <Bar dataKey={labels.deaths} fill="#ef4444" radius={[0, 4, 4, 0]} maxBarSize={18} />
+                <Bar dataKey={labels.injuries} fill="#f59e0b" radius={[0, 4, 4, 0]} maxBarSize={18} />
+                <Bar dataKey={labels.homes} fill="#38bdf8" radius={[0, 4, 4, 0]} maxBarSize={18} />
                 <Bar
                   dataKey={labels.livestock}
                   fill="#34d399"
-                  radius={[0, 3, 3, 0]}
-                  maxBarSize={12}
+                  radius={[0, 4, 4, 0]}
+                  maxBarSize={18}
                 />
               </BarChart>
             </ResponsiveContainer>

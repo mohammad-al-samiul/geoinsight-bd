@@ -189,6 +189,8 @@ export class DashboardService {
               startDate: true,
               adminUnitId: true,
             },
+            orderBy: { startDate: "desc" },
+            take: 500,
           }),
           prismaRead.adminUnit.findMany({
             where: { type: "DIVISION" },
@@ -266,38 +268,70 @@ export class DashboardService {
         };
       });
 
-      // Cached path: capped per-division queries (8 divisions × 2 = 16 max)
-      const unitScores = await Promise.all(
-        divisions.map(async (div) => {
-          const divProjects = await prismaRead.project.findMany({
-            where: { adminUnit: { OR: [{ id: div.id }, { divisionId: div.id }] } },
-            select: { status: true, budgetAllocated: true, budgetSpent: true },
-            take: 50,
-          });
-          const divAlerts = await prismaRead.redFlagAlert.count({
-            where: {
-              resolvedAt: null,
-              project: { adminUnit: { OR: [{ id: div.id }, { divisionId: div.id }] } },
-            },
-          });
-          const perf =
-            divProjects.length === 0
-              ? 75
-              : Math.round(
-                  divProjects.reduce((s, p) => {
-                    const ratio = Number(p.budgetSpent) / Math.max(Number(p.budgetAllocated), 1);
-                    const statusBonus = p.status === "COMPLETED" ? 20 : p.status === "STALLED" ? -15 : 0;
-                    return s + Math.min(100, ratio * 80 + statusBonus);
-                  }, 0) / divProjects.length,
-                );
-          return {
-            unitId: div.id,
-            performanceScore: perf,
-            riskScore: Math.min(95, divAlerts * 8 + 15),
-            openAlerts: divAlerts,
-          };
+      // Two batched queries instead of 2 per division (previously 16),
+      // grouped in memory by the division each unit rolls up to.
+      const [divisionProjectRows, openAlertRows] = await Promise.all([
+        prismaRead.project.findMany({
+          select: {
+            status: true,
+            budgetAllocated: true,
+            budgetSpent: true,
+            adminUnit: { select: { id: true, divisionId: true } },
+          },
+          orderBy: { startDate: "desc" },
+          take: 2000,
         }),
-      );
+        prismaRead.redFlagAlert.findMany({
+          where: { resolvedAt: null },
+          select: {
+            project: { select: { adminUnit: { select: { id: true, divisionId: true } } } },
+          },
+          take: 2000,
+        }),
+      ]);
+
+      const divisionKey = (unit: { id: string; divisionId: string | null } | null | undefined) =>
+        unit ? (unit.divisionId ?? unit.id) : null;
+
+      const projectsByDivision = new Map<
+        string,
+        Array<{ status: string; budgetAllocated: unknown; budgetSpent: unknown }>
+      >();
+      for (const row of divisionProjectRows) {
+        const key = divisionKey(row.adminUnit);
+        if (!key) continue;
+        const bucket = projectsByDivision.get(key);
+        if (bucket) bucket.push(row);
+        else projectsByDivision.set(key, [row]);
+      }
+
+      const alertsByDivision = new Map<string, number>();
+      for (const row of openAlertRows) {
+        const key = divisionKey(row.project?.adminUnit);
+        if (!key) continue;
+        alertsByDivision.set(key, (alertsByDivision.get(key) ?? 0) + 1);
+      }
+
+      const unitScores = divisions.map((div) => {
+        const divProjects = projectsByDivision.get(div.id) ?? [];
+        const divAlerts = alertsByDivision.get(div.id) ?? 0;
+        const perf =
+          divProjects.length === 0
+            ? 75
+            : Math.round(
+                divProjects.reduce((s, p) => {
+                  const ratio = Number(p.budgetSpent) / Math.max(Number(p.budgetAllocated), 1);
+                  const statusBonus = p.status === "COMPLETED" ? 20 : p.status === "STALLED" ? -15 : 0;
+                  return s + Math.min(100, ratio * 80 + statusBonus);
+                }, 0) / divProjects.length,
+              );
+        return {
+          unitId: div.id,
+          performanceScore: perf,
+          riskScore: Math.min(95, divAlerts * 8 + 15),
+          openAlerts: divAlerts,
+        };
+      });
 
       const tradeFlows = buildTradeFlows(commodityRows);
 

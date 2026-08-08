@@ -72,6 +72,8 @@ const config: Config = {
         "fade-in": "fadeIn 0.28s ease-out",
         "slide-in": "slideIn 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
         rise: "riseIn 0.45s cubic-bezier(0.22, 1, 0.36, 1)",
+        "scale-in": "scaleIn 0.24s cubic-bezier(0.22, 1, 0.36, 1)",
+        shimmer: "shimmer 1.8s ease-in-out infinite",
       },
       keyframes: {
         fadeIn: {
@@ -85,6 +87,14 @@ const config: Config = {
         riseIn: {
           from: { opacity: "0", transform: "translateY(10px)" },
           to: { opacity: "1", transform: "translateY(0)" },
+        },
+        scaleIn: {
+          from: { opacity: "0", transform: "scale(0.96)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
+        shimmer: {
+          from: { transform: "translateX(-100%)" },
+          to: { transform: "translateX(100%)" },
         },
       },
     },

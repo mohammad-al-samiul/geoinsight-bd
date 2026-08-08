@@ -38,6 +38,8 @@ export function CommandBar({
 
   return (
     <header className="sticky top-0 z-[100] overflow-visible border-b border-command-border/80 bg-command/90 shadow-panel backdrop-blur-xl">
+      {/* Live data pulse tracing along the bottom edge of the command bar */}
+      <span aria-hidden="true" className="data-pulse-line pointer-events-none absolute inset-x-0 bottom-0 h-px" />
       <div className="flex h-14 items-center gap-3 px-4 lg:px-6">
         <Button
           variant="ghost"
@@ -64,16 +66,16 @@ export function CommandBar({
           </div>
         </div>
 
-        <div className="mx-auto hidden max-w-md flex-1 md:flex">
+        <div className="mx-2 min-w-0 flex-1 max-w-md sm:mx-auto">
           <CommandSearch />
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
           <LocaleSwitcher />
           <Badge
             variant="outline"
             className={cn(
-              "hidden border-primary/30 bg-primary/10 text-[10px] font-semibold uppercase tracking-wider text-primary sm:inline-flex",
+              "hidden border-primary/30 bg-primary/10 text-[10px] font-semibold uppercase tracking-wider text-primary lg:inline-flex",
             )}
           >
             {tr(user.role)}
@@ -82,9 +84,10 @@ export function CommandBar({
             <Button
               variant={feedOpen ? "secondary" : "ghost"}
               size="icon"
-              className="hidden xl:inline-flex"
+              className="lg:inline-flex"
               onClick={onToggleFeed}
               aria-label={t("toggleFeed")}
+              aria-pressed={feedOpen}
             >
               <AlertTriangle className="h-4 w-4" />
             </Button>
@@ -102,14 +105,16 @@ export function CommandBar({
         </div>
       </div>
 
-      <div
-        className={cn(
-          "border-t border-command-border/40 bg-background/20 px-4 py-3 lg:px-6",
-          sidebarCollapsed && "lg:pl-4",
-        )}
-      >
-        {showAdminCascadeFilter ? <AdminCascadeFilter variant="solid" /> : null}
-      </div>
+      {showAdminCascadeFilter ? (
+        <div
+          className={cn(
+            "border-t border-command-border/40 bg-background/20 px-3 py-2.5 sm:px-4 sm:py-3 lg:px-6",
+            sidebarCollapsed && "lg:pl-4",
+          )}
+        >
+          <AdminCascadeFilter variant="solid" />
+        </div>
+      ) : null}
     </header>
   );
 }

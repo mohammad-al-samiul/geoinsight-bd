@@ -12,7 +12,8 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import type { LatLngExpression } from "leaflet";
-import { BD_MAP_CENTER, BD_MAP_ZOOM, getMapBoundsForFilter } from "@/lib/geojson-bd";
+import { BD_MAP_CENTER, BD_MAP_ZOOM } from "@/lib/geojson-bd";
+import { getMapBoundsForFilter } from "@/lib/bd-boundaries";
 import type { AdminFilterState } from "@/types";
 import type { WeatherObservation, DisasterAlert } from "@/hooks/use-weather-live";
 import { MapSkeleton } from "@/components/ui/skeleton";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 
 export interface ExternalArticle {
@@ -35,16 +35,21 @@ export function useIngestionArticles(limit = 20) {
   const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<IngestionSyncResult | null>(null);
 
+  const hasDataRef = useRef(false);
+
   const load = useCallback(async () => {
-    setLoading(true);
+    // Blocking loader only before the first payload; refreshes swap in place.
+    if (!hasDataRef.current) setLoading(true);
     setError(null);
     try {
       const json = await apiClient<{ success: boolean; data: ExternalArticle[] }>(
         `ingestion/articles?limit=${limit}&days=7`,
       );
       setArticles(json.data ?? []);
+      hasDataRef.current = true;
     } catch (err) {
       setArticles([]);
+      hasDataRef.current = false;
       setError(err instanceof Error ? err.message : "Articles unavailable");
     } finally {
       setLoading(false);

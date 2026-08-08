@@ -71,7 +71,10 @@ export function DashboardViewport() {
     [drillToUnit],
   );
 
-  if (loading) {
+  // Full-screen loader only for the very first payload. Later loads (map
+  // drill-downs, socket refreshes) keep the dashboard mounted and swap data
+  // in place — no jarring teardown of the map and charts.
+  if (loading && !metrics) {
     return <ModuleCinematicLoader bn fullScreen label="জাতীয় পরিস্থিতির ডেটা সিঙ্ক হচ্ছে…" />;
   }
 
@@ -101,8 +104,8 @@ export function DashboardViewport() {
         </Badge>
       </div>
 
-      <div className="space-y-5">
-        <div className="h-[420px] lg:h-[480px]">
+      <div className="min-w-0 space-y-5">
+        <div className="min-w-0 h-[260px] sm:h-[360px] lg:h-[480px]">
           <BangladeshChoroplethMap
             filter={filter}
             markers={markers}
@@ -110,11 +113,13 @@ export function DashboardViewport() {
             onFeatureClick={handleFeatureClick}
           />
         </div>
-        <KpiScorecards
-          metrics={metrics}
-          loading={loading}
-          pulseKeys={pulseKeys}
-        />
+        <div className="min-w-0">
+          <KpiScorecards
+            metrics={metrics}
+            loading={loading}
+            pulseKeys={pulseKeys}
+          />
+        </div>
       </div>
     </div>
   );

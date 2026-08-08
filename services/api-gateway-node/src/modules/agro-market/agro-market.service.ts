@@ -21,6 +21,7 @@ export class AgroMarketService {
         priceUpdatedAt: true,
       },
       orderBy: { name: "asc" },
+      take: 1000,
     });
   }
 }

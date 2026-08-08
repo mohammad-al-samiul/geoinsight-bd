@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import { CircleAlert, Layers3, MapPin } from "lucide-react";
 import { MapSkeleton } from "@/components/ui/skeleton";
-import { getVisibleGeoJson, getUnitScoreOverlayVersion } from "@/lib/geojson-bd";
+import { getVisibleUnitCount, getUnitScoreOverlayVersion } from "@/lib/geojson-bd";
 import { getDrillChildType } from "@/lib/filter-utils";
 import { useAdminHierarchy } from "@/hooks/use-admin-hierarchy";
 import type { AdminFilterState } from "@/types";
@@ -34,10 +34,12 @@ export function BangladeshChoroplethMap({
 }: BangladeshChoroplethMapProps) {
   const { ready: hierarchyReady } = useAdminHierarchy();
   const scoreVersion = getUnitScoreOverlayVersion();
-  const geoJson = useMemo(
-    () => getVisibleGeoJson(filter),
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- hierarchyReady/scoreVersion invalidate the unit list
+  const unitCount = useMemo(
+    () => getVisibleUnitCount(filter),
     [filter, hierarchyReady, scoreVersion],
   );
+  const geoVersion = `${hierarchyReady ? 1 : 0}-${scoreVersion}`;
   const level = getDrillChildType(filter);
 
   return (
@@ -50,14 +52,14 @@ export function BangladeshChoroplethMap({
           </h3>
         </div>
         <Badge variant="outline" className="border-primary/30 text-[10px] text-primary">
-          {level} level · {geoJson.features.length} units
+          {level} level · {unitCount} units
         </Badge>
       </div>
 
       <div className="relative z-0 min-h-0 flex-1 isolate">
         <ChoroplethMapInner
           filter={filter}
-          geoJson={geoJson}
+          geoVersion={geoVersion}
           markers={markers}
           mapPulseKey={mapPulseKey}
           onFeatureClick={onFeatureClick}

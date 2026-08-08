@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
@@ -30,9 +30,11 @@ export function useAccountabilityScores(lang: "bn" | "en" = "bn") {
   const [scores, setScores] = useState<AccountabilityScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasDataRef = useRef(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    // Blocking loader only before the first payload; refreshes swap in place.
+    if (!hasDataRef.current) setLoading(true);
     setError(null);
     try {
       const qs = scopeQuery(filter);
@@ -42,8 +44,10 @@ export function useAccountabilityScores(lang: "bn" | "en" = "bn") {
         data: { scores: AccountabilityScore[] };
       }>(`intelligence/accountability/score${sep}lang=${lang}`, { method: "POST" });
       setScores(json.data.scores ?? []);
+      hasDataRef.current = true;
     } catch (err) {
       setScores([]);
+      hasDataRef.current = false;
       setError(err instanceof Error ? err.message : "Accountability scoring failed");
     } finally {
       setLoading(false);

@@ -1,5 +1,7 @@
 "use client";
 
+import { emitToast } from "@/components/ui/toast";
+
 export class ApiClientError extends Error {
   constructor(
     public readonly status: number,
@@ -47,14 +49,31 @@ export async function apiClient<T = unknown>(
   retried = false,
 ): Promise<T> {
   const normalized = path.replace(/^\//, "");
-  const res = await fetch(`/api/proxy/${normalized}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...init.headers,
-    },
-  });
+  const method = (init.method ?? "GET").toUpperCase();
+  const isMutation = method !== "GET" && method !== "HEAD";
+
+  let res: Response;
+  try {
+    res = await fetch(`/api/proxy/${normalized}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...init.headers,
+      },
+    });
+  } catch (error) {
+    // Network-level failure (offline, DNS, aborted server). Reads surface
+    // through page-level error states; mutations get an immediate toast.
+    if (isMutation) {
+      emitToast({
+        title: "Network error",
+        description: "Could not reach the server. Check your connection and try again.",
+        variant: "destructive",
+      });
+    }
+    throw error;
+  }
 
   if (res.status === 401 && !retried) {
     const refreshed = await tryRefresh();
@@ -75,10 +94,15 @@ export async function apiClient<T = unknown>(
   const body = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new ApiClientError(
-      res.status,
-      (body as { message?: string }).message ?? "Request failed",
-    );
+    const message = (body as { message?: string }).message ?? "Request failed";
+    if (isMutation) {
+      emitToast({
+        title: "Action failed",
+        description: message,
+        variant: "destructive",
+      });
+    }
+    throw new ApiClientError(res.status, message);
   }
 
   return body as T;

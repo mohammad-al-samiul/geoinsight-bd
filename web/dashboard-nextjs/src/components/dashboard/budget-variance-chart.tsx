@@ -5,6 +5,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -13,6 +14,8 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { chartTooltipProps } from "@/lib/chart-tooltip";
+import { chartLayout, truncateLabel } from "@/lib/chart-theme";
+import { useBreakpoint } from "@/hooks/use-breakpoint";
 import type { BudgetVariancePoint } from "@/types/dashboard";
 
 interface BudgetVarianceChartProps {
@@ -33,10 +36,18 @@ export function BudgetVarianceChart({
   pulseKey,
   className,
 }: BudgetVarianceChartProps) {
+  const bp = useBreakpoint();
+  const layout = chartLayout(bp);
+  const chartData = data.map((d) => ({
+    ...d,
+    projectShort: truncateLabel(d.project, layout.narrow ? 10 : layout.tablet ? 16 : 28),
+  }));
+
   return (
     <div
       className={cn(
-        "h-52 w-full transition-all duration-500 sm:h-56",
+        "w-full transition-all duration-500",
+        layout.areaHeightClass,
         pulseKey ? "animate-score-pulse" : "",
         className,
       )}
@@ -44,23 +55,28 @@ export function BudgetVarianceChart({
     >
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
-          data={data}
+          data={chartData}
           layout="vertical"
-          margin={{ top: 4, right: 8, left: 4, bottom: 0 }}
+          margin={{
+            top: 8,
+            right: layout.narrow ? 36 : 48,
+            left: 4,
+            bottom: 4,
+          }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(217 28% 16%)" horizontal={false} />
           <XAxis
             type="number"
-            tick={{ fill: "hsl(215 18% 58%)", fontSize: 10 }}
+            tick={layout.tick}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) => `${v}%`}
           />
           <YAxis
             type="category"
-            dataKey="project"
-            width={140}
-            tick={{ fill: "hsl(215 18% 58%)", fontSize: 11 }}
+            dataKey="projectShort"
+            width={layout.yAxisCategoryWidth}
+            tick={layout.tick}
             axisLine={false}
             tickLine={false}
           />
@@ -74,11 +90,26 @@ export function BudgetVarianceChart({
                 "Variance",
               ];
             }}
+            labelFormatter={(_, payload) => {
+              const row = payload?.[0]?.payload as BudgetVariancePoint | undefined;
+              return row?.project ?? "";
+            }}
           />
-          <Bar dataKey="variance" radius={[0, 4, 4, 0]} animationDuration={800}>
-            {data.map((entry) => (
+          <Bar
+            dataKey="variance"
+            radius={[0, 6, 6, 0]}
+            animationDuration={800}
+            maxBarSize={layout.narrow ? 18 : 28}
+          >
+            {chartData.map((entry) => (
               <Cell key={entry.project} fill={varianceColor(entry.variance)} />
             ))}
+            <LabelList
+              dataKey="variance"
+              position="right"
+              formatter={(v: number) => `${v}%`}
+              style={layout.labelList}
+            />
           </Bar>
         </BarChart>
       </ResponsiveContainer>

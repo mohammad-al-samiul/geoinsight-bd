@@ -29,6 +29,51 @@ interface UseSocketOptions {
 const KPI_EVENTS = ["kpi:update", "kpi_update"] as const;
 const ALERT_EVENTS = ["alert:created", "ai_red_flag"] as const;
 
+/**
+ * One physical socket connection per auth token, shared across all hook
+ * consumers (dashboard, anomaly feed, realtime refresh) with ref-counting.
+ * Previously each consumer opened its own connection.
+ */
+interface SharedSocketEntry {
+  socket: Socket;
+  refCount: number;
+}
+
+const sharedSockets = new Map<string, SharedSocketEntry>();
+
+function acquireSocket(token: string | null | undefined): Socket {
+  const key = token ?? "";
+  let entry = sharedSockets.get(key);
+  if (!entry) {
+    entry = {
+      socket: io(SOCKET_URL, {
+        autoConnect: true,
+        transports: ["websocket", "polling"],
+        auth: token ? { token } : undefined,
+        reconnection: true,
+        reconnectionAttempts: 8,
+        reconnectionDelay: 1500,
+      }),
+      refCount: 0,
+    };
+    sharedSockets.set(key, entry);
+  }
+  entry.refCount += 1;
+  return entry.socket;
+}
+
+function releaseSocket(token: string | null | undefined) {
+  const key = token ?? "";
+  const entry = sharedSockets.get(key);
+  if (!entry) return;
+  entry.refCount -= 1;
+  if (entry.refCount <= 0) {
+    entry.socket.removeAllListeners();
+    entry.socket.disconnect();
+    sharedSockets.delete(key);
+  }
+}
+
 export function useSocket({
   token,
   enabled = true,
@@ -66,24 +111,21 @@ export function useSocket({
       return;
     }
 
-    const socket = io(SOCKET_URL, {
-      autoConnect: true,
-      transports: ["websocket", "polling"],
-      auth: token ? { token } : undefined,
-      reconnection: true,
-      reconnectionAttempts: 8,
-      reconnectionDelay: 1500,
-    });
-
+    const socket = acquireSocket(token);
     socketRef.current = socket;
-    setStatus("connecting");
+    setStatus(socket.connected ? "connected" : "connecting");
 
-    socket.on("connect", () => setStatus("connected"));
-    socket.on("disconnect", () => setStatus("disconnected"));
-    socket.on("connect_error", () => setStatus("error"));
+    const onConnect = () => setStatus("connected");
+    const onDisconnect = () => setStatus("disconnected");
+    const onConnectError = () => setStatus("error");
 
-    const bind = (event: string) => {
-      socket.on(event, (data: GovSocketEnvelope | Record<string, unknown>) => {
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
+
+    const dataEvents = [...KPI_EVENTS, ...ALERT_EVENTS, "dashboard:refresh"];
+    const dataHandlers = dataEvents.map((event) => {
+      const handler = (data: GovSocketEnvelope | Record<string, unknown>) => {
         const envelope: GovSocketEnvelope =
           "payload" in data && "adminUnitId" in data
             ? (data as GovSocketEnvelope)
@@ -94,15 +136,18 @@ export function useSocket({
                 timestamp: new Date().toISOString(),
               };
         handleEnvelope(envelope);
-      });
-    };
-
-    [...KPI_EVENTS, ...ALERT_EVENTS, "dashboard:refresh"].forEach(bind);
+      };
+      socket.on(event, handler);
+      return { event, handler };
+    });
 
     return () => {
-      socket.removeAllListeners();
-      socket.disconnect();
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
+      dataHandlers.forEach(({ event, handler }) => socket.off(event, handler));
       socketRef.current = null;
+      releaseSocket(token);
     };
   }, [enabled, token, handleEnvelope]);
 

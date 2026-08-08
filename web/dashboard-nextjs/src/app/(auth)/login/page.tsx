@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
+import { DataFlowBackground } from "@/components/ui/data-flow-background";
 import { authFetch, ApiClientError } from "@/lib/api-client";
 import { Shield } from "lucide-react";
 
@@ -43,13 +44,14 @@ function LoginForm() {
         <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
         <div className="absolute -right-16 bottom-0 h-80 w-80 rounded-full bg-sky-500/10 blur-3xl" />
       </div>
+      <DataFlowBackground className="absolute inset-0" intensity="rich" />
 
       <div className="relative w-full max-w-md animate-rise">
         <div className="mb-4 flex justify-end">
           <LocaleSwitcher />
         </div>
 
-        <div className="glass-panel overflow-hidden rounded-2xl p-8 sm:p-9">
+        <div className="glass-panel overflow-hidden rounded-2xl p-5 sm:p-8 sm:p-9">
           <div className="mb-8 text-center">
             <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10">
               <Shield className="h-7 w-7 text-primary" />

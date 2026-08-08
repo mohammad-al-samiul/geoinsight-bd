@@ -72,7 +72,7 @@ export function HazardWeatherMap({
           Heat stress
         </span>
       </div>
-      <div className="glass-panel h-[380px] overflow-hidden rounded-xl shadow-panel lg:h-[460px]">
+      <div className="glass-panel h-[240px] overflow-hidden rounded-xl shadow-panel sm:h-[340px] lg:h-[460px]">
         <HazardWeatherMapInner
           filter={filter}
           zones={zones}

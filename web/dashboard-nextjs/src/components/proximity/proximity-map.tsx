@@ -53,7 +53,7 @@ export function ProximityMap({
           Clear
         </span>
       </div>
-      <div className="glass-panel h-[420px] overflow-hidden rounded-xl shadow-panel lg:h-[520px]">
+      <div className="glass-panel h-[240px] overflow-hidden rounded-xl shadow-panel sm:h-[340px] lg:h-[520px]">
         <ProximityMapInner
           zones={zones}
           tracks={tracks}

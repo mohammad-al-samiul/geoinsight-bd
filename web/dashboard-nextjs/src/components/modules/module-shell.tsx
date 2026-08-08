@@ -12,7 +12,7 @@ import {
   ModulePageAura,
 } from "@/components/ui/module-motion";
 import { useLocale, useTranslations } from "next-intl";
-import { Children, type ReactNode } from "react";
+import { Children, memo, type ReactNode } from "react";
 
 interface ModuleShellProps {
   title: string;
@@ -62,7 +62,7 @@ export function ModuleShell({
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="surface-hero intel-rail relative z-10 px-5 py-5 sm:px-7 sm:py-6"
+        className="surface-hero intel-rail relative z-10 px-3 py-5 sm:px-5 sm:py-6"
       >
         <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="pl-3">
@@ -89,15 +89,27 @@ export function ModuleShell({
 
       {error && (
         <motion.div
+          role="alert"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           className="relative z-10 flex items-start gap-3 rounded-xl border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <div>
+          <div className="flex-1">
             <p className="font-medium">{t("loadFailed")}</p>
             <p className="mt-1 text-destructive/80">{error}</p>
           </div>
+          {onRetry && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRetry}
+              className="shrink-0 gap-2 border-destructive/40 text-destructive hover:bg-destructive/10"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              {t("refresh")}
+            </Button>
+          )}
         </motion.div>
       )}
 
@@ -163,11 +175,11 @@ export function StatCard({ label, value, hint, accent = "default", icon }: StatC
 export function StatGrid({ children }: { children: ReactNode }) {
   const items = Children.toArray(children);
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {items.map((child, i) => (
         <motion.div
           key={i}
-          className="relative isolate overflow-hidden rounded-xl"
+          className="relative isolate min-w-0 overflow-hidden rounded-xl"
           initial={{ opacity: 0, y: 16, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{
@@ -195,6 +207,59 @@ interface DataTableProps<T extends { id?: string }> {
   onRowClick?: (row: T) => void;
 }
 
+interface DataTableRowProps<T extends { id?: string }> {
+  row: T;
+  index: number;
+  columns: DataTableProps<T>["columns"];
+  onRowClick?: (row: T) => void;
+}
+
+function DataTableRowInner<T extends { id?: string }>({
+  row,
+  index,
+  columns,
+  onRowClick,
+}: DataTableRowProps<T>) {
+  const clickable = Boolean(onRowClick);
+
+  return (
+    <motion.tr
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: Math.min(index * 0.04, 0.5), duration: 0.35 }}
+      className={cn(
+        "border-b border-border/30 transition-colors",
+        clickable
+          ? "cursor-pointer hover:bg-primary/5 focus-visible:bg-primary/10 focus-visible:outline-none"
+          : "hover:bg-secondary/25",
+      )}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => onRowClick?.(row) : undefined}
+      onKeyDown={
+        clickable
+          ? (event: React.KeyboardEvent) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onRowClick?.(row);
+              }
+            }
+          : undefined
+      }
+    >
+      {columns.map((col) => (
+        <td key={col.key} className="px-4 py-3.5">
+          {col.render
+            ? col.render(row)
+            : String((row as Record<string, unknown>)[col.key] ?? "—")}
+        </td>
+      ))}
+    </motion.tr>
+  );
+}
+
+// Rows only re-render when their own data or column config changes.
+const DataTableRow = memo(DataTableRowInner) as typeof DataTableRowInner;
+
 export function DataTable<T extends { id?: string }>({
   columns,
   rows,
@@ -212,13 +277,13 @@ export function DataTable<T extends { id?: string }>({
   }
 
   return (
-    <div className="glass-panel overflow-hidden rounded-xl">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+    <div className="glass-panel min-w-0 overflow-hidden rounded-xl">
+      <div className="min-w-0 overflow-x-auto overscroll-x-contain">
+        <table className="w-full min-w-[640px] text-sm sm:min-w-0 lg:min-w-full">
           <thead>
             <tr className="border-b border-border/50 bg-secondary/25 text-left text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               {columns.map((col) => (
-                <th key={col.key} className="px-4 py-3.5 font-semibold">
+                <th key={col.key} scope="col" className="px-4 py-3.5 font-semibold">
                   {col.label}
                 </th>
               ))}
@@ -226,25 +291,13 @@ export function DataTable<T extends { id?: string }>({
           </thead>
           <tbody>
             {rows.map((row, i) => (
-              <motion.tr
+              <DataTableRow
                 key={row.id ?? i}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: Math.min(i * 0.04, 0.5), duration: 0.35 }}
-                className={cn(
-                  "border-b border-border/30 transition-colors",
-                  onRowClick ? "cursor-pointer hover:bg-primary/5" : "hover:bg-secondary/25",
-                )}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-              >
-                {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-3.5">
-                    {col.render
-                      ? col.render(row)
-                      : String((row as Record<string, unknown>)[col.key] ?? "—")}
-                  </td>
-                ))}
-              </motion.tr>
+                row={row}
+                index={i}
+                columns={columns}
+                onRowClick={onRowClick}
+              />
             ))}
           </tbody>
         </table>

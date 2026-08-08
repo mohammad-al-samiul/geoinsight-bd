@@ -29,6 +29,8 @@ import { FloatCard } from "@/components/ui/module-motion";
 import { SourceLink } from "@/components/ui/source-link";
 import { cn } from "@/lib/utils";
 import { chartTooltipProps } from "@/lib/chart-tooltip";
+import { chartLayout } from "@/lib/chart-theme";
+import { useBreakpoint } from "@/hooks/use-breakpoint";
 
 const THEME_ORDER = [
   "hsc_exam",
@@ -158,7 +160,12 @@ export function UnrestPulsePanel() {
     };
   }, [movements, data?.summary]);
 
-  const chartHeight = Math.max(200, districtChart.length * 30);
+  const bp = useBreakpoint();
+  const layout = chartLayout(bp);
+  const chartHeight = Math.max(
+    layout.chartHeightSm,
+    districtChart.length * (layout.narrow ? 28 : 30),
+  );
   const bn = locale === "bn";
 
   return (
@@ -214,12 +221,12 @@ export function UnrestPulsePanel() {
                     margin={{ top: 0, right: 12, left: 4, bottom: 0 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.12)" horizontal={false} />
-                    <XAxis type="number" allowDecimals={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                    <XAxis type="number" allowDecimals={false} tick={layout.tickMuted} />
                     <YAxis
                       type="category"
                       dataKey="name"
-                      width={88}
-                      tick={{ fill: "#cbd5e1", fontSize: 11 }}
+                      width={layout.yAxisCategoryWidth}
+                      tick={layout.tick}
                     />
                     <Tooltip
                       {...chartTooltipProps}
@@ -252,8 +259,8 @@ export function UnrestPulsePanel() {
               <p className="text-sm text-muted-foreground">{t("noSignals")}</p>
             ) : (
               <>
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+                  <div className="scroll-x-strip min-w-0 flex-1">
                     <FilterChip
                       active={themeFilter === "all"}
                       onClick={() => setThemeFilter("all")}

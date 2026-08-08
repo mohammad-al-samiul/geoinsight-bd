@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import { getUnitCoords } from "@/lib/admin-hierarchy";
+import { getUnitCoords, loadAdminHierarchy } from "@/lib/admin-hierarchy";
 import { unitSearchParams } from "@/lib/unit-scope";
 import type { AdminFilterState } from "@/types";
 import type {
@@ -96,6 +96,10 @@ export async function fetchRedFlagMarkers(
     }>(`alerts?${params}`);
 
     if (!json.success || !Array.isArray(json.data)) return [];
+
+    // One hierarchy fetch (shared/cached) so getUnitCoords resolves from the
+    // in-memory cache instead of firing one admin-units/:id request per alert.
+    await loadAdminHierarchy();
 
     const markers = await Promise.all(
       json.data.map(async (a) => {

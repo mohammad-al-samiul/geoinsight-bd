@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
 import { getUnitById } from "@/lib/admin-units";
 import { apiClient } from "@/lib/api-client";
@@ -75,17 +75,21 @@ export function useDivisionalCrisis() {
   const [livePulse, setLivePulse] = useState<DivisionalLivePulse | null>(null);
   const [loading, setLoading] = useState(true);
   const [liveError, setLiveError] = useState<string | null>(null);
+  const hasDataRef = useRef(false);
 
   const loadLivePulse = useCallback(async () => {
-    setLoading(true);
+    // Blocking loader only before the first payload; refreshes swap in place.
+    if (!hasDataRef.current) setLoading(true);
     setLiveError(null);
     try {
       const response = await apiClient<{ success: boolean; data: DivisionalLivePulse }>(
         "divisional-crisis/pulse",
       );
       setLivePulse(response.data);
+      hasDataRef.current = true;
     } catch (error) {
       setLivePulse(null);
+      hasDataRef.current = false;
       setLiveError(error instanceof Error ? error.message : "Live crisis data unavailable");
     } finally {
       setLoading(false);

@@ -5,6 +5,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -12,6 +13,8 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { chartTooltipProps } from "@/lib/chart-tooltip";
+import { chartLayout } from "@/lib/chart-theme";
+import { useBreakpoint } from "@/hooks/use-breakpoint";
 import type { CompletionTrendPoint } from "@/types/dashboard";
 
 interface CompletionAreaChartProps {
@@ -25,19 +28,30 @@ export function CompletionAreaChart({
   pulseKey,
   className,
 }: CompletionAreaChartProps) {
+  const bp = useBreakpoint();
+  const layout = chartLayout(bp);
   const gradientId = useMemo(() => `completion-${pulseKey ?? 0}`, [pulseKey]);
 
   return (
     <div
       className={cn(
-        "h-52 w-full transition-all duration-500 sm:h-56",
+        "w-full transition-all duration-500",
+        layout.areaHeightClass,
         pulseKey ? "animate-score-pulse" : "",
         className,
       )}
       key={pulseKey}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+        <AreaChart
+          data={data}
+          margin={{
+            top: layout.narrow ? 12 : 18,
+            right: layout.narrow ? 8 : 16,
+            left: 0,
+            bottom: 4,
+          }}
+        >
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="hsl(158 64% 42%)" stopOpacity={0.45} />
@@ -47,15 +61,17 @@ export function CompletionAreaChart({
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(217 28% 16%)" vertical={false} />
           <XAxis
             dataKey="month"
-            tick={{ fill: "hsl(215 18% 58%)", fontSize: 10 }}
+            tick={layout.tick}
             axisLine={false}
             tickLine={false}
+            interval={layout.narrow ? "preserveStartEnd" : 0}
           />
           <YAxis
             domain={[60, 100]}
-            tick={{ fill: "hsl(215 18% 58%)", fontSize: 10 }}
+            tick={layout.tick}
             axisLine={false}
             tickLine={false}
+            width={layout.yAxisNumberWidth}
             tickFormatter={(v) => `${v}%`}
           />
           <Tooltip
@@ -66,11 +82,20 @@ export function CompletionAreaChart({
             type="monotone"
             dataKey="rate"
             stroke="hsl(158 64% 42%)"
-            strokeWidth={2}
+            strokeWidth={layout.narrow ? 2 : 3}
             fill={`url(#${gradientId})`}
             animationDuration={800}
             animationEasing="ease-out"
-          />
+          >
+            {!layout.narrow && (
+              <LabelList
+                dataKey="rate"
+                position="top"
+                formatter={(v: number) => `${v}%`}
+                style={layout.labelList}
+              />
+            )}
+          </Area>
         </AreaChart>
       </ResponsiveContainer>
     </div>

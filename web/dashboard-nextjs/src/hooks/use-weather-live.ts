@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
 
@@ -117,9 +117,11 @@ export function useWeatherLive() {
   const [data, setData] = useState<WeatherLiveData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasDataRef = useRef(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    // Blocking loader only before the first payload; refreshes swap in place.
+    if (!hasDataRef.current) setLoading(true);
     setError(null);
     try {
       const qs = scopeQuery(filter);
@@ -127,8 +129,10 @@ export function useWeatherLive() {
         `weather/live${qs}`,
       );
       setData(json.data);
+      hasDataRef.current = true;
     } catch (err) {
       setData(null);
+      hasDataRef.current = false;
       setError(err instanceof Error ? err.message : "Weather data unavailable");
     } finally {
       setLoading(false);

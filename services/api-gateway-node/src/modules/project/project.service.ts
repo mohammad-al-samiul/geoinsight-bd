@@ -31,6 +31,9 @@ export class ProjectService {
         _count: { select: { redFlagAlerts: true } },
       },
       orderBy: { startDate: "desc" },
+      // Bounded payload: dashboard views never need more than the most
+      // recent projects in scope.
+      take: 500,
     });
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale } from "next-intl";
 import { apiClient } from "@/lib/api-client";
 
@@ -57,15 +57,18 @@ export function useStrategicOutlook() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const hasDataRef = useRef(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    // Blocking loader only before the first payload; refreshes swap in place.
+    if (!hasDataRef.current) setLoading(true);
     setError(null);
     try {
       const json = await apiClient<{ success: boolean; data: StrategicOutlook }>(
         `outlook/strategic?lang=${lang}`,
       );
       setData(json.data);
+      hasDataRef.current = true;
     } catch (err) {
       // If backend is not available in local dev, provide a mock preview so UI can be inspected.
       if (process.env.NODE_ENV === "development") {

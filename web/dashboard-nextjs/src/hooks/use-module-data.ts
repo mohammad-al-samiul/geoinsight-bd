@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
 import { useAuthActions } from "@/hooks/use-auth";
@@ -49,10 +49,13 @@ export function useProjectsList() {
   const [rows, setRows] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasDataRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!ready) return;
-    setLoading(true);
+    // Blocking loader only before the first payload; later refreshes
+    // (sockets, polls, filter changes) swap data in place.
+    if (!hasDataRef.current) setLoading(true);
     setError(null);
     try {
       const json = await fetchWithRetry(() =>
@@ -61,8 +64,10 @@ export function useProjectsList() {
         ),
       );
       setRows(json.data ?? []);
+      hasDataRef.current = true;
     } catch (err) {
       setRows([]);
+      hasDataRef.current = false;
       setError(errorMessage(err));
     } finally {
       setLoading(false);
@@ -120,10 +125,11 @@ export function useRepresentativesList() {
   const [rows, setRows] = useState<RepresentativeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasDataRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!ready) return;
-    setLoading(true);
+    if (!hasDataRef.current) setLoading(true);
     setError(null);
     try {
       const json = await fetchWithRetry(() =>
@@ -132,8 +138,10 @@ export function useRepresentativesList() {
         ),
       );
       setRows(json.data ?? []);
+      hasDataRef.current = true;
     } catch (err) {
       setRows([]);
+      hasDataRef.current = false;
       setError(errorMessage(err));
     } finally {
       setLoading(false);
@@ -155,10 +163,11 @@ export function useAgroMarketsList() {
   const [rows, setRows] = useState<AgroMarketRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasDataRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!ready) return;
-    setLoading(true);
+    if (!hasDataRef.current) setLoading(true);
     setError(null);
     try {
       const json = await fetchWithRetry(() =>
@@ -167,8 +176,10 @@ export function useAgroMarketsList() {
         ),
       );
       setRows(json.data ?? []);
+      hasDataRef.current = true;
     } catch (err) {
       setRows([]);
+      hasDataRef.current = false;
       setError(errorMessage(err));
     } finally {
       setLoading(false);
@@ -191,10 +202,11 @@ export function useKpiData() {
   const [records, setRecords] = useState<KpiRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasDataRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!ready) return;
-    setLoading(true);
+    if (!hasDataRef.current) setLoading(true);
     setError(null);
 
     const unit = activeUnitId(filter);
@@ -228,6 +240,7 @@ export function useKpiData() {
     }
 
     setError(errors.length > 0 ? errors.join(" · ") : null);
+    hasDataRef.current = errors.length === 0;
     setLoading(false);
   }, [filter, ready]);
 

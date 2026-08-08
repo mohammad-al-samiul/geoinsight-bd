@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 import {
-  Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart,
+  Bar, BarChart, CartesianGrid, Cell, LabelList, Legend, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
@@ -17,6 +17,8 @@ import { IntelCard } from "@/components/ui/intel-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { chartTooltipProps } from "@/lib/chart-tooltip";
+import { chartLayout, piePercentLabel, truncateLabel } from "@/lib/chart-theme";
+import { useBreakpoint } from "@/hooks/use-breakpoint";
 import {
   CATEGORY_LABELS_BN, CATEGORY_LABELS_EN, FACT_CHECK_LABELS_BN, FACT_CHECK_LABELS_EN,
   PARTY_LABELS_BN, PARTY_LABELS_EN, PARTY_ORDER, THREAT_LEVEL_ORDER,
@@ -149,6 +151,9 @@ function LiveScanBanner({ bn, active }: { bn: boolean; active: boolean }) {
 }
 
 function ShieldCharts({ signals, bn }: { signals: NarrativeSignal[]; bn: boolean }) {
+  const bp = useBreakpoint();
+  const layout = chartLayout(bp);
+
   const catData = useMemo(() => {
     const counts: Partial<Record<NarrativeCategory, number>> = {};
     for (const s of signals) counts[s.category] = (counts[s.category] ?? 0) + 1;
@@ -188,30 +193,37 @@ function ShieldCharts({ signals, bn }: { signals: NarrativeSignal[]; bn: boolean
   if (signals.length === 0) return null;
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="grid min-w-0 gap-4 md:grid-cols-3">
       <motion.div
-        className="shield-float-slow"
+        className="shield-float-slow min-w-0"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15, duration: 0.55 }}
         whileHover={{ scale: 1.02 }}
       >
-        <IntelCard accent="danger" padding="sm" index={0} float={false} shimmer={false} className="h-full !overflow-visible">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+        <IntelCard accent="danger" padding="sm" index={0} float={false} shimmer={false} className="h-full min-w-0 !overflow-visible">
+          <p className="mb-3 text-sm font-bold uppercase tracking-widest text-muted-foreground">
             {bn ? "ঝুঁকির মাত্রা বিতরণ" : "Threat Level Distribution"}
           </p>
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart margin={{ top: 18, right: 18, bottom: 8, left: 18 }}>
+          <ResponsiveContainer width="100%" height={layout.chartHeightMd}>
+            <PieChart margin={{ top: layout.narrow ? 12 : 28, right: layout.narrow ? 12 : 36, bottom: 12, left: layout.narrow ? 12 : 36 }}>
               <Pie
                 data={threatData}
                 dataKey="value"
                 cx="50%"
-                cy="48%"
-                innerRadius={48}
-                outerRadius={70}
+                cy="46%"
+                innerRadius={layout.pieInner}
+                outerRadius={layout.pieOuter}
                 paddingAngle={4}
-                label={({ name, percent }) => `${name} ${Math.round((percent ?? 0) * 100)}%`}
-                labelLine={{ stroke: "#64748b", strokeWidth: 1 }}
+                label={(props) =>
+                  piePercentLabel({
+                    ...props,
+                    showName: layout.showPieNames,
+                    fontSize: layout.pieFontSize,
+                    offset: layout.pieLabelOffset,
+                  })
+                }
+                labelLine={{ stroke: "#94a3b8", strokeWidth: 1.5 }}
                 isAnimationActive
                 animationDuration={1200}
                 animationBegin={200}
@@ -220,9 +232,20 @@ function ShieldCharts({ signals, bn }: { signals: NarrativeSignal[]; bn: boolean
                   <Cell key={entry.name} fill={entry.color} opacity={0.9} />
                 ))}
               </Pie>
-              <Tooltip {...chartTooltipProps} formatter={(v, n) => [v, n]} />
-              <Legend iconType="circle" iconSize={9}
-                formatter={(v) => <span className="text-[11px] text-muted-foreground">{v}</span>} />
+              <Tooltip
+                {...chartTooltipProps}
+                formatter={(v: number, n) => {
+                  const total = threatData.reduce((s, d) => s + d.value, 0) || 1;
+                  const pct = Math.round((v / total) * 100);
+                  return [`${v} (${pct}%)`, n];
+                }}
+              />
+              <Legend
+                iconType="circle"
+                iconSize={layout.narrow ? 9 : 12}
+                wrapperStyle={layout.legend}
+                formatter={(v) => <span className="text-xs font-semibold text-foreground/90 sm:text-sm">{v}</span>}
+              />
             </PieChart>
           </ResponsiveContainer>
         </IntelCard>
@@ -236,21 +259,28 @@ function ShieldCharts({ signals, bn }: { signals: NarrativeSignal[]; bn: boolean
         whileHover={{ scale: 1.015 }}
       >
         <IntelCard padding="sm" index={1} className="h-full">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+          <p className="mb-3 text-sm font-bold uppercase tracking-widest text-muted-foreground">
             {bn ? "ক্যাটাগরি অনুযায়ী সংকেত" : "Signals by Category"}
           </p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={catData} layout="vertical"
-              margin={{ top: 0, right: 16, left: 4, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={layout.chartHeightMd}>
+            <BarChart
+              data={catData.map((d) => ({
+                ...d,
+                name: truncateLabel(String(d.name ?? ""), layout.narrow ? 12 : 22),
+              }))}
+              layout="vertical"
+              margin={{ top: 4, right: layout.narrow ? 28 : 48, left: 4, bottom: 4 }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" horizontal={false} />
-              <XAxis type="number" allowDecimals={false} tick={{ fill: "#64748b", fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" width={130} tick={{ fill: "#94a3b8", fontSize: 11 }} />
+              <XAxis type="number" allowDecimals={false} tick={layout.tick} />
+              <YAxis type="category" dataKey="name" width={layout.yAxisCategoryWidth} tick={layout.tick} />
               <Tooltip {...chartTooltipProps} />
-              <Bar dataKey="count" radius={[0, 5, 5, 0]} maxBarSize={36}
+              <Bar dataKey="count" radius={[0, 6, 6, 0]} maxBarSize={layout.barMaxSize}
                 isAnimationActive animationDuration={1100} animationBegin={280}>
                 {catData.map((entry, i) => (
                   <Cell key={i} fill={entry.color} fillOpacity={0.82} />
                 ))}
+                <LabelList dataKey="count" position="right" style={layout.labelList} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -265,21 +295,22 @@ function ShieldCharts({ signals, bn }: { signals: NarrativeSignal[]; bn: boolean
         whileHover={{ scale: 1.01 }}
       >
         <IntelCard padding="sm" accent="info" index={2}>
-          <p className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-            <Users className="h-3.5 w-3.5 text-sky-400" />
+          <p className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-muted-foreground">
+            <Users className="h-4 w-4 text-sky-400" />
             {bn ? "দল অনুযায়ী সংকেত" : "Signals by Party"}
           </p>
-          <ResponsiveContainer width="100%" height={140}>
-            <BarChart data={partyData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={layout.chartHeightSm}>
+            <BarChart data={partyData} margin={{ top: 20, right: 12, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" vertical={false} />
-              <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-              <YAxis allowDecimals={false} tick={{ fill: "#64748b", fontSize: 11 }} width={26} />
+              <XAxis dataKey="name" tick={layout.tick} />
+              <YAxis allowDecimals={false} tick={layout.tick} width={layout.yAxisNumberWidth} />
               <Tooltip {...chartTooltipProps} />
-              <Bar dataKey="count" radius={[5, 5, 0, 0]} maxBarSize={56}
+              <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={layout.narrow ? 40 : 64}
                 isAnimationActive animationDuration={1000} animationBegin={360}>
                 {partyData.map((entry) => (
                   <Cell key={entry.name} fill={entry.color} fillOpacity={0.85} />
                 ))}
+                <LabelList dataKey="count" position="top" style={layout.labelList} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

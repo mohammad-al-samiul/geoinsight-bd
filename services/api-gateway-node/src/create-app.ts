@@ -1,3 +1,4 @@
+import compression from "compression";
 import cors from "cors";
 import express, { Express } from "express";
 import helmet from "helmet";
@@ -18,6 +19,9 @@ export function createApp(): Express {
   app.set("trust proxy", 1);
   app.use(helmet({ contentSecurityPolicy: env.NODE_ENV === "production" }));
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+  // gzip/brotli-negotiated response compression; large JSON payloads
+  // (hierarchy, dashboards, feeds) shrink dramatically over the wire.
+  app.use(compression({ threshold: 1024 }));
   app.use(express.json({ limit: "1mb" }));
 
   if (env.NODE_ENV !== "test") {

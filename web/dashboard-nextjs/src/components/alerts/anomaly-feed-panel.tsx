@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useCallback, useState } from "react";
 import { AlertDetailModal } from "@/components/alerts/alert-detail-modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,50 @@ const SEVERITY_STYLES: Record<AnomalyAlert["severity"], string> = {
   HIGH: "border-orange-500/30 bg-orange-500/5",
   CRITICAL: "border-destructive/40 bg-destructive/10",
 };
+
+interface AnomalyAlertItemProps {
+  alert: AnomalyAlert;
+  statusLabel: string;
+  onOpen: (alert: AnomalyAlert) => void;
+}
+
+// Memoized: the live socket feed pulses the parent frequently, so each row
+// only re-renders when its own alert data changes.
+const AnomalyAlertItem = memo(function AnomalyAlertItem({
+  alert,
+  statusLabel,
+  onOpen,
+}: AnomalyAlertItemProps) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpen(alert)}
+        className={cn(
+          "group flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-all hover:border-primary/40",
+          SEVERITY_STYLES[alert.severity],
+          alert.isNew && "animate-score-pulse ring-1 ring-primary/30",
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium leading-snug text-foreground">
+            {alert.headline}
+          </p>
+          <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
+            {alert.detail}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+            <span>{new Date(alert.createdAt).toLocaleTimeString("en-BD")}</span>
+            <Badge variant="outline" className="h-5 text-[9px]">
+              {statusLabel}
+            </Badge>
+          </div>
+        </div>
+        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition group-hover:text-primary" />
+      </button>
+    </li>
+  );
+});
 
 interface AnomalyFeedPanelProps {
   className?: string;
@@ -40,18 +84,21 @@ export function AnomalyFeedPanel({
   const [selected, setSelected] = useState<AnomalyAlert | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const openAlert = (alert: AnomalyAlert) => {
+  const openAlert = useCallback((alert: AnomalyAlert) => {
     setSelected(alert);
     setModalOpen(true);
-  };
+  }, []);
 
-  const statusLabel = (status: string) => {
-    try {
-      return ts(status as "VERIFIED" | "PENDING" | "UNANCHORED");
-    } catch {
-      return status;
-    }
-  };
+  const statusLabel = useCallback(
+    (status: string) => {
+      try {
+        return ts(status as "VERIFIED" | "PENDING" | "UNANCHORED");
+      } catch {
+        return status;
+      }
+    },
+    [ts],
+  );
 
   return (
     <>
@@ -98,7 +145,7 @@ export function AnomalyFeedPanel({
         <div
           className={cn(
             "overflow-y-auto p-2",
-            compact ? "max-h-[320px]" : "max-h-[min(70vh,560px)] flex-1",
+            compact ? "max-h-[320px]" : "max-h-none flex-1 sm:max-h-[min(70vh,560px)]",
           )}
         >
           {error && (
@@ -117,33 +164,12 @@ export function AnomalyFeedPanel({
           ) : (
             <ul className="space-y-2">
               {alerts.map((alert) => (
-                <li key={alert.id}>
-                  <button
-                    type="button"
-                    onClick={() => openAlert(alert)}
-                    className={cn(
-                      "group flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-all hover:border-primary/40",
-                      SEVERITY_STYLES[alert.severity],
-                      alert.isNew && "animate-score-pulse ring-1 ring-primary/30",
-                    )}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium leading-snug text-foreground">
-                        {alert.headline}
-                      </p>
-                      <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
-                        {alert.detail}
-                      </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
-                        <span>{new Date(alert.createdAt).toLocaleTimeString("en-BD")}</span>
-                        <Badge variant="outline" className="h-5 text-[9px]">
-                          {statusLabel(alert.verificationStatus)}
-                        </Badge>
-                      </div>
-                    </div>
-                    <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition group-hover:text-primary" />
-                  </button>
-                </li>
+                <AnomalyAlertItem
+                  key={alert.id}
+                  alert={alert}
+                  statusLabel={statusLabel(alert.verificationStatus)}
+                  onOpen={openAlert}
+                />
               ))}
             </ul>
           )}

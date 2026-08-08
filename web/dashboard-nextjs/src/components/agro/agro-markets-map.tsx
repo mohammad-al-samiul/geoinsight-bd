@@ -53,7 +53,7 @@ export function AgroMarketsMap({
           {markets.length} বাজার
         </span>
       </div>
-      <div className="relative h-[360px] overflow-hidden rounded-xl border border-emerald-500/20 bg-background/40 shadow-panel sm:h-[420px]">
+      <div className="relative h-[240px] overflow-hidden rounded-xl border border-emerald-500/20 bg-background/40 shadow-panel sm:h-[340px] lg:h-[460px]">
         <AgroMarketsMapInner filter={filter} markets={markets} />
       </div>
     </div>

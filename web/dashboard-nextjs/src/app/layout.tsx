@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { JetBrains_Mono, Noto_Sans_Bengali, Sora } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
+import { AppProviders } from "@/components/app-providers";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
@@ -53,7 +54,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           locale === "bn" ? "font-bengali" : "font-sans",
         )}
       >
-        <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
+        <NextIntlClientProvider messages={messages}>
+          <AppProviders>{children}</AppProviders>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

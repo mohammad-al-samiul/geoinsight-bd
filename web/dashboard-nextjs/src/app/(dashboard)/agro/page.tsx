@@ -422,13 +422,13 @@ export default function AgroPage() {
                     </p>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {[
                     { label: "মূল্যযুক্ত বাজার", value: localOverview.priced.length, tone: "text-emerald-300" },
                     { label: "পণ্যের ধরন", value: localOverview.commodities.length, tone: "text-sky-300" },
                     { label: "সর্বোচ্চ ব্যবধান", value: localOverview.commodities[0] ? `৳${localOverview.commodities[0].spread.toFixed(0)}` : "—", tone: "text-amber-300" },
                   ].map((item) => (
-                    <div key={item.label} className="min-w-[90px] rounded-xl border border-white/10 bg-background/35 px-3 py-2 text-center">
+                    <div key={item.label} className="min-w-0 rounded-xl border border-white/10 bg-background/35 px-3 py-2 text-center">
                       <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{item.label}</p>
                       <p className={cn("mt-1 font-display text-lg font-bold tabular-nums", item.tone)}>{item.value}</p>
                     </div>

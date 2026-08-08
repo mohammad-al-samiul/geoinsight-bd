@@ -62,7 +62,7 @@ export function CitizenChatbotPanel() {
         </Button>
       </div>
 
-      <div className="mt-4 flex h-[400px] flex-col glass-panel rounded-xl shadow-panel">
+      <div className="mt-4 flex h-[min(60dvh,400px)] flex-col glass-panel rounded-xl shadow-panel sm:h-[400px]">
         <div className="flex-1 space-y-2 overflow-y-auto p-4">
           {messages.map((m, i) => (
             <div

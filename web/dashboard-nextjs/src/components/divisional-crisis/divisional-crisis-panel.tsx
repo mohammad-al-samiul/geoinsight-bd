@@ -51,6 +51,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
   Pie,
   PieChart,
@@ -76,6 +77,8 @@ import {
   CitizenReportPayload,
 } from "@/hooks/use-divisional-crisis";
 import { chartTooltipProps } from "@/lib/chart-tooltip";
+import { chartLayout, piePercentLabel } from "@/lib/chart-theme";
+import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { cn } from "@/lib/utils";
 import type { DivisionCrisisData, DistrictInfo } from "@/lib/divisional-crisis-data";
 
@@ -102,6 +105,8 @@ export function DivisionalCrisisPanel() {
   const t = useTranslations("modules.divisionalCrisis");
   const locale = useLocale();
   const bn = locale === "bn";
+  const bp = useBreakpoint();
+  const layout = chartLayout(bp);
 
   const {
     loading,
@@ -515,14 +520,14 @@ export function DivisionalCrisisPanel() {
                 </span>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[0, 10, 20, 30].map((surge) => (
                   <button
                     key={surge}
                     type="button"
                     onClick={() => setFilters({ ...filters, stressSurgePercentage: surge })}
                     className={cn(
-                      "flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all border text-center",
+                      "py-2 px-3 rounded-lg text-xs font-semibold transition-all border text-center",
                       filters.stressSurgePercentage === surge
                         ? "bg-amber-500 text-black border-amber-400 font-bold shadow-md shadow-amber-500/20"
                         : "bg-secondary/40 text-muted-foreground border-border/40 hover:bg-secondary hover:text-foreground"
@@ -544,7 +549,7 @@ export function DivisionalCrisisPanel() {
               <Layers className="h-3.5 w-3.5" />
               {bn ? "বিভাগ:" : "Division:"}
             </span>
-            <div className="flex flex-wrap gap-1">
+            <div className="scroll-x-strip max-w-full">
               <button
                 type="button"
                 onClick={() => setFilters({ ...filters, divisionId: "all" })}
@@ -761,8 +766,8 @@ export function DivisionalCrisisPanel() {
         </AnimatePresence>
 
         {/* Analytics Tabs Header */}
-        <div className="flex items-center justify-between border-b border-border/40 pb-2 print:hidden">
-          <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-col gap-2 border-b border-border/40 pb-2 print:hidden sm:flex-row sm:items-center sm:justify-between">
+          <div className="scroll-x-strip min-w-0 flex-1">
             <button
               onClick={() => setActiveTab("overview")}
               className={cn(
@@ -903,18 +908,19 @@ export function DivisionalCrisisPanel() {
                   </Badge>
                 </div>
 
-                <div className="h-[320px] w-full pt-2">
+                <div className="w-full pt-2" style={{ height: layout.chartHeightLg }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={crimeComparisonChartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                    <BarChart data={crimeComparisonChartData} margin={{ top: 28, right: 16, left: 0, bottom: 28 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" vertical={false} />
                       <XAxis
                         dataKey={bn ? "name" : "nameEn"}
-                        tick={{ fill: "#94a3b8", fontSize: 11 }}
+                        tick={layout.tick}
                         interval={0}
                         angle={-20}
                         textAnchor="end"
+                        height={56}
                       />
-                      <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                      <YAxis tick={layout.tick} width={layout.yAxisNumberWidth} />
                       <Tooltip
                         {...chartTooltipProps}
                         formatter={(value, name) => [
@@ -924,7 +930,7 @@ export function DivisionalCrisisPanel() {
                             : (bn ? "ক্রাইসিস স্কোর" : "Crisis Score"),
                         ]}
                       />
-                      <Bar dataKey="totalCases" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={32} name={bn ? "মোট মামলা" : "Total Cases"}>
+                      <Bar dataKey="totalCases" fill="#ef4444" radius={[6, 6, 0, 0]} maxBarSize={layout.barMaxSize} name={bn ? "মোট মামলা" : "Total Cases"}>
                         {crimeComparisonChartData.map((entry, index) => (
                           <Cell
                             key={`cell-${index}`}
@@ -937,6 +943,7 @@ export function DivisionalCrisisPanel() {
                             }
                           />
                         ))}
+                        <LabelList dataKey="totalCases" position="top" style={layout.labelList} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -949,27 +956,37 @@ export function DivisionalCrisisPanel() {
               <IntelCard accent="warning" padding="md">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h3 className="font-display text-sm font-semibold flex items-center gap-2">
-                      <PieChartIcon className="h-4 w-4 text-amber-400" />
+                    <h3 className="font-display text-base font-semibold flex items-center gap-2">
+                      <PieChartIcon className="h-5 w-5 text-amber-400" />
                       {bn ? "জাতীয় অপরাধের ধরণ ও শতাংশ (Percentage)" : "National Crime Breakdown & Percentage"}
                     </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="text-sm text-muted-foreground mt-0.5">
                       {bn ? "অপরাধের ধরণের শতকরা ভাগের অনুপাত" : "Distribution percentage of major crime categories"}
                     </p>
                   </div>
                 </div>
 
-                <div className="h-[240px] w-full">
+                <div className="w-full" style={{ height: layout.chartHeightMd }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
+                    <PieChart margin={{ top: 24, right: 28, bottom: 12, left: 28 }}>
                       <Pie
                         data={aggregateCrimeTypeBreakdown}
                         cx="50%"
                         cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
+                        innerRadius={layout.pieInner}
+                        outerRadius={layout.pieOuter}
                         paddingAngle={4}
                         dataKey="value"
+                        nameKey={bn ? "nameBn" : "name"}
+                        label={(props) =>
+                          piePercentLabel({
+                            ...props,
+                            showName: layout.showPieNames,
+                            fontSize: layout.pieFontSize,
+                            offset: layout.pieLabelOffset,
+                          })
+                        }
+                        labelLine={{ stroke: "#94a3b8", strokeWidth: 1.5 }}
                       >
                         {aggregateCrimeTypeBreakdown.map((entry, index) => (
                           <Cell key={`pie-cell-${index}`} fill={CRIME_COLORS[index % CRIME_COLORS.length]} />
@@ -979,7 +996,7 @@ export function DivisionalCrisisPanel() {
                         {...chartTooltipProps}
                         formatter={(value, name, item) => [
                           `${value.toLocaleString()} (${item.payload.percentage}%)`,
-                          item.payload.nameBn,
+                          bn ? item.payload.nameBn : item.payload.name,
                         ]}
                       />
                     </PieChart>
@@ -987,17 +1004,17 @@ export function DivisionalCrisisPanel() {
                 </div>
 
                 {/* Custom Interactive Legend for Pie Chart */}
-                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-border/40">
+                <div className="grid grid-cols-1 gap-2.5 text-sm pt-3 border-t border-border/40 sm:grid-cols-2">
                   {aggregateCrimeTypeBreakdown.map((item, idx) => (
-                    <div key={item.name} className="flex items-center justify-between gap-1.5 p-1.5 rounded bg-background/30 border border-border/20">
-                      <div className="flex items-center gap-2 min-w-0">
+                    <div key={item.name} className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-background/30 border border-border/20">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <span
-                          className="h-2.5 w-2.5 rounded-full shrink-0"
+                          className="h-3.5 w-3.5 rounded-full shrink-0"
                           style={{ backgroundColor: CRIME_COLORS[idx % CRIME_COLORS.length] }}
                         />
-                        <span className="truncate text-muted-foreground font-medium">{bn ? item.nameBn : item.name}</span>
+                        <span className="truncate text-foreground/90 font-semibold">{bn ? item.nameBn : item.name}</span>
                       </div>
-                      <span className="font-bold tabular-nums text-foreground shrink-0">{item.percentage}%</span>
+                      <span className="text-base font-extrabold tabular-nums text-foreground shrink-0">{item.percentage}%</span>
                     </div>
                   ))}
                 </div>
@@ -1022,17 +1039,19 @@ export function DivisionalCrisisPanel() {
                 </div>
               </div>
 
-              <div className="h-[300px] w-full">
+              <div className="w-full" style={{ height: layout.chartHeightMd }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={forecastChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <AreaChart data={forecastChartData} margin={{ top: 16, right: 16, left: 8, bottom: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" vertical={false} />
-                    <XAxis dataKey={bn ? "periodBn" : "period"} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
-                    <YAxis yAxisId="left" tick={{ fill: "#cbd5e1", fontSize: 11 }} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fill: "#a855f7", fontSize: 11 }} />
+                    <XAxis dataKey={bn ? "periodBn" : "period"} tick={layout.tick} />
+                    <YAxis yAxisId="left" tick={layout.tick} width={layout.yAxisNumberWidth} />
+                    {layout.showSecondaryYAxis && (
+                      <YAxis yAxisId="right" orientation="right" tick={{ ...layout.tick, fill: "#c084fc" }} width={layout.yAxisNumberWidth} />
+                    )}
                     <Tooltip {...chartTooltipProps} />
-                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-                    <Area yAxisId="left" type="monotone" dataKey="cases" stroke="#06b6d4" fill="#06b6d4" fillOpacity={0.2} name={bn ? "পূর্বাভাসকৃত মোট অপরাধ" : "Projected Crime Cases"} />
-                    <Area yAxisId="right" type="monotone" dataKey="loadShedding" stroke="#a855f7" fill="#a855f7" fillOpacity={0.2} name={bn ? "পূর্বাভাসকৃত লোডশেডিং (ঘণ্টা)" : "Projected Load-shedding (hrs)"} />
+                    <Legend wrapperStyle={layout.legend} />
+                    <Area yAxisId="left" type="monotone" dataKey="cases" stroke="#06b6d4" fill="#06b6d4" fillOpacity={0.2} strokeWidth={2.5} name={bn ? "পূর্বাভাসকৃত মোট অপরাধ" : "Projected Crime Cases"} />
+                    <Area yAxisId={layout.showSecondaryYAxis ? "right" : "left"} type="monotone" dataKey="loadShedding" stroke="#a855f7" fill="#a855f7" fillOpacity={0.2} strokeWidth={2.5} name={bn ? "পূর্বাভাসকৃত লোডশেডিং (ঘণ্টা)" : "Projected Load-shedding (hrs)"} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -1073,16 +1092,20 @@ export function DivisionalCrisisPanel() {
                 </div>
               </div>
 
-              <div className="h-[300px] w-full">
+              <div className="w-full" style={{ height: layout.chartHeightMd }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={historicalYoYChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <BarChart data={historicalYoYChartData} margin={{ top: 28, right: 16, left: 8, bottom: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" vertical={false} />
-                    <XAxis dataKey="year" tick={{ fill: "#cbd5e1", fontSize: 11 }} />
-                    <YAxis tick={{ fill: "#cbd5e1", fontSize: 11 }} />
+                    <XAxis dataKey="year" tick={layout.tick} />
+                    <YAxis tick={layout.tick} width={52} />
                     <Tooltip {...chartTooltipProps} />
-                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-                    <Bar dataKey="totalCrimes" fill="#10b981" name={bn ? "বাৎসরিক মোট অপরাধ" : "Annual Total Crimes"} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="avgLoadShedding" fill="#f59e0b" name={bn ? "গড় লোডশেডিং (ঘণ্টা)" : "Avg Load-shedding (hrs)"} radius={[4, 4, 0, 0]} />
+                    <Legend wrapperStyle={layout.legend} />
+                    <Bar dataKey="totalCrimes" fill="#10b981" name={bn ? "বাৎসরিক মোট অপরাধ" : "Annual Total Crimes"} radius={[6, 6, 0, 0]} maxBarSize={48}>
+                      <LabelList dataKey="totalCrimes" position="top" style={layout.labelList} />
+                    </Bar>
+                    <Bar dataKey="avgLoadShedding" fill="#f59e0b" name={bn ? "গড় লোডশেডিং (ঘণ্টা)" : "Avg Load-shedding (hrs)"} radius={[6, 6, 0, 0]} maxBarSize={48}>
+                      <LabelList dataKey="avgLoadShedding" position="top" style={layout.labelList} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1106,12 +1129,12 @@ export function DivisionalCrisisPanel() {
                 </div>
               </div>
 
-              <div className="h-[380px] w-full">
+              <div className="w-full" style={{ height: layout.chartHeightLg }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarChartData}>
+                  <RadarChart cx="50%" cy="50%" outerRadius={layout.narrow ? "58%" : "75%"} data={radarChartData}>
                     <PolarGrid stroke="rgba(148,163,184,0.15)" />
-                    <PolarAngleAxis dataKey={bn ? "subjectBn" : "subject"} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
-                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "#94a3b8", fontSize: 10 }} />
+                    <PolarAngleAxis dataKey={bn ? "subjectBn" : "subject"} tick={layout.tickMuted} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={layout.tickMuted} tickFormatter={(v) => `${v}%`} />
                     {filteredDivisions.slice(0, 5).map((div) => (
                       <Radar
                         key={div.id}
@@ -1120,10 +1143,11 @@ export function DivisionalCrisisPanel() {
                         stroke={DIVISION_COLOR_MAP[div.id] || "#3b82f6"}
                         fill={DIVISION_COLOR_MAP[div.id] || "#3b82f6"}
                         fillOpacity={0.2}
+                        strokeWidth={2}
                       />
                     ))}
                     <Tooltip {...chartTooltipProps} />
-                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                    <Legend wrapperStyle={layout.legend} />
                   </RadarChart>
                 </ResponsiveContainer>
               </div>
@@ -1148,18 +1172,18 @@ export function DivisionalCrisisPanel() {
 
             {/* Multi-Metric Resource Chart */}
             <IntelCard accent="warning" padding="md">
-              <div className="h-[280px] w-full">
+              <div className="w-full" style={{ height: layout.chartHeightMd }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={resourceCrisisChartData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
+                  <BarChart data={resourceCrisisChartData} margin={{ top: 16, right: 16, left: 4, bottom: 16 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" vertical={false} />
-                    <XAxis dataKey={bn ? "name" : "nameEn"} tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                    <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                    <XAxis dataKey={bn ? "name" : "nameEn"} tick={layout.tick} />
+                    <YAxis tick={layout.tick} tickFormatter={(v) => `${v}%`} width={48} />
                     <Tooltip {...chartTooltipProps} />
-                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-                    <Bar dataKey="gasDeficit" fill="#f59e0b" name={bn ? "গ্যাস ঘাটতি (%)" : "Gas Deficit (%)"} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="fuelDeficit" fill="#ef4444" name={bn ? "তেল/জ্বালানি সংকট (%)" : "Fuel Stock Deficit (%)"} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="loadSheddingHours" fill="#a855f7" name={bn ? "দৈনিক লোডশেডিং (ঘণ্টা)" : "Load-shedding (hrs)"} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="waterScarcity" fill="#06b6d4" name={bn ? "পানি সংকট ইনডেক্স" : "Water Scarcity Index"} radius={[4, 4, 0, 0]} />
+                    <Legend wrapperStyle={layout.legend} />
+                    <Bar dataKey="gasDeficit" fill="#f59e0b" name={bn ? "গ্যাস ঘাটতি (%)" : "Gas Deficit (%)"} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    <Bar dataKey="fuelDeficit" fill="#ef4444" name={bn ? "তেল/জ্বালানি সংকট (%)" : "Fuel Stock Deficit (%)"} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    <Bar dataKey="loadSheddingHours" fill="#a855f7" name={bn ? "দৈনিক লোডশেডিং (ঘণ্টা)" : "Load-shedding (hrs)"} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    <Bar dataKey="waterScarcity" fill="#06b6d4" name={bn ? "পানি সংকট ইনডেক্স" : "Water Scarcity Index"} radius={[4, 4, 0, 0]} maxBarSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1381,23 +1405,26 @@ export function DivisionalCrisisPanel() {
 
                     {/* Crime Breakdown Progress Bars */}
                     <div className="mt-3 space-y-2">
-                      <div className="text-[11px] font-semibold text-muted-foreground flex items-center justify-between">
+                      <div className="text-sm font-semibold text-muted-foreground flex items-center justify-between gap-2">
                         <span>{bn ? "শীর্ষ অপরাধের ধরণ ও শতাংশ:" : "Top Crime Breakdown (%):"}</span>
-                        <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[200px]" title={(div.crime.topHotspots_bn).join(", ")}>
+                        <span className="text-xs text-muted-foreground font-mono truncate max-w-[200px]" title={(div.crime.topHotspots_bn).join(", ")}>
                           {bn ? `হটস্পট: ${(div.crime.topHotspots_bn).slice(0, 3).join(", ")}` : `Hotspots: ${div.crime.topHotspots.slice(0, 3).join(", ")}`}
                         </span>
                       </div>
 
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         {div.crime.breakdown.slice(0, 3).map((item, idx) => (
-                          <div key={item.type} className="space-y-0.5">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-foreground/90 font-medium">{bn ? item.type_bn : item.type}</span>
-                              <span className="font-semibold tabular-nums text-muted-foreground">
-                                {item.count.toLocaleString()} ({item.percentage}%)
+                          <div key={item.type} className="space-y-1">
+                            <div className="flex items-center justify-between text-sm gap-2">
+                              <span className="text-foreground/90 font-semibold">{bn ? item.type_bn : item.type}</span>
+                              <span className="text-base font-extrabold tabular-nums text-foreground shrink-0">
+                                {item.percentage}%
+                                <span className="ml-1.5 text-xs font-semibold text-muted-foreground">
+                                  ({item.count.toLocaleString()})
+                                </span>
                               </span>
                             </div>
-                            <div className="h-1.5 w-full bg-secondary/50 rounded-full overflow-hidden">
+                            <div className="h-2.5 w-full bg-secondary/50 rounded-full overflow-hidden">
                               <div
                                 className="h-full rounded-full transition-all duration-500"
                                 style={{

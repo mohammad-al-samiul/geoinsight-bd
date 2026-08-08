@@ -32,22 +32,27 @@ export function useDashboardData(filter: AdminFilterState) {
     setPulseKeys((prev) => ({ ...prev, [key]: Date.now() }));
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [m, mk] = await Promise.all([
-        fetchDashboardMetricsSafe(filter),
-        fetchRedFlagMarkers(filter),
-      ]);
-      setMetrics(m);
-      setMarkers(mk);
-      if (m?.unitScores?.length) {
-        applyUnitScoreOverlay(m.unitScores);
+  const load = useCallback(
+    async (options?: { silent?: boolean }) => {
+      // Silent refreshes (socket-driven) swap data in place without tearing
+      // the dashboard down into the full-screen loader.
+      if (!options?.silent) setLoading(true);
+      try {
+        const [m, mk] = await Promise.all([
+          fetchDashboardMetricsSafe(filter),
+          fetchRedFlagMarkers(filter),
+        ]);
+        setMetrics(m);
+        setMarkers(mk);
+        if (m?.unitScores?.length) {
+          applyUnitScoreOverlay(m.unitScores);
+        }
+      } finally {
+        if (!options?.silent) setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
+    },
+    [filter],
+  );
 
   useEffect(() => {
     load();
@@ -115,7 +120,7 @@ export function useDashboardData(filter: AdminFilterState) {
     onKpiUpdate: (payload) => handleKpiUpdate(payload),
     onRedFlag: (payload, envelope) =>
       handleRedFlag(payload, envelope.adminUnitId),
-    onDashboardRefresh: () => load(),
+    onDashboardRefresh: () => load({ silent: true }),
   });
 
   return {

@@ -2,14 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CircleMarker, GeoJSON, MapContainer, TileLayer, Tooltip, useMap } from "react-leaflet";
-import type { Feature, FeatureCollection, Geometry } from "geojson";
+import type { Feature } from "geojson";
 import type { GeoJSON as GeoJSONLayer, Layer, Path, PathOptions } from "leaflet";
 import { AlertTriangle, MapPin, X } from "lucide-react";
-import {
-  BD_MAP_CENTER,
-  BD_MAP_ZOOM,
-  getMapBoundsForFilter,
-} from "@/lib/geojson-bd";
+import { BD_MAP_CENTER, BD_MAP_ZOOM } from "@/lib/geojson-bd";
+// Heavy boundary polygons only load with this dynamically-imported component.
+import { getMapBoundsForFilter, getVisibleGeoJson } from "@/lib/bd-boundaries";
 import type { AdminFilterState } from "@/types";
 import type { GeoFeatureProperties, RedFlagMarker } from "@/types/dashboard";
 import { getDrillChildType, getDrillParentId } from "@/lib/filter-utils";
@@ -18,7 +16,8 @@ import { MapSkeleton } from "@/components/ui/skeleton";
 
 interface ChoroplethMapInnerProps {
   filter: AdminFilterState;
-  geoJson: FeatureCollection<Geometry, GeoFeatureProperties>;
+  /** Bumped when the admin hierarchy or live unit scores change. */
+  geoVersion?: string | number;
   markers: RedFlagMarker[];
   mapPulseKey?: number;
   onFeatureClick: (props: GeoFeatureProperties) => void;
@@ -117,7 +116,7 @@ function buildIssueClusters(markers: RedFlagMarker[]): IssueCluster[] {
 
 export function ChoroplethMapInner({
   filter,
-  geoJson,
+  geoVersion,
   markers,
   mapPulseKey,
   onFeatureClick,
@@ -125,6 +124,9 @@ export function ChoroplethMapInner({
   const layerRef = useRef<GeoJSONLayer | null>(null);
   const [mounted, setMounted] = useState(false);
   const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- geoVersion signals hierarchy/score updates
+  const geoJson = useMemo(() => getVisibleGeoJson(filter), [filter, geoVersion]);
 
   useEffect(() => {
     setMounted(true);
@@ -247,7 +249,7 @@ export function ChoroplethMapInner({
       </MapContainer>
 
       {selectedCluster && (
-        <aside className="absolute bottom-3 left-3 z-[1000] w-[min(360px,calc(100%-24px))] overflow-hidden rounded-xl border border-orange-400/35 bg-slate-950/95 shadow-2xl backdrop-blur">
+        <aside className="absolute inset-x-3 bottom-3 z-[1000] max-h-[42%] max-w-full overflow-hidden rounded-xl border border-orange-400/35 bg-slate-950/95 shadow-2xl backdrop-blur sm:inset-x-auto sm:left-3 sm:max-h-none sm:w-[min(360px,calc(100%-24px))]">
           <div className="flex items-center justify-between border-b border-white/10 bg-orange-500/10 px-3.5 py-2.5">
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-500/20 text-orange-300">

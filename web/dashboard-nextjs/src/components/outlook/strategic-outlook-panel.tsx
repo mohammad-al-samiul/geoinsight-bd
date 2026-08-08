@@ -21,7 +21,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useStrategicOutlook } from "@/hooks/use-strategic-outlook";
+import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { chartTooltipProps } from "@/lib/chart-tooltip";
+import { chartLayout } from "@/lib/chart-theme";
 import { cn } from "@/lib/utils";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -445,6 +447,8 @@ function ChallengeDomainView({
   t: ReturnType<typeof useTranslations>;
   radarStroke: string;
 }) {
+  const bp = useBreakpoint();
+  const layout = chartLayout(bp);
   const sorted = useMemo(
     () => [...items].sort((a, b) => b.severity - a.severity),
     [items],
@@ -584,7 +588,7 @@ function ChallengeDomainView({
                 {bn ? "রাডারে তুলনামূলক চাপ" : "Comparative pressure radar"}
               </span>
             </div>
-            <ResponsiveContainer width="100%" height={340}>
+            <ResponsiveContainer width="100%" height={layout.narrow ? layout.chartHeightSm : layout.chartHeightMd}>
               <RadarChart
                 data={sorted.slice(0, 6).map((c) => ({
                   subject: c.title.length > 22 ? `${c.title.slice(0, 20)}…` : c.title,
@@ -592,10 +596,10 @@ function ChallengeDomainView({
                 }))}
                 cx="50%"
                 cy="50%"
-                outerRadius="55%"
+                outerRadius={layout.narrow ? "48%" : "55%"}
               >
                 <PolarGrid stroke="rgba(148,163,184,0.12)" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: "#94a3b8", fontSize: layout.tick.fontSize }} />
                 <Radar
                   name={t("severity")}
                   dataKey="value"
@@ -620,6 +624,8 @@ export function StrategicOutlookPanel() {
   const t = useTranslations("outlook");
   const locale = useLocale();
   const bn = locale === "bn";
+  const bp = useBreakpoint();
+  const layout = chartLayout(bp);
   const { data, loading, error, reload, refresh, refreshing } = useStrategicOutlook();
   const [activeTab, setActiveTab] = useState<"overview"|"politics"|"economy"|"sources">("overview");
   useRealtimeRefresh(reload);
@@ -714,11 +720,11 @@ export function StrategicOutlookPanel() {
                 <p className="mb-1 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
                   {t("challengeIntensity")}
                 </p>
-                <ResponsiveContainer width="100%" height={240}>
-                  <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="52%">
+                <ResponsiveContainer width="100%" height={layout.chartHeightSm}>
+                  <RadarChart data={radarData} cx="50%" cy="50%" outerRadius={layout.narrow ? "46%" : "52%"}>
                     <PolarGrid stroke="rgba(148,163,184,0.12)" />
                     <PolarAngleAxis dataKey="subject"
-                      tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                      tick={{ fill: "#94a3b8", fontSize: layout.tick.fontSize }} />
                     <Radar name={t("politics")} dataKey="politics"
                       stroke="#a855f7" fill="#a855f7" fillOpacity={0.25} strokeWidth={2} />
                     <Radar name={t("economy")} dataKey="economy"
@@ -733,12 +739,12 @@ export function StrategicOutlookPanel() {
           {/* ── Tabs ── */}
           <div className="rounded-2xl border border-border/50 overflow-hidden">
             {/* Tab bar */}
-            <div className="flex border-b border-border/50 bg-secondary/15">
+            <div className="scroll-x-strip border-b border-border/50 bg-secondary/15 px-1 sm:gap-0">
               {tabs.map(tab => (
                 <button key={tab.id} type="button"
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
                   className={cn(
-                    "flex-1 px-4 py-3 text-xs font-semibold tracking-wide transition-all",
+                    "px-4 py-3 text-xs font-semibold tracking-wide transition-all sm:flex-1",
                     activeTab === tab.id
                       ? "bg-primary/10 text-primary border-b-2 border-primary"
                       : "text-muted-foreground/70 hover:text-foreground hover:bg-white/5",
@@ -761,24 +767,73 @@ export function StrategicOutlookPanel() {
                       <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
                         {t("challengeIntensity")}
                       </p>
-                      <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={challengeBarData}
-                          margin={{ top: 4, right: 12, left: 8, bottom: 90 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.08)" vertical={false} />
-                          <XAxis dataKey="name"
-                            tick={{ fill: "#94a3b8", fontSize: 11 }}
-                            interval={0}
-                            angle={-38}
-                            textAnchor="end"
-                            height={90} />
-                          <YAxis domain={[0, 5]} ticks={[1,2,3,4,5]}
-                            tick={{ fill: "#475569", fontSize: 11 }} width={22} />
+                      <ResponsiveContainer
+                        width="100%"
+                        height={
+                          layout.narrow
+                            ? Math.max(layout.chartHeightMd, challengeBarData.length * 36)
+                            : layout.chartHeightMd
+                        }
+                      >
+                        <BarChart
+                          data={challengeBarData}
+                          layout={layout.narrow ? "vertical" : "horizontal"}
+                          margin={
+                            layout.narrow
+                              ? { top: 4, right: 12, left: 4, bottom: 4 }
+                              : { top: 4, right: 12, left: 8, bottom: layout.tablet ? 56 : 90 }
+                          }
+                        >
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="rgba(148,163,184,0.08)"
+                            vertical={false}
+                            horizontal={layout.narrow ? false : undefined}
+                          />
+                          {layout.narrow ? (
+                            <>
+                              <XAxis
+                                type="number"
+                                domain={[0, 5]}
+                                ticks={[1, 2, 3, 4, 5]}
+                                tick={layout.tickMuted}
+                              />
+                              <YAxis
+                                type="category"
+                                dataKey="name"
+                                width={layout.yAxisCategoryWidth}
+                                tick={layout.tick}
+                                interval={0}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <XAxis
+                                dataKey="name"
+                                tick={layout.tick}
+                                interval={0}
+                                angle={layout.tablet ? -22 : -38}
+                                textAnchor="end"
+                                height={layout.tablet ? 56 : 90}
+                              />
+                              <YAxis
+                                domain={[0, 5]}
+                                ticks={[1, 2, 3, 4, 5]}
+                                tick={layout.tickMuted}
+                                width={layout.yAxisNumberWidth}
+                              />
+                            </>
+                          )}
                           <Tooltip {...chartTooltipProps}
                             formatter={(v, _n, p) => [
                               `${String(v)}/5`,
                               (p.payload as { domain?: string } | undefined)?.domain === "politics" ? t("politics") : t("economy"),
                             ]} />
-                          <Bar dataKey="value" radius={[5, 5, 0, 0]} maxBarSize={44}>
+                          <Bar
+                            dataKey="value"
+                            radius={layout.narrow ? [0, 5, 5, 0] : [5, 5, 0, 0]}
+                            maxBarSize={layout.barMaxSize}
+                          >
                             {challengeBarData.map((e, i) => (
                               <Cell key={i}
                                 fill={e.domain === "politics" ? "#a855f7" : "#f59e0b"}

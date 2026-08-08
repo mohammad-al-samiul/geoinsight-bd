@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, type HTMLMotionProps } from "framer-motion";
 import { Loader2, Radar } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DataFlowBackground } from "@/components/ui/data-flow-background";
 
 /** Ambient aurora behind module content — same language as Narrative Shield. */
 export function ModulePageAura({ className }: { className?: string }) {
@@ -53,6 +54,9 @@ export function ModuleCinematicLoader({
 
   return (
     <motion.div
+      role="status"
+      aria-live="polite"
+      aria-label={label}
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.98 }}
@@ -66,6 +70,7 @@ export function ModuleCinematicLoader({
       )}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <DataFlowBackground className="absolute inset-0" intensity="rich" />
         {fullScreen && (
           <>
             <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(16,185,129,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.08)_1px,transparent_1px)] [background-size:44px_44px]" />

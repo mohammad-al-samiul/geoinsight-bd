@@ -9,7 +9,8 @@ import {
   useMap,
 } from "react-leaflet";
 import type { LatLngExpression } from "leaflet";
-import { BD_MAP_CENTER, BD_MAP_ZOOM, getMapBoundsForFilter } from "@/lib/geojson-bd";
+import { BD_MAP_CENTER, BD_MAP_ZOOM } from "@/lib/geojson-bd";
+import { getMapBoundsForFilter } from "@/lib/bd-boundaries";
 import type { AdminFilterState } from "@/types";
 import type { AgroMarketRow } from "@/lib/module-types";
 import { MapSkeleton } from "@/components/ui/skeleton";
