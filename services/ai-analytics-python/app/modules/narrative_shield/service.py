@@ -74,7 +74,26 @@ def _threat_level(score: float) -> NarrativeThreatLevel:
     return NarrativeThreatLevel.LOW
 
 
-# ── MOCK hostile signals — Google News only (no FB / TG / YT) ─────────────────
+def _infer_party(text: str) -> str:
+    lower = text.lower()
+    if "বিএনপি" in text or "bnp" in lower:
+        return "BNP"
+    if "জামায়াত" in text or "জামাত" in text or "jamaat" in lower:
+        return "JAMAAT"
+    if "এনসিপি" in text or "ncp" in lower:
+        return "NCP"
+    return "OTHER"
+
+
+def _has_bangla(text: str) -> bool:
+    return any("\u0980" <= ch <= "\u09ff" for ch in text)
+
+
+# Minimum rule score to keep a live article in Narrative Shield (broad monitor)
+_INGEST_MIN_SCORE = 0.12
+
+
+# ── Offline demo fallback — only when NARRATIVE_ALLOW_DEMO=true ───────────────
 # organization = political party code: BNP | JAMAAT | NCP | OTHER
 
 _DEMO_SIGNALS: list[dict] = [
@@ -194,20 +213,22 @@ class NarrativeShieldService:
 
     # ── Classification ────────────────────────────────────────────────────────
 
-    async def classify(self, req: ClassifyRequest) -> ClassifyResponse:
+    async def classify(
+        self, req: ClassifyRequest, *, use_llm: bool = True
+    ) -> ClassifyResponse:
         fingerprint = _build_fingerprint(req.title, req.source_name)
         category, rule_score = _classify_rule_based(req.title, req.body)
 
         confidence = rule_score
-        title_bn: str | None = None
+        title_bn: str | None = req.title if _has_bangla(req.title) else None
         reason = f"Rule-based keyword match for category {category.value} (score {rule_score:.2f})"
 
-        # LLM enhancement when available
-        if self._ollama.enabled and rule_score > 0.10:
+        # LLM enhancement when available (skip on bulk ingest — dead Ollama hangs 180s/item)
+        if use_llm and self._ollama.enabled and rule_score > 0.10:
             llm_result = await self._llm_classify(req, category, rule_score)
             if llm_result:
                 confidence = llm_result.get("confidence", rule_score)
-                title_bn = llm_result.get("title_bn")
+                title_bn = llm_result.get("title_bn") or title_bn
                 reason = llm_result.get("reason", reason)
                 llm_cat = llm_result.get("category")
                 if llm_cat and llm_cat in NarrativeCategory.__members__:
@@ -294,23 +315,81 @@ class NarrativeShieldService:
 
     async def ingest_feed(self, limit: int = 20) -> FeedIngestResponse:
         """
-        Ingest hostile narrative signals from Google News only.
+        Ingest hostile narrative signals from live Google News / RSS.
 
-        Each candidate is fact-checked before inclusion. Hard-blocked domains
-        are skipped; everything else is stored with authenticity metadata.
+        Bulk path skips Ollama (unreachable Ollama previously hung 180s/item and
+        timed out the gateway). Hard-blocked domains are skipped.
         """
+        import os
+
+        from app.modules.ingestion.fetcher import fetch_all_feeds
+        from app.modules.ingestion.sources import NARRATIVE_SHIELD_FEEDS
+
         signals: list[FeedSignal] = []
         seen: set[str] = set()
         skipped = 0
         skipped_unauthentic = 0
+        skipped_low_score = 0
 
-        google_only = [
-            item
-            for item in _DEMO_SIGNALS
-            if str(item.get("source_platform", "")).lower().startswith("google")
-        ]
+        limit = max(1, min(limit, 50))
+        live_items: list[dict] = []
+        used_live = False
 
-        for item in google_only[:limit]:
+        try:
+            articles = await fetch_all_feeds(
+                NARRATIVE_SHIELD_FEEDS,
+                max_per_feed=6,
+                timeout_sec=10.0,
+                concurrency=8,
+            )
+            for art in articles:
+                live_items.append(
+                    {
+                        "title": art.title,
+                        "title_bn": art.title if art.language == "bn" or _has_bangla(art.title) else None,
+                        "body": art.summary or None,
+                        "source_name": (
+                            art.source_name
+                            if art.source_name.lower().startswith("google")
+                            else f"Google News · {art.source_name}"
+                        ),
+                        "source_platform": "Google",
+                        "organization": _infer_party(f"{art.title} {art.summary}"),
+                        "speaker_name": None,
+                        "district": None,
+                        "division": None,
+                        "source_url": art.url,
+                        "published_at": (
+                            art.published_at.isoformat() if art.published_at else None
+                        ),
+                    }
+                )
+            used_live = len(live_items) > 0
+            logger.info(
+                "Narrative Shield live fetch: %s articles from %s feeds",
+                len(live_items),
+                len(NARRATIVE_SHIELD_FEEDS),
+            )
+        except Exception as exc:
+            logger.warning("Narrative Shield live fetch failed: %s", exc)
+
+        allow_demo = os.getenv("NARRATIVE_ALLOW_DEMO", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        if not live_items and allow_demo:
+            logger.warning("Narrative Shield falling back to demo signals")
+            live_items = [
+                item
+                for item in _DEMO_SIGNALS
+                if str(item.get("source_platform", "")).lower().startswith("google")
+            ]
+
+        for item in live_items:
+            if len(signals) >= limit:
+                break
+
             fp = _build_fingerprint(item["title"], item["source_name"])
             if fp in seen:
                 skipped += 1
@@ -328,7 +407,22 @@ class NarrativeShieldService:
                 division=item.get("division"),
                 source_url=item.get("source_url"),
             )
-            result = await self.classify(req)
+            # Fast path: no LLM during ingest
+            result = await self.classify(req, use_llm=False)
+
+            # Themed narrative feeds already query protest/disinfo topics —
+            # keep borderline items for analyst review instead of dropping all.
+            confidence = result.confidence_score
+            category = result.category
+            threat = result.threat_level
+            if confidence < _INGEST_MIN_SCORE:
+                if used_live:
+                    confidence = max(confidence, _INGEST_MIN_SCORE)
+                    threat = _threat_level(confidence)
+                    category = NarrativeCategory.SOCIAL_UNREST
+                else:
+                    skipped_low_score += 1
+                    continue
 
             fc = await self._fact_checker.check(
                 title=item["title"],
@@ -339,6 +433,8 @@ class NarrativeShieldService:
                 source_name=item.get("source_name"),
                 organization=item.get("organization"),
                 lang="bn",
+                use_llm=False,
+                use_live_search=False,
             )
 
             # Hard gate: never ingest blocked / known-fake domains
@@ -355,7 +451,7 @@ class NarrativeShieldService:
                 FeedSignal(
                     fingerprint=fp,
                     title=item["title"],
-                    title_bn=item.get("title_bn"),
+                    title_bn=item.get("title_bn") or result.title_bn,
                     body=item.get("body"),
                     source_url=item.get("source_url"),
                     source_name=item["source_name"],
@@ -364,9 +460,9 @@ class NarrativeShieldService:
                     organization=item.get("organization"),
                     district=item.get("district"),
                     division=item.get("division"),
-                    threat_level=result.threat_level,
-                    category=result.category,
-                    confidence_score=result.confidence_score,
+                    threat_level=threat,
+                    category=category,
+                    confidence_score=round(confidence, 4),
                     published_at=item.get("published_at") or datetime.now(UTC).isoformat(),
                     fact_check_status=NarrativeFactCheckStatus(fc["fact_check_status"]),
                     authenticity_score=fc["authenticity_score"],
@@ -376,6 +472,9 @@ class NarrativeShieldService:
                     fact_checked_at=fc.get("fact_checked_at"),
                 )
             )
+
+        if skipped_low_score:
+            logger.info("Narrative Shield skipped %s low-score articles", skipped_low_score)
 
         return FeedIngestResponse(
             ingested=len(signals),

@@ -128,9 +128,12 @@ interface AiDebunkResult {
 }
 
 async function callAiIngest(limit: number): Promise<AiIngestResult> {
-  const res = await fetchAi(`/api/v1/narrative-shield/ingest-feed?limit=${limit}`, {
-    method: "POST",
-  });
+  // Live Google/RSS ingest can take >30s on a cold VPS — use LLM budget.
+  const res = await fetchAi(
+    `/api/v1/narrative-shield/ingest-feed?limit=${limit}`,
+    { method: "POST" },
+    { timeoutMs: AI_FETCH_LLM_MS },
+  );
   if (!res.ok) throw new Error(`AI ingest failed: ${await res.text()}`);
   return res.json() as Promise<AiIngestResult>;
 }
@@ -249,8 +252,10 @@ export class NarrativeShieldService {
     try {
       aiResult = await callAiIngest(limit);
     } catch (err) {
-      console.warn("[narrative-shield] AI ingest failed:", err instanceof Error ? err.message : err);
-      return { ingested: 0, skipped: 0, error: "AI service unavailable" };
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn("[narrative-shield] AI ingest failed:", message);
+      // Surface failure so UI does not toast false success
+      throw new Error(`Narrative Shield ingest failed: ${message}`);
     }
 
     let upserted = 0;

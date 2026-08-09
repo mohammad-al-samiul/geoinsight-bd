@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -130,7 +131,8 @@ def _round_robin_merge(
 async def fetch_all_feeds(
     feeds: tuple[FeedSource, ...],
     max_per_feed: int = 10,
-    timeout_sec: float = 25.0,
+    timeout_sec: float = 12.0,
+    concurrency: int = 8,
 ) -> list[RawArticle]:
     headers = {
         "User-Agent": "Mozilla/5.0 (compatible; GeoInsightBD-Ingestion/1.0; +https://geoinsight.gov.bd)",
@@ -139,13 +141,25 @@ async def fetch_all_feeds(
     }
 
     batches: list[tuple[str, list[RawArticle]]] = []
+    sem = asyncio.Semaphore(max(1, concurrency))
 
     async with httpx.AsyncClient(timeout=timeout_sec, headers=headers) as client:
-        for feed in feeds:
-            batch = await fetch_feed(feed, max_per_feed, client)
-            if batch:
-                batches.append((feed.name, batch))
-            else:
-                print(f"[ingestion] Empty feed: {feed.name}")
+
+        async def _one(feed: FeedSource) -> tuple[str, list[RawArticle]]:
+            async with sem:
+                batch = await fetch_feed(feed, max_per_feed, client)
+                return feed.name, batch
+
+        results = await asyncio.gather(*[_one(f) for f in feeds], return_exceptions=True)
+
+    for result in results:
+        if isinstance(result, BaseException):
+            print(f"[ingestion] Feed worker failed: {result}")
+            continue
+        name, batch = result
+        if batch:
+            batches.append((name, batch))
+        else:
+            print(f"[ingestion] Empty feed: {name}")
 
     return _round_robin_merge(batches, max_per_feed)

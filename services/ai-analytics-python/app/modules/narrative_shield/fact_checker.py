@@ -148,6 +148,8 @@ class FactChecker:
         organization: str | None = None,
         title_bn: str | None = None,
         lang: str = "bn",
+        use_llm: bool = True,
+        use_live_search: bool = True,
     ) -> dict[str, Any]:
         # Always prefer Bengali claim text for Google verify / corroboration
         search_title = (title_bn or title).strip()
@@ -166,21 +168,24 @@ class FactChecker:
 
         corroboration_hits = 0
         search_note = "Live search skipped (no API key) — heuristic + domain trust only"
-        live = await self._live_corroborate(search_title, speaker_name)
-        if live is not None:
-            corroboration_hits = live["trusted_hits"]
-            evidence.extend(live["urls"][:5])
-            search_note = live["note"]
-            # Boost / cut based on corroboration
-            if corroboration_hits >= 2:
-                score = min(1.0, score + 0.18)
-            elif corroboration_hits == 1:
-                score = min(1.0, score + 0.08)
-            elif live.get("total", 0) > 0 and corroboration_hits == 0:
-                score = max(0.0, score - 0.12)
+        if use_live_search:
+            live = await self._live_corroborate(search_title, speaker_name)
+            if live is not None:
+                corroboration_hits = live["trusted_hits"]
+                evidence.extend(live["urls"][:5])
+                search_note = live["note"]
+                # Boost / cut based on corroboration
+                if corroboration_hits >= 2:
+                    score = min(1.0, score + 0.18)
+                elif corroboration_hits == 1:
+                    score = min(1.0, score + 0.08)
+                elif live.get("total", 0) > 0 and corroboration_hits == 0:
+                    score = max(0.0, score - 0.12)
+        else:
+            search_note = "Bulk ingest — domain trust + markers only"
 
         llm_note = ""
-        if self._ollama.enabled and score < 0.75:
+        if use_llm and self._ollama.enabled and score < 0.75:
             llm_note = await self._llm_assist(search_title, body, markers, lang) or ""
 
         status = _status_from_score(score, blocked)

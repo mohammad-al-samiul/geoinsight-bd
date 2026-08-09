@@ -13,9 +13,13 @@ ANTI_GOVT_KW: list[str] = [
     "সরকার পতন", "সরকার হটাও", "সরকার বিরোধী", "রাষ্ট্র উৎখাত",
     "অবৈধ সরকার", "ক্ষমতাসীন দল", "স্বৈরশাসক", "ফ্যাসিস্ট সরকার",
     "পদত্যাগ করো", "সরকারকে চ্যালেঞ্জ", "সংসদ ভেঙে দাও",
+    "বিরোধী দল", "অসন্তোষ", "ক্ষোভ", "অপপ্রচার", "গুজব",
+    "সরকারের বিরুদ্ধে", "পদত্যাগ",
     # English
     "topple the government", "overthrow", "regime change", "oust the PM",
     "illegal government", "fascist regime", "resign now", "down with",
+    "anti-government", "misinformation", "rumour", "disinformation",
+    "opposition protest", "public outrage",
 ]
 
 SOVEREIGNTY_KW: list[str] = [
@@ -43,9 +47,11 @@ SOCIAL_UNREST_KW: list[str] = [
     "সাম্প্রদায়িক দাঙ্গা", "হিন্দু নির্যাতন", "মুসলিম বিরোধী",
     "জাতিগত সংঘাত", "গোষ্ঠী সংঘর্ষ", "পরিকল্পিত হামলা",
     "সংখ্যালঘু হত্যা", "বাড়ি জ্বালানো",
+    "আন্দোলন", "বিক্ষোভ", "হরতাল", "সমাবেশ", "রাজপথ",
     # English
     "communal riot", "minority persecution", "ethnic cleansing",
     "planned attack", "burn villages", "sectarian violence",
+    "protest", "demonstration", "strike", "hartal", "rally",
 ]
 
 RELIGIOUS_EXTREMISM_KW: list[str] = [

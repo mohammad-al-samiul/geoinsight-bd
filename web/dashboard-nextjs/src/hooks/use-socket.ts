@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
-import { SOCKET_URL } from "@/lib/config";
+import { getSocketUrl } from "@/lib/config";
 import type { SocketAlertPayload, SocketKpiPayload } from "@/types/dashboard";
 
 export type SocketConnectionStatus =
@@ -46,7 +46,7 @@ function acquireSocket(token: string | null | undefined): Socket {
   let entry = sharedSockets.get(key);
   if (!entry) {
     entry = {
-      socket: io(SOCKET_URL, {
+      socket: io(getSocketUrl(), {
         autoConnect: true,
         transports: ["websocket", "polling"],
         auth: token ? { token } : undefined,

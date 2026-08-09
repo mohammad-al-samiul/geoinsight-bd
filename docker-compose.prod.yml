@@ -304,8 +304,11 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       NEXT_TELEMETRY_DISABLED: "1"
+      # BFF must use Docker DNS — never the public VPS IP from inside the container
       API_GATEWAY_URL: ${DASHBOARD_API_GATEWAY_URL:-http://geoinsight-api-gateway:4000}
       NODE_OPTIONS: "--dns-result-order=ipv4first"
+      # HTTP VPS / IP access: Secure cookies would never stick without TLS
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     depends_on:
       api-gateway:
         condition: service_healthy

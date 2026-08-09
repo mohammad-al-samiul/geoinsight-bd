@@ -288,3 +288,68 @@ GOOGLE_NEWS_TOPIC_FEEDS: tuple[FeedSource, ...] = (
 GOOGLE_NEWS_FEEDS: tuple[FeedSource, ...] = GOOGLE_NEWS_SITE_FEEDS + GOOGLE_NEWS_TOPIC_FEEDS
 
 ALL_FEEDS: tuple[FeedSource, ...] = RSS_NEWSPAPER_FEEDS + GOOGLE_NEWS_FEEDS
+
+# Narrative Shield — hostile / disinfo / unrest focused Google News queries
+# (subset kept small so Fetch Now finishes within gateway timeout)
+NARRATIVE_SHIELD_FEEDS: tuple[FeedSource, ...] = (
+    FeedSource(
+        "Google News — Narrative Anti-Govt BN",
+        "https://news.google.com/rss/search?q=%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE%E0%A6%A6%E0%A7%87%E0%A6%B6+%28%E0%A6%B8%E0%A6%B0%E0%A6%95%E0%A6%BE%E0%A6%B0+%E0%A6%B9%E0%A6%9F%E0%A6%BE%E0%A6%93+OR+%E0%A6%B8%E0%A6%B0%E0%A6%95%E0%A6%BE%E0%A6%B0+%E0%A6%AA%E0%A6%A4%E0%A6%A8+OR+%E0%A6%85%E0%A6%AA%E0%A6%AA%E0%A7%8D%E0%A6%B0%E0%A6%9A%E0%A6%BE%E0%A6%B0+OR+%E0%A6%97%E0%A7%81%E0%A6%9C%E0%A6%AC%29&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
+        "Google News — Narrative Protest BN",
+        "https://news.google.com/rss/search?q=%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE%E0%A6%A6%E0%A7%87%E0%A6%B6+%28%E0%A6%86%E0%A6%A8%E0%A7%8D%E0%A6%A6%E0%A7%8B%E0%A6%B2%E0%A6%A8+OR+%E0%A6%AC%E0%A6%BF%E0%A6%95%E0%A7%8D%E0%A6%B7%E0%A7%8B%E0%A6%AD+OR+%E0%A6%B9%E0%A6%B0%E0%A6%A4%E0%A6%BE%E0%A6%B2%29&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
+        "Google News — Narrative Protest EN",
+        "https://news.google.com/rss/search?q=bangladesh+(protest+OR+demonstration+OR+strike+OR+hartal+OR+misinformation+OR+rumour)&hl=en&gl=BD&ceid=BD:en",
+        "google_news",
+        "en",
+    ),
+    FeedSource(
+        "Google News — Narrative Opposition BN",
+        "https://news.google.com/rss/search?q=%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE%E0%A6%A6%E0%A7%87%E0%A6%B6+%28%E0%A6%AC%E0%A6%BF%E0%A6%B0%E0%A7%8B%E0%A6%A7%E0%A7%80+OR+%E0%A6%AC%E0%A6%BF%E0%A6%8F%E0%A6%A8%E0%A6%AA%E0%A6%BF+OR+%E0%A6%9C%E0%A6%BE%E0%A6%AE%E0%A6%BE%E0%A7%9F%E0%A6%BE%E0%A6%A4+OR+%E0%A6%8F%E0%A6%A8%E0%A6%B8%E0%A6%BF%E0%A6%AA%E0%A6%BF%29+%28%E0%A6%86%E0%A6%A8%E0%A7%8D%E0%A6%A6%E0%A7%8B%E0%A6%B2%E0%A6%A8+OR+%E0%A6%AC%E0%A6%BF%E0%A6%95%E0%A7%8D%E0%A6%B7%E0%A7%8B%E0%A6%AD+OR+%E0%A6%B8%E0%A6%AE%E0%A6%BE%E0%A6%AC%E0%A7%87%E0%A6%B6%29&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
+        "Google News — Narrative Economy Crisis",
+        "https://news.google.com/rss/search?q=bangladesh+(reserves+OR+inflation+OR+bank+scam+OR+IMF+OR+%E0%A6%B0%E0%A6%BF%E0%A6%9C%E0%A6%BE%E0%A6%B0%E0%A7%8D%E0%A6%AD+OR+%E0%A6%AE%E0%A7%82%E0%A6%B2%E0%A7%8D%E0%A6%AF%E0%A6%B8%E0%A7%8D%E0%A6%AB%E0%A7%80%E0%A6%A4%E0%A6%BF)&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
+        "Google News — Narrative Communal",
+        "https://news.google.com/rss/search?q=%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE%E0%A6%A6%E0%A7%87%E0%A6%B6+%28%E0%A6%B8%E0%A6%BE%E0%A6%AE%E0%A7%8D%E0%A6%AA%E0%A7%8D%E0%A6%B0%E0%A6%A6%E0%A6%BE%E0%A6%AF%E0%A6%BC%E0%A6%BF%E0%A6%95+OR+%E0%A6%B8%E0%A6%82%E0%A6%96%E0%A7%8D%E0%A6%AF%E0%A6%BE%E0%A6%B2%E0%A6%98%E0%A7%81+OR+communal+OR+minority+attack%29&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
+        "Google News — Narrative Election",
+        "https://news.google.com/rss/search?q=%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE%E0%A6%A6%E0%A7%87%E0%A6%B6+%28%E0%A6%A8%E0%A6%BF%E0%A6%B0%E0%A7%8D%E0%A6%AC%E0%A6%BE%E0%A6%9A%E0%A6%A8+%E0%A6%95%E0%A6%BE%E0%A6%B0%E0%A6%9A%E0%A7%81%E0%A6%AA%E0%A6%BF+OR+%E0%A6%AD%E0%A7%8B%E0%A6%9F+%E0%A6%9A%E0%A7%81%E0%A6%B0%E0%A6%BF+OR+election+rigging+OR+vote+fraud%29&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
+        "Prothom Alo RSS",
+        "https://www.prothomalo.com/feed",
+        "rss_newspaper",
+        "bn",
+    ),
+    FeedSource(
+        "BBC Bangla RSS",
+        "https://feeds.bbci.co.uk/bengali/rss.xml",
+        "rss_newspaper",
+        "bn",
+    ),
+    FeedSource(
+        "Daily Star Bangladesh RSS",
+        "https://www.thedailystar.net/news/bangladesh/rss.xml",
+        "rss_newspaper",
+        "en",
+    ),
+)

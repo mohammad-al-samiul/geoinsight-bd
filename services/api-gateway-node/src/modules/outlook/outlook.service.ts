@@ -1,6 +1,6 @@
-import { env } from "../../core/config/env";
 import { prismaRead } from "../../core/database/prisma.client";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
+import { AI_FETCH_LLM_MS, fetchAi } from "../../shared/http/fetch-ai";
 import { broadcastDashboardRefresh } from "../pipeline/pipeline.broadcast";
 import { unrestService } from "../unrest/unrest.service";
 
@@ -153,11 +153,15 @@ export class OutlookService {
 
     let aiResult: Record<string, unknown>;
     try {
-      const res = await fetch(`${env.AI_SERVICE_URL}/api/v1/outlook/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(aiPayload),
-      });
+      const res = await fetchAi(
+        `/api/v1/outlook/generate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(aiPayload),
+        },
+        { timeoutMs: AI_FETCH_LLM_MS },
+      );
       if (!res.ok) throw new Error(`outlook AI ${res.status}`);
       aiResult = (await res.json()) as Record<string, unknown>;
     } catch (err) {

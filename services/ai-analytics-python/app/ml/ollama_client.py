@@ -41,11 +41,14 @@ class OllamaClient:
         messages: list[dict[str, str]],
         *,
         temperature: float = 0.35,
+        timeout: float = 45.0,
     ) -> str | None:
         if not self.enabled:
             return None
         try:
-            async with httpx.AsyncClient(timeout=180.0) as client:
+            # Connect timeout short so dead Ollama does not stall ingest/pipeline
+            timeout_cfg = httpx.Timeout(timeout, connect=3.0)
+            async with httpx.AsyncClient(timeout=timeout_cfg) as client:
                 res = await client.post(
                     f"{self._url}/api/chat",
                     json={

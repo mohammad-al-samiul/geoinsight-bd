@@ -714,8 +714,15 @@ export function NarrativeShieldPanel() {
   const handleBulk = (action: "DEBUNK"|"ESCALATE"|"DISMISS") => act(
     () => actions.bulk(Array.from(selected), action, bn ? "bn" : "en"),
     bn ? `✓ ${selected.size}টি সম্পন্ন` : `✓ ${selected.size} processed`);
-  const handleFetch = () => act(() => actions.refresh(20),
-    bn ? "✓ Google ফিড আনা হয়েছে" : "✓ Google feed ingested");
+  const handleFetch = () => act(async () => {
+    const res = await actions.refresh(20);
+    const payload = res?.data ?? {};
+    if (payload.error) throw new Error(String(payload.error));
+    if (typeof payload.ingested === "number" && payload.ingested === 0) {
+      throw new Error(bn ? "কোনো নতুন সিগন্যাল পাওয়া যায়নি" : "No new signals ingested");
+    }
+  }, bn ? "✓ Google ফিড আনা হয়েছে" : "✓ Google feed ingested",
+    bn ? "রিয়েলটাইম ফিড আনা যায়নি" : "Live feed fetch failed");
   const handleDedup = () => act(() => actions.dedup(),
     bn ? "✓ ডুপ্লিকেট মুছে ফেলা হয়েছে" : "✓ Duplicates removed");
   const handleCsv = async () => {
