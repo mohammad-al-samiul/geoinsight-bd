@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectDetail } from "@/hooks/use-module-data";
-import { formatDate, formatLakh } from "@/lib/format";
+import { formatCrore, formatDate } from "@/lib/format";
 import type { ProjectRow } from "@/lib/module-types";
 import { resolveUnitName } from "@/lib/unit-names";
 import { AlertTriangle } from "lucide-react";
@@ -49,14 +49,26 @@ export function ProjectDetailModal({ project, open, onOpenChange }: ProjectDetai
           </DialogDescription>
         </DialogHeader>
 
+        {(project.responsibleName || detail?.responsibleName) && (
+          <p className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-xs text-sky-100">
+            Responsible: {detail?.responsibleName ?? project.responsibleName}
+            {(detail?.responsibleParty ?? project.responsibleParty)
+              ? ` · ${detail?.responsibleParty ?? project.responsibleParty}`
+              : ""}
+            {(detail?.progressPct ?? project.progressPct) != null
+              ? ` · Progress ${detail?.progressPct ?? project.progressPct}%`
+              : ""}
+          </p>
+        )}
+
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-lg border border-border/60 bg-secondary/30 p-3">
-            <p className="text-xs text-muted-foreground">Allocated</p>
-            <p className="text-lg font-bold">{formatLakh(allocated)}</p>
+            <p className="text-xs text-muted-foreground">Allocated (cr)</p>
+            <p className="text-lg font-bold">{formatCrore(allocated)}</p>
           </div>
           <div className="rounded-lg border border-border/60 bg-secondary/30 p-3">
-            <p className="text-xs text-muted-foreground">Spent</p>
-            <p className="text-lg font-bold">{formatLakh(spent)}</p>
+            <p className="text-xs text-muted-foreground">Spent (cr)</p>
+            <p className="text-lg font-bold">{formatCrore(spent)}</p>
           </div>
           <div className="rounded-lg border border-border/60 bg-secondary/30 p-3">
             <p className="text-xs text-muted-foreground">Variance</p>

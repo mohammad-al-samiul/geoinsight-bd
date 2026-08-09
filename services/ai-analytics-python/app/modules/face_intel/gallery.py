@@ -1,4 +1,4 @@
-"""VIP face gallery registry — seed NIDs aligned with `deploy/scripts/seed/03-representatives-real.sql`."""
+"""VIP face gallery — current BNP mandate duty-holders only (no Awami League)."""
 
 from __future__ import annotations
 
@@ -15,52 +15,51 @@ class VipProfile(TypedDict):
     party: str | None
 
 
-# Deterministic gallery keys used for encoding files under gallery/
 VIP_GALLERY: list[VipProfile] = [
     {
-        "vip_id": "vip-obq",
+        "vip_id": "vip-nik",
         "representative_id": "d4000001-0001-4001-8001-000000000010",
         "nid": "1000000000010",
-        "name": "Obaidul Quader MP",
+        "name": "Nazrul Islam Khan (Road Transport)",
         "designation": "Minister",
         "designation_bn": "মন্ত্রী",
-        "party": "Awami League",
+        "party": "BNP",
     },
     {
-        "vip_id": "vip-sh",
+        "vip_id": "vip-tr",
         "representative_id": "d4000001-0001-4001-8001-000000000001",
         "nid": "1000000000001",
-        "name": "Sheikh Hasina",
-        "designation": "Minister",
-        "designation_bn": "মন্ত্রী",
-        "party": "Awami League",
+        "name": "Tarique Rahman (Senior Minister)",
+        "designation": "Senior Minister",
+        "designation_bn": "সিনিয়র মন্ত্রী",
+        "party": "BNP",
     },
     {
-        "vip_id": "vip-dipu",
+        "vip_id": "vip-rf",
         "representative_id": "d4000001-0001-4001-8001-000000000011",
         "nid": "1000000000011",
-        "name": "Dr. Dipu Moni MP",
+        "name": "Rumeen Farhana (Law & Justice)",
         "designation": "Member of Parliament",
         "designation_bn": "সংসদ সদস্য",
-        "party": "Awami League",
+        "party": "BNP",
     },
     {
         "vip_id": "vip-nawaz-dc",
         "representative_id": "d4000001-0001-4001-8001-000000000003",
         "nid": "1000000000003",
-        "name": "Dr. Ahmed Nawaz DC",
+        "name": "Dr. Ahmed Nawaz (DC, Gazipur)",
         "designation": "Deputy Commissioner",
         "designation_bn": "জেলা প্রশাসক",
         "party": "BCS (Admin)",
     },
     {
-        "vip_id": "vip-askar",
-        "representative_id": "d4000001-0001-4001-8001-000000000017",
-        "nid": "1000000000017",
-        "name": "Asaduzzaman Khan MP",
+        "vip_id": "vip-finance",
+        "representative_id": "d4000001-0001-4001-8001-000000000012",
+        "nid": "1000000000012",
+        "name": "Amir Khasru Mahmud Chowdhury (Finance)",
         "designation": "Minister",
         "designation_bn": "মন্ত্রী",
-        "party": "Awami League",
+        "party": "BNP",
     },
 ]
 

@@ -4,6 +4,13 @@ export function formatLakh(value: number | string): string {
   return `${(n / 100).toLocaleString("en-BD", { maximumFractionDigits: 0 })} L`;
 }
 
+/** ADP seed budgets are stored in crore BDT. */
+export function formatCrore(value: number | string): string {
+  const n = Number(value);
+  if (Number.isNaN(n)) return "—";
+  return `${n.toLocaleString("en-BD", { maximumFractionDigits: 1 })} cr`;
+}
+
 export function formatPercent(value: number | string, unit?: string): string {
   const n = Number(value);
   if (Number.isNaN(n)) return "—";

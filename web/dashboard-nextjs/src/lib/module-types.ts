@@ -44,6 +44,18 @@ export interface ProjectRow {
   startDate: string;
   blockchainTx?: string | null;
   adminUnitId: string;
+  progressPct?: number;
+  responsibleName?: string | null;
+  responsibleRole?: string | null;
+  responsibleParty?: string | null;
+  liveSignalCount?: number;
+  adminUnit?: AdminUnitRef;
+  government?: {
+    ruling_party: string;
+    term_started_on: string;
+    label_bn: string;
+    label_en: string;
+  };
   _count?: { redFlagAlerts: number };
 }
 
@@ -67,6 +79,16 @@ export interface RepresentativeRow {
   tenureStart: string;
   tenureEnd?: string | null;
   adminUnitId: string;
+  liveMentions?: number;
+  completionPct?: number | null;
+  budgetUtilPct?: number | null;
+  adminUnit?: AdminUnitRef;
+  government?: {
+    ruling_party: string;
+    term_started_on: string;
+    label_bn: string;
+    label_en: string;
+  };
 }
 
 export interface AgroMarketRow {

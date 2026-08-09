@@ -28,10 +28,17 @@ VALUES
   ('f6000001-0001-4001-8001-000000000015', 'CORRUPTION_RISK', 4, 'Coastal embankment tender — single-bidder concentration flagged', 'e5000001-0001-4001-8001-000000000034', NOW() - INTERVAL '15 days')
 ON CONFLICT (id) DO UPDATE SET ai_explanation = EXCLUDED.ai_explanation, severity = EXCLUDED.severity;
 
-INSERT INTO representatives (id, name, nid, role, party, tenure_start, admin_unit_id, created_at, updated_at)
+-- Extra duty-holders under current BNP mandate only (no Awami League)
+INSERT INTO representatives (id, name, nid, role, party, tenure_start, tenure_end, admin_unit_id, created_at, updated_at)
 VALUES
-  ('d4000001-0001-4001-8001-000000000021', 'Dr. Samanta Lal Sen MP', '1000000000021', 'MINISTER', 'Awami League', '2024-01-30', 'b2000001-0001-4001-8001-000000000154', NOW(), NOW()),
-  ('d4000001-0001-4001-8001-000000000022', 'Nurul Islam Nahid MP', '1000000000022', 'MP', 'Awami League', '2024-01-30', 'b2000001-0001-4001-8001-000000000159', NOW(), NOW()),
-  ('d4000001-0001-4001-8001-000000000023', 'Md. Habibur Rahman DC', '1000000000023', 'DC', 'BCS (Admin)', '2023-08-01', 'b2000001-0001-4001-8001-000000000145', NOW(), NOW()),
-  ('d4000001-0001-4001-8001-000000000024', 'Shamim Osman MP', '1000000000024', 'MP', 'Awami League', '2024-01-30', 'b2000001-0001-4001-8001-000000000001', NOW(), NOW())
-ON CONFLICT (nid) DO UPDATE SET name = EXCLUDED.name, party = EXCLUDED.party, updated_at = NOW();
+  ('d4000001-0001-4001-8001-000000000021', 'Salahuddin Ahmed (Home Minister)', '1000000000021', 'MINISTER', 'BNP', '2026-02-15', NULL, 'b2000001-0001-4001-8001-000000000154', NOW(), NOW()),
+  ('d4000001-0001-4001-8001-000000000022', 'Barrister Mahbub Uddin Khokon (Whip)', '1000000000022', 'MP', 'BNP', '2026-02-15', NULL, 'b2000001-0001-4001-8001-000000000159', NOW(), NOW()),
+  ('d4000001-0001-4001-8001-000000000023', 'Md. Habibur Rahman (DC, Cox''s Bazar)', '1000000000023', 'DC', 'BCS (Admin)', '2023-08-01', NULL, 'b2000001-0001-4001-8001-000000000145', NOW(), NOW()),
+  ('d4000001-0001-4001-8001-000000000024', 'Dr. Khondaker Mosharraf Hossain (Health)', '1000000000024', 'MP', 'BNP', '2026-02-15', NULL, 'b2000001-0001-4001-8001-000000000001', NOW(), NOW())
+ON CONFLICT (nid) DO UPDATE SET
+  name = EXCLUDED.name,
+  role = EXCLUDED.role,
+  party = EXCLUDED.party,
+  tenure_start = EXCLUDED.tenure_start,
+  tenure_end = NULL,
+  updated_at = NOW();

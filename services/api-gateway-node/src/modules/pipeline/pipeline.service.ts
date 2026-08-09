@@ -6,7 +6,6 @@ import {
   ProjectStatus,
   RedFlagType,
 } from "@prisma/client";
-import { env } from "../../core/config/env";
 import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
 import { publishToGovQueue } from "../../infrastructure/messaging/gov-queue.publisher";
@@ -217,7 +216,46 @@ export class PipelineService {
       let completion: number;
       let budgetUtil: number;
 
-      if (env.LIVE_DATA_ONLY) {
+      // Prefer real ADP project rows even when LIVE_DATA_ONLY — signal heuristics are fallback only.
+      const projects = await prismaRead.project.findMany({
+        where: {
+          adminUnit: {
+            OR: [
+              { id: rep.adminUnitId },
+              { districtId: rep.adminUnit.districtId ?? undefined },
+              { divisionId: rep.adminUnitId },
+            ],
+          },
+        },
+        select: { status: true, budgetAllocated: true, budgetSpent: true },
+      });
+
+      if (projects.length > 0) {
+        completion = Math.round(
+          projects.reduce((sum, p) => {
+            const pct =
+              p.status === ProjectStatus.COMPLETED
+                ? 100
+                : p.status === ProjectStatus.ONGOING
+                  ? Math.min(
+                      95,
+                      (Number(p.budgetSpent) / Math.max(Number(p.budgetAllocated), 1)) * 100,
+                    )
+                  : p.status === ProjectStatus.STALLED
+                    ? 35
+                    : 10;
+            return sum + pct;
+          }, 0) / projects.length,
+        );
+        budgetUtil = Math.round(
+          (projects.reduce(
+            (sum, p) => sum + Number(p.budgetSpent) / Math.max(Number(p.budgetAllocated), 1),
+            0,
+          ) /
+            projects.length) *
+            100,
+        );
+      } else {
         const [projectSignals, alertSignals] = await Promise.all([
           prismaRead.liveSignal.count({
             where: {
@@ -244,52 +282,6 @@ export class PipelineService {
         budgetUtil = Math.round(
           Math.max(58, Math.min(94, 68 + projectSignals * 1.5 - alertSignals * 2)),
         );
-      } else {
-        const projects = await prismaRead.project.findMany({
-          where: {
-            adminUnit: {
-              OR: [
-                { id: rep.adminUnitId },
-                { districtId: rep.adminUnit.districtId ?? undefined },
-                { divisionId: rep.adminUnitId },
-              ],
-            },
-          },
-          select: { status: true, budgetAllocated: true, budgetSpent: true },
-        });
-
-        completion =
-          projects.length === 0
-            ? 72
-            : Math.round(
-                projects.reduce((sum, p) => {
-                  const pct =
-                    p.status === ProjectStatus.COMPLETED
-                      ? 100
-                      : p.status === ProjectStatus.ONGOING
-                        ? Math.min(
-                            95,
-                            (Number(p.budgetSpent) / Math.max(Number(p.budgetAllocated), 1)) * 100,
-                          )
-                        : p.status === ProjectStatus.STALLED
-                          ? 35
-                          : 10;
-                  return sum + pct;
-                }, 0) / projects.length,
-              );
-
-        budgetUtil =
-          projects.length === 0
-            ? 68
-            : Math.round(
-                (projects.reduce(
-                  (sum, p) =>
-                    sum + Number(p.budgetSpent) / Math.max(Number(p.budgetAllocated), 1),
-                  0,
-                ) /
-                  projects.length) *
-                  100,
-              );
       }
       const grievanceArticles = await prismaRead.externalArticle.count({
         where: {

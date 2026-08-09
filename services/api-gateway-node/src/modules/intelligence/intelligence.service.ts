@@ -4,7 +4,6 @@ import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
 import { publishToGovQueue } from "../../infrastructure/messaging/gov-queue.publisher";
 import { hashAiExplanation } from "../twin/twin.service";
 import { auditService } from "../../shared/audit/audit.service";
-import { liveDataService } from "../live-data/live-data.service";
 import type { DashboardScopeQuery } from "../dashboard/dashboard.service";
 import {
   matchesScopeDistrict,
@@ -103,21 +102,8 @@ export class IntelligenceService {
   ) {
     const unitId = scopeUnitId(query);
 
-    const projects = env.LIVE_DATA_ONLY
-      ? (await liveDataService.listProjects({
-          ...(unitId && { districtId: unitId }),
-        })).map((p) => ({
-          id: p.id,
-          title: p.title,
-          budgetAllocated: 0,
-          budgetSpent: 0,
-          status: ProjectStatus.ONGOING,
-          contractorNid: null as string | null,
-          startDate: new Date(p.startDate),
-          adminUnitId: p.adminUnitId,
-          redFlagAlerts: [] as Array<{ id: string; flagType: RedFlagType }>,
-        }))
-      : await prismaRead.project.findMany({
+    // Always use ADP project rows with budgets — never zeroed live-signal stubs.
+    const projects = await prismaRead.project.findMany({
           where: {
             status: { in: [ProjectStatus.ONGOING, ProjectStatus.STALLED] },
             ...(unitId && { adminUnitId: unitId }),
@@ -277,8 +263,13 @@ export class IntelligenceService {
   }
 
   async scoreAccountability(unitId?: string, lang: "bn" | "en" = "bn") {
+    // Current-mandate duty-holders only — never Awami League / ended tenure.
     const reps = await prismaRead.representative.findMany({
-      where: unitId ? { adminUnitId: unitId } : undefined,
+      where: {
+        ...(unitId ? { adminUnitId: unitId } : {}),
+        OR: [{ tenureEnd: null }, { tenureEnd: { gt: new Date() } }],
+        NOT: { party: { contains: "Awami", mode: "insensitive" } },
+      },
       include: {
         adminUnit: { select: { name: true, nameBn: true } },
         kpiRecords: {

@@ -442,26 +442,29 @@
     },
     "projects": {
       "title": "Project Tracker",
-      "description": "National development projects — budget, status, and red-flag counts by scope.",
+      "description": "National development projects under the current government — owner, budget (crore BDT), progress, and live news signals.",
       "total": "Total projects",
       "active": "Active",
       "delayed": "Delayed",
       "redFlags": "Open red flags",
       "colTitle": "Project",
       "colStatus": "Status",
-      "colBudget": "Budget (L)",
+      "colBudget": "Budget (cr)",
       "colProgress": "Progress",
+      "colOwner": "Responsible",
       "colAlerts": "Alerts",
       "hintSpent": "Spent: {amount}",
-      "colAllocated": "Allocated",
-      "colSpent": "Spent",
+      "colAllocated": "Allocated (cr)",
+      "colSpent": "Spent (cr)",
       "colBlockchain": "Blockchain",
       "anchored": "Anchored",
       "pending": "Pending",
       "emptyScope": "No projects in this scope. Clear filter for national view.",
       "clickHint": "Click a row for full project details and red-flag history.",
       "ongoing": "Ongoing",
-      "totalBudget": "Total budget"
+      "completed": "Completed",
+      "totalBudget": "Total budget",
+      "mandateHint": "Mandate"
     },
     "alerts": {
       "title": "Red Flag Command Log",
@@ -495,8 +498,8 @@
       "emptyScope": "No agro markets in this scope."
     },
     "representatives": {
-      "title": "Representatives",
-      "description": "MPs, Ministers, DCs, and local leaders — tenure and party by unit.",
+      "title": "Representatives & KPIs",
+      "description": "Current-government ministers, MPs and DCs — party, unit, project completion and budget-utilisation KPIs.",
       "colName": "Name",
       "colRole": "Role",
       "colParty": "Party",
@@ -509,8 +512,12 @@
       "colConstituency": "Constituency / Unit",
       "colNid": "NID",
       "colTenure": "Tenure",
+      "colCompletion": "Completion",
+      "colBudgetUtil": "Budget use",
+      "colLive": "Live mentions",
       "present": "Present",
-      "emptyScope": "No representatives in this scope."
+      "emptyScope": "No representatives in this scope.",
+      "mandateHint": "Mandate"
     },
     "narrativeShield": {
       "title": "Narrative Shield",

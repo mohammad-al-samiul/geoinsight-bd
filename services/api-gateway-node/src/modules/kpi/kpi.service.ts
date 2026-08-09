@@ -48,41 +48,33 @@ export class KpiService {
 
         ...(query.fiscalYear && { fiscalYear: query.fiscalYear }),
 
-        ...(query.unitId && {
-
-          representative: {
-
-            OR: [
-
-              { adminUnitId: query.unitId },
-
-              {
-
-                adminUnit: {
-
-                  OR: [
-
-                    { id: query.unitId },
-
-                    { divisionId: query.unitId },
-
-                    { districtId: query.unitId },
-
-                    { upazilaId: query.unitId },
-
-                    { parentId: query.unitId },
-
-                  ],
-
-                },
-
-              },
-
-            ],
-
-          },
-
-        }),
+        // Only current-mandate duty-holders — never Awami League KPI rows
+        representative: {
+          NOT: { party: { contains: "Awami", mode: "insensitive" } },
+          OR: [{ tenureEnd: null }, { tenureEnd: { gt: new Date() } }],
+          ...(query.unitId
+            ? {
+                AND: [
+                  {
+                    OR: [
+                      { adminUnitId: query.unitId },
+                      {
+                        adminUnit: {
+                          OR: [
+                            { id: query.unitId },
+                            { divisionId: query.unitId },
+                            { districtId: query.unitId },
+                            { upazilaId: query.unitId },
+                            { parentId: query.unitId },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                ],
+              }
+            : {}),
+        },
 
       },
 
