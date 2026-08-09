@@ -663,6 +663,7 @@
     "analystHint": "Analyst reports, IMF/WB/ADB and research institution coverage",
     "allSources": "All Sources",
     "challengeIntensity": "Challenge Intensity Analysis",
+    "challengeIntensityHint": "Each bar = one challenge’s intensity (0–100%). Purple = politics, amber = economy.",
     "pressureMap": "Pressure Map",
     "riskScore": "Risk Score",
     "drivers": "Key Drivers",

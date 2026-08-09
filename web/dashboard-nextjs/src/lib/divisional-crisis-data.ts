@@ -35,6 +35,9 @@ export interface HistoricalYoY {
   avgGasDeficit: number;
 }
 
+/** Shortage pin kinds shown on the 8-division SVG map */
+export type ShortageKind = "gas" | "fuel" | "power" | "water";
+
 export interface LiveIncidentAlert {
   id: string;
   divisionId: string;
@@ -46,6 +49,100 @@ export interface LiveIncidentAlert {
   titleBn: string;
   locationEn: string;
   locationBn: string;
+  /** WGS84 pin on the Bangladesh Leaflet map */
+  lat?: number;
+  lng?: number;
+  source?: "ops" | "citizen" | "pin-alert";
+  kind?: ShortageKind | "other";
+}
+
+export interface HighwayCorridor {
+  id: string;
+  nameEn: string;
+  nameBn: string;
+  /** Leaflet lat/lng waypoints [lat, lng] */
+  path: Array<[number, number]>;
+  stressHintEn: string;
+  stressHintBn: string;
+}
+
+/** Major transport corridors overlaid on the real Bangladesh map */
+export const HIGHWAY_CORRIDORS: HighwayCorridor[] = [
+  {
+    id: "dhaka-chattogram",
+    nameEn: "Dhaka–Chattogram Corridor",
+    nameBn: "ঢাকা–চট্টগ্রাম করিডোর",
+    path: [
+      [23.81, 90.41],
+      [23.46, 91.18],
+      [22.9, 91.4],
+      [22.34, 91.83],
+    ],
+    stressHintEn: "Port truck diesel & industrial gas pressure risk",
+    stressHintBn: "বন্দর ট্রাক ডিজেল ও শিল্প গ্যাস চাপ ঝুঁকি",
+  },
+  {
+    id: "dhaka-northwest",
+    nameEn: "Dhaka–Rajshahi–Rangpur Axis",
+    nameBn: "ঢাকা–রাজশাহী–রংপুর অক্ষ",
+    path: [
+      [23.81, 90.41],
+      [24.37, 89.6],
+      [24.37, 88.6],
+      [25.75, 89.25],
+    ],
+    stressHintEn: "Highway pump queues & rural feeder outages",
+    stressHintBn: "হাইওয়ে পাম্প সারি ও গ্রামীণ ফিডার বিভ্রাট",
+  },
+  {
+    id: "southwest-coast",
+    nameEn: "Khulna–Barishal Coastal Link",
+    nameBn: "খুলনা–বরিশাল উপকূল লিংক",
+    path: [
+      [22.85, 89.55],
+      [22.7, 90.37],
+    ],
+    stressHintEn: "Salinity / diesel for river transport",
+    stressHintBn: "লবণাক্ততা ও নৌ-পরিবহন ডিজেল সংকট",
+  },
+  {
+    id: "northeast",
+    nameEn: "Dhaka–Sylhet Highway",
+    nameBn: "ঢাকা–সিলেট হাইওয়ে",
+    path: [
+      [23.81, 90.41],
+      [24.3, 91.1],
+      [24.9, 91.87],
+    ],
+    stressHintEn: "CNG corridor & tea-estate power dips",
+    stressHintBn: "সিএনজি করিডোর ও চা-বাগান বিদ্যুৎ ঘাটতি",
+  },
+];
+
+/** Approximate map pin locations for each division (used for citizen alerts) */
+export const DIVISION_MAP_CENTROIDS_LATLNG: Record<string, { lat: number; lng: number }> = {
+  dhaka: { lat: 23.81, lng: 90.41 },
+  chattogram: { lat: 22.34, lng: 91.83 },
+  khulna: { lat: 22.85, lng: 89.55 },
+  rajshahi: { lat: 24.37, lng: 88.6 },
+  sylhet: { lat: 24.9, lng: 91.87 },
+  barishal: { lat: 22.7, lng: 90.37 },
+  rangpur: { lat: 25.75, lng: 89.25 },
+  mymensingh: { lat: 24.75, lng: 90.4 },
+};
+
+export interface ShortageSite {
+  id: string;
+  divisionId: string;
+  kind: ShortageKind;
+  nameEn: string;
+  nameBn: string;
+  severity: "critical" | "high" | "moderate";
+  detailEn: string;
+  detailBn: string;
+  /** WGS84 coordinates for Leaflet Bangladesh map */
+  lat: number;
+  lng: number;
 }
 
 export interface ResourceCrisisInfo {
@@ -137,9 +234,13 @@ export const LIVE_INCIDENT_ALERTS: LiveIncidentAlert[] = [
     timestamp: "১০ মিনিট আগে",
     severity: "critical",
     titleEn: "Gazipur Industrial Gas Pressure Drop Alert",
-    titleBn: "গাজীপুর শিল্পাঞ্চলে গ্যাসের চ্যাপ মারাত্মক পতন",
+    titleBn: "গাজীপুর শিল্পাঞ্চলে গ্যাসের চাপ মারাত্মক পতন",
     locationEn: "Gazipur Sadar & Tongi",
     locationBn: "গাজীপুর সদর ও টঙ্গী",
+    lat: 23.92,
+    lng: 90.4,
+    source: "ops",
+    kind: "gas",
   },
   {
     id: "alert-2",
@@ -152,6 +253,10 @@ export const LIVE_INCIDENT_ALERTS: LiveIncidentAlert[] = [
     titleBn: "টেকনাফ সীমান্তে বিপুল পরিমাণ মাদক চালান আটক",
     locationEn: "Teknaf Border",
     locationBn: "টেকনাফ সীমান্ত",
+    lat: 20.86,
+    lng: 92.3,
+    source: "ops",
+    kind: "other",
   },
   {
     id: "alert-3",
@@ -164,6 +269,10 @@ export const LIVE_INCIDENT_ALERTS: LiveIncidentAlert[] = [
     titleBn: "সাতক্ষীরা উপকূলীয় অঞ্চলে পানীয় জলের তীব্র সংকট",
     locationEn: "Satkhira Shyamnagar",
     locationBn: "সাতক্ষীরা শ্যামনগর",
+    lat: 22.33,
+    lng: 89.1,
+    source: "ops",
+    kind: "water",
   },
   {
     id: "alert-4",
@@ -176,6 +285,10 @@ export const LIVE_INCIDENT_ALERTS: LiveIncidentAlert[] = [
     titleBn: "মেঘনা নদীতে নৌ-ডাকাতি রোধে র্যাব-কোস্টগার্ডের টহল",
     locationEn: "Meghna Estuary",
     locationBn: "মেঘনা মোহনা",
+    lat: 22.55,
+    lng: 90.7,
+    source: "ops",
+    kind: "other",
   },
   {
     id: "alert-5",
@@ -188,6 +301,10 @@ export const LIVE_INCIDENT_ALERTS: LiveIncidentAlert[] = [
     titleBn: "বরেন্দ্র অঞ্চলে গভীর নলকূপে বিদ্যুৎ সরবরাহ সমন্বয়",
     locationEn: "Godagari & Natore",
     locationBn: "গোদাগাড়ী ও নাটোর",
+    lat: 24.47,
+    lng: 88.33,
+    source: "ops",
+    kind: "power",
   },
 ];
 
@@ -866,4 +983,45 @@ export const BANGLADESH_DIVISIONS_DATA: DivisionCrisisData[] = [
       dcOfficeControl: "091-66500",
     },
   },
+];
+
+/**
+ * Named shortage points (CNG / fuel pumps, grid nodes, water stress)
+ * plotted on the interactive division map. Values are operational estimates
+ * that the live pulse layer can elevate when riskScore rises.
+ */
+export const DIVISION_SHORTAGE_SITES: ShortageSite[] = [
+  // Dhaka
+  { id: "dh-gas-tongi", divisionId: "dhaka", kind: "gas", nameEn: "Tongi CNG Hub", nameBn: "টঙ্গী সিএনজি হাব", severity: "critical", detailEn: "Industrial low pressure — 4–6 hr supply cuts", detailBn: "শিল্প গ্যাস চাপ সংকট — দৈনিক ৪–৬ ঘণ্টা সরবরাহ বন্ধ", lat: 23.9, lng: 90.41 },
+  { id: "dh-fuel-mirpur", divisionId: "dhaka", kind: "fuel", nameEn: "Mirpur-10 Filling Station Cluster", nameBn: "মিরপুর-১০ পাম্প ক্লাস্টার", severity: "high", detailEn: "Octane queue & diesel shortage at pumps", detailBn: "পাম্পে অকটেন সারি ও ডিজেল ঘাটতি", lat: 23.81, lng: 90.37 },
+  { id: "dh-power-uttara", divisionId: "dhaka", kind: "power", nameEn: "Uttara Grid Node", nameBn: "উত্তরা গ্রিড নোড", severity: "high", detailEn: "Peak evening load-shedding 3–5 hrs", detailBn: "সন্ধ্যার পিকে ৩–৫ ঘণ্টা লোডশেডিং", lat: 23.87, lng: 90.39 },
+  { id: "dh-water-savar", divisionId: "dhaka", kind: "water", nameEn: "Savar Deep Tube-well Zone", nameBn: "সাভার গভীর নলকূপ জোন", severity: "critical", detailEn: "Groundwater drop affecting industries", detailBn: "শিল্প এলাকায় ভূগর্ভস্থ পানি স্তর পতন", lat: 23.86, lng: 90.26 },
+  // Chattogram
+  { id: "ctg-gas-sitakunda", divisionId: "chattogram", kind: "gas", nameEn: "Sitakunda Industrial Gas Line", nameBn: "সীতাকুণ্ড শিল্প গ্যাস লাইন", severity: "critical", detailEn: "Ship-breaking & mill pressure drop", detailBn: "শিপ ব্রেকিং ও মিলে গ্যাস চাপ হ্রাস", lat: 22.62, lng: 91.66 },
+  { id: "ctg-fuel-agrabad", divisionId: "chattogram", kind: "fuel", nameEn: "Agrabad Depot Pumps", nameBn: "আগ্রাবাদ ডিপো পাম্প", severity: "high", detailEn: "Port truck diesel rationing", detailBn: "বন্দর ট্রাকে ডিজেল রেশনিং", lat: 22.32, lng: 91.81 },
+  { id: "ctg-power-cox", divisionId: "chattogram", kind: "power", nameEn: "Cox's Bazar Feeder", nameBn: "কক্সবাজার ফিডার", severity: "moderate", detailEn: "Coastal feeder instability", detailBn: "উপকূলীয় ফিডারে অস্থিরতা", lat: 21.43, lng: 92.01 },
+  // Khulna
+  { id: "kh-gas-city", divisionId: "khulna", kind: "gas", nameEn: "Khulna City CNG Stations", nameBn: "খুলনা সিটি সিএনজি স্টেশন", severity: "high", detailEn: "CNG stations closed mid-day", detailBn: "দুপুরে সিএনজি স্টেশন বন্ধ", lat: 22.85, lng: 89.54 },
+  { id: "kh-fuel-mongla", divisionId: "khulna", kind: "fuel", nameEn: "Mongla Port Fuel Yard", nameBn: "মোংলা বন্দর জ্বালানি ইয়ার্ড", severity: "critical", detailEn: "Diesel stock below 3-day buffer", detailBn: "ডিজেল মজুদ ৩ দিনের নিচে", lat: 22.47, lng: 89.6 },
+  { id: "kh-water-satkhira", divisionId: "khulna", kind: "water", nameEn: "Satkhira Salinity Belt", nameBn: "সাতক্ষীরা লবণাক্ত বেল্ট", severity: "critical", detailEn: "Drinking water salinity spike", detailBn: "পানীয় জলে লবণাক্ততা বৃদ্ধি", lat: 22.33, lng: 89.1 },
+  // Rajshahi
+  { id: "rj-gas-city", divisionId: "rajshahi", kind: "gas", nameEn: "Rajshahi City Gas Loop", nameBn: "রাজশাহী সিটি গ্যাস লুপ", severity: "moderate", detailEn: "Evening residential pressure drop", detailBn: "সন্ধ্যায় আবাসিক গ্যাস চাপ কম", lat: 24.37, lng: 88.6 },
+  { id: "rj-fuel-godagari", divisionId: "rajshahi", kind: "fuel", nameEn: "Godagari Border Pumps", nameBn: "গোদাগাড়ী সীমান্ত পাম্প", severity: "high", detailEn: "Octane shortage near border route", detailBn: "সীমান্ত রুটে অকটেন সংকট", lat: 24.47, lng: 88.33 },
+  { id: "rj-power-nawabganj", divisionId: "rajshahi", kind: "power", nameEn: "Chapainawabganj Rural Grid", nameBn: "চাঁপাইনবাবগঞ্জ গ্রামীণ গ্রিড", severity: "high", detailEn: "5–7 hr rural load-shedding", detailBn: "গ্রামাঞ্চলে ৫–৭ ঘণ্টা লোডশেডিং", lat: 24.6, lng: 88.27 },
+  // Sylhet
+  { id: "sy-gas-city", divisionId: "sylhet", kind: "gas", nameEn: "Sylhet City CNG Corridor", nameBn: "সিলেট সিটি সিএনজি করিডোর", severity: "moderate", detailEn: "CNG pump queues at peak hours", detailBn: "পিক আওয়ারে সিএনজি সারি", lat: 24.9, lng: 91.87 },
+  { id: "sy-fuel-beanibazar", divisionId: "sylhet", kind: "fuel", nameEn: "Beanibazar Filling Stations", nameBn: "বিয়ানীবাজার পাম্প", severity: "high", detailEn: "Diesel supply lag from depot", detailBn: "ডিপো থেকে ডিজেল সরবরাহ বিলম্ব", lat: 24.81, lng: 92.16 },
+  { id: "sy-power-habiganj", divisionId: "sylhet", kind: "power", nameEn: "Habiganj Tea Estate Feeder", nameBn: "হবিগঞ্জ চা বাগান ফিডার", severity: "moderate", detailEn: "Estate power interruptions", detailBn: "বাগানে বিদ্যুৎ বিভ্রাট", lat: 24.38, lng: 91.41 },
+  // Barishal
+  { id: "br-fuel-city", divisionId: "barishal", kind: "fuel", nameEn: "Barishal Launch Terminal Pumps", nameBn: "বরিশাল লঞ্চ টার্মিনাল পাম্প", severity: "high", detailEn: "River transport diesel crunch", detailBn: "নৌ-পরিবহনে ডিজেল সংকট", lat: 22.7, lng: 90.37 },
+  { id: "br-power-bhola", divisionId: "barishal", kind: "power", nameEn: "Bhola Island Feeder", nameBn: "ভোলা দ্বীপ ফিডার", severity: "critical", detailEn: "Long island outages overnight", detailBn: "রাতে দ্বীপে দীর্ঘ বিদ্যুৎ বিভ্রাট", lat: 22.69, lng: 90.65 },
+  { id: "br-water-patuakhali", divisionId: "barishal", kind: "water", nameEn: "Patuakhali Coastal Belt", nameBn: "পটুয়াখালী উপকূল বেল্ট", severity: "high", detailEn: "Saline intrusion in tube-wells", detailBn: "নলকূপে লবণাক্ত পানি অনুপ্রবেশ", lat: 22.36, lng: 90.33 },
+  // Rangpur
+  { id: "rp-gas-city", divisionId: "rangpur", kind: "gas", nameEn: "Rangpur City CNG Points", nameBn: "রংপুর সিটি সিএনজি পয়েন্ট", severity: "moderate", detailEn: "Limited CNG hours", detailBn: "সিএনজি সরবরাহ সীমিত সময়", lat: 25.74, lng: 89.25 },
+  { id: "rp-fuel-dinajpur", divisionId: "rangpur", kind: "fuel", nameEn: "Dinajpur Highway Pumps", nameBn: "দিনাজপুর হাইওয়ে পাম্প", severity: "high", detailEn: "Truck diesel queue on corridor", detailBn: "করিডোরে ট্রাক ডিজেল সারি", lat: 25.63, lng: 88.64 },
+  { id: "rp-power-kurigram", divisionId: "rangpur", kind: "power", nameEn: "Kurigram Char Feeder", nameBn: "কুড়িগ্রাম চর ফিডার", severity: "critical", detailEn: "Char areas dark 6–8 hrs", detailBn: "চরাঞ্চলে ৬–৮ ঘণ্টা অন্ধকার", lat: 25.81, lng: 89.65 },
+  // Mymensingh
+  { id: "my-gas-bhaluka", divisionId: "mymensingh", kind: "gas", nameEn: "Bhaluka Industrial Gas Spur", nameBn: "ভালুকা শিল্প গ্যাস স্পার", severity: "critical", detailEn: "Daytime industrial pressure collapse", detailBn: "দিনের বেলা শিল্প গ্যাস চাপ পতন", lat: 24.38, lng: 90.38 },
+  { id: "my-fuel-sadar", divisionId: "mymensingh", kind: "fuel", nameEn: "Mymensingh Sadar Pumps", nameBn: "ময়মনসিংহ সদর পাম্প", severity: "moderate", detailEn: "Octane intermittent at city pumps", detailBn: "শহরের পাম্পে অকটেন মাঝে মাঝে সংকট", lat: 24.75, lng: 90.4 },
+  { id: "my-power-jamalpur", divisionId: "mymensingh", kind: "power", nameEn: "Jamalpur Poultry Grid", nameBn: "জামালপুর পোল্ট্রি গ্রিড", severity: "high", detailEn: "Hatchery outages overnight", detailBn: "রাতে হ্যাচারিতে বিদ্যুৎ বিভ্রাট", lat: 24.92, lng: 89.95 },
 ];

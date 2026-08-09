@@ -37,7 +37,7 @@
                                                                ┌─────────────────────┐
                                                                │ AI Server (≥16GB)   │
                                                                │ Ollama :11434       │
-                                                               │ llama3.1:8b         │
+                                                               │ gpt-oss:20b         │
                                                                └─────────────────────┘
 ```
 
@@ -183,7 +183,7 @@ docker compose \
  App VPS                          AI Server
  ┌─────────────────────┐         ┌──────────────────┐
  │ ai-analytics:8000   │──HTTP──►│ Ollama :11434    │
- │  OLLAMA_URL=…       │         │ llama3.1:8b      │
+ │  OLLAMA_URL=…       │         │ gpt-oss:20b      │
  │ SENTIMENT_USE_MOCK  │         └──────────────────┘
  │  = true (small VPS) │
  └─────────────────────┘

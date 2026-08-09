@@ -13,7 +13,6 @@ import type { SocketConnectionStatus } from "@/hooks/use-socket";
 import { useTranslations } from "next-intl";
 import { Radio, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ModuleCinematicLoader } from "@/components/ui/module-motion";
 
 export function DashboardViewport() {
   const t = useTranslations("modules.dashboard");
@@ -71,13 +70,8 @@ export function DashboardViewport() {
     [drillToUnit],
   );
 
-  // Full-screen loader only for the very first payload. Later loads (map
-  // drill-downs, socket refreshes) keep the dashboard mounted and swap data
-  // in place — no jarring teardown of the map and charts.
-  if (loading && !metrics) {
-    return <ModuleCinematicLoader bn fullScreen label="জাতীয় পরিস্থিতির ডেটা সিঙ্ক হচ্ছে…" />;
-  }
-
+  // Progressive SaaS pattern: chrome + map + KPI skeletons paint immediately.
+  // Data streams in without a full-screen blocker.
   return (
     <div className="mx-auto max-w-[1600px] space-y-5 animate-fade-in">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -116,7 +110,7 @@ export function DashboardViewport() {
         <div className="min-w-0">
           <KpiScorecards
             metrics={metrics}
-            loading={loading}
+            loading={loading && !metrics}
             pulseKeys={pulseKeys}
           />
         </div>

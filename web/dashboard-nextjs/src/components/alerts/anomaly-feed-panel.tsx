@@ -11,7 +11,6 @@ import type { AnomalyAlert } from "@/types/alerts";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 import { AlertTriangle, ChevronRight, Radio, RefreshCw } from "lucide-react";
-import { ModuleCinematicLoader } from "@/components/ui/module-motion";
 
 const SEVERITY_STYLES: Record<AnomalyAlert["severity"], string> = {
   LOW: "border-sky-500/30 bg-sky-500/5",
@@ -45,14 +44,21 @@ const AnomalyAlertItem = memo(function AnomalyAlertItem({
         )}
       >
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium leading-snug text-foreground">
+          <p className="text-xs font-semibold leading-relaxed text-foreground break-words whitespace-normal">
             {alert.headline}
           </p>
-          <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
-            {alert.detail}
-          </p>
+          {alert.detail ? (
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground break-words whitespace-normal">
+              {alert.detail}
+            </p>
+          ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
             <span>{new Date(alert.createdAt).toLocaleTimeString("en-BD")}</span>
+            {alert.unitName ? (
+              <Badge variant="outline" className="h-5 max-w-full truncate text-[9px]">
+                {alert.unitName}
+              </Badge>
+            ) : null}
             <Badge variant="outline" className="h-5 text-[9px]">
               {statusLabel}
             </Badge>
@@ -67,14 +73,11 @@ const AnomalyAlertItem = memo(function AnomalyAlertItem({
 interface AnomalyFeedPanelProps {
   className?: string;
   compact?: boolean;
-  /** Used by the dedicated alerts route; embedded feeds retain their compact skeleton. */
-  fullScreenLoading?: boolean;
 }
 
 export function AnomalyFeedPanel({
   className,
   compact = false,
-  fullScreenLoading = false,
 }: AnomalyFeedPanelProps) {
   const t = useTranslations("modules.alerts");
   const tc = useTranslations("common");
@@ -102,30 +105,23 @@ export function AnomalyFeedPanel({
 
   return (
     <>
-      {fullScreenLoading && loading && (
-        <ModuleCinematicLoader
-          bn
-          fullScreen
-          label="সতর্কতা ও ঝুঁকির ডেটা সিঙ্ক হচ্ছে…"
-        />
-      )}
       <section
         className={cn(
-          "glass-panel flex flex-col overflow-hidden rounded-xl shadow-panel",
+          "glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-xl shadow-panel",
           className,
         )}
       >
-        <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-            <div>
-              <h3 className="text-sm font-semibold">{t("feedTitle")}</h3>
+        <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+            <div className="min-w-0">
+              <h3 className="truncate text-sm font-semibold">{t("feedTitle")}</h3>
               {!compact && (
                 <p className="text-[10px] text-muted-foreground">{t("feedSubtitle")}</p>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Badge variant="outline" className="gap-1 border-primary/30 text-[10px] text-primary">
               <Radio className="h-3 w-3" />
               {tc("live")}
@@ -142,12 +138,8 @@ export function AnomalyFeedPanel({
           </div>
         </div>
 
-        <div
-          className={cn(
-            "overflow-y-auto p-2",
-            compact ? "max-h-[320px]" : "max-h-none flex-1 sm:max-h-[min(70vh,560px)]",
-          )}
-        >
+        {/* Fill parent height; list scrolls — do not cap at 320px (left empty gap). */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
           {error && (
             <p className="m-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
               {tc("loadFailed")}: {error}
@@ -162,7 +154,7 @@ export function AnomalyFeedPanel({
           ) : alerts.length === 0 && !error ? (
             <p className="p-6 text-center text-sm text-muted-foreground">{t("empty")}</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-2 pb-2">
               {alerts.map((alert) => (
                 <AnomalyAlertItem
                   key={alert.id}

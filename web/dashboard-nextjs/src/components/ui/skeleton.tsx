@@ -105,3 +105,62 @@ export function ListSkeleton({ items = 5 }: { items?: number }) {
     </div>
   );
 }
+
+/** Progressive in-layout module placeholder — SaaS pattern, never full-screen. */
+export function ModuleContentSkeleton() {
+  return (
+    <div role="status" aria-label="Loading content" className="space-y-5 animate-fade-in">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="glass-panel rounded-xl p-4">
+            <Skeleton className="h-2.5 w-16" />
+            <Skeleton className="mt-3 h-7 w-20" />
+            <Skeleton className="mt-2 h-3 w-28" />
+          </div>
+        ))}
+      </div>
+      <TableSkeleton rows={5} columns={4} />
+    </div>
+  );
+}
+
+/** Soft route transition inside the dashboard chrome (keeps shell visible). */
+export function RouteSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Loading page"
+      className="mx-auto max-w-7xl space-y-5 animate-fade-in"
+    >
+      <div className="surface-hero intel-rail relative px-3 py-5 sm:px-5 sm:py-6">
+        <Skeleton className="h-2.5 w-28" />
+        <Skeleton className="mt-3 h-8 w-56 sm:w-72" />
+        <Skeleton className="mt-3 h-4 w-full max-w-xl" />
+      </div>
+      <ModuleContentSkeleton />
+    </div>
+  );
+}
+
+/** Home command viewport skeleton — map + KPI cards. */
+export function DashboardViewportSkeleton() {
+  return (
+    <div role="status" aria-label="Loading dashboard" className="mx-auto max-w-[1600px] space-y-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-52 sm:w-64" />
+          <Skeleton className="h-4 w-40" />
+        </div>
+        <Skeleton className="h-6 w-20 rounded-full" />
+      </div>
+      <div className="h-[260px] sm:h-[360px] lg:h-[480px]">
+        <MapSkeleton />
+      </div>
+      <div className="grid grid-cols-1 gap-5">
+        <ScorecardSkeleton />
+        <ScorecardSkeleton />
+        <ScorecardSkeleton />
+      </div>
+    </div>
+  );
+}

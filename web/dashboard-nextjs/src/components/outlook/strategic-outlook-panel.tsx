@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Bar, BarChart, CartesianGrid, Cell, PolarAngleAxis, PolarGrid,
+  Bar, BarChart, CartesianGrid, Cell, LabelList, PolarAngleAxis, PolarGrid,
   Radar, RadarChart, RadialBar, RadialBarChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from "recharts";
@@ -638,14 +638,37 @@ export function StrategicOutlookPanel() {
   const polRisk = pol.reduce((s, c) => s + c.severity, 0);
   const ecoRisk = eco.reduce((s, c) => s + c.severity, 0);
 
+  /** Each bar = one challenge; severity 1–5 → intensity % */
   const challengeBarData = [
-    ...pol.map(c => ({ name: c.title, value: c.severity, domain: "politics" })),
-    ...eco.map(c => ({ name: c.title, value: c.severity, domain: "economy" })),
+    ...pol.map((c, i) => ({
+      id: `p${i + 1}`,
+      label: c.title,
+      shortLabel: c.title.length > 22 ? `${c.title.slice(0, 20)}…` : c.title,
+      pct: Math.round((Math.min(5, Math.max(0, c.severity)) / 5) * 100),
+      severity: c.severity,
+      domain: "politics" as const,
+    })),
+    ...eco.map((c, i) => ({
+      id: `e${i + 1}`,
+      label: c.title,
+      shortLabel: c.title.length > 22 ? `${c.title.slice(0, 20)}…` : c.title,
+      pct: Math.round((Math.min(5, Math.max(0, c.severity)) / 5) * 100),
+      severity: c.severity,
+      domain: "economy" as const,
+    })),
   ];
 
   const radarData = [
-    ...pol.slice(0, 3).map(c => ({ subject: c.title, politics: c.severity, economy: 0 })),
-    ...eco.slice(0, 3).map(c => ({ subject: c.title, politics: 0, economy: c.severity })),
+    ...pol.slice(0, 3).map((c) => ({
+      subject: c.title.length > 18 ? `${c.title.slice(0, 16)}…` : c.title,
+      politics: Math.round((c.severity / 5) * 100),
+      economy: 0,
+    })),
+    ...eco.slice(0, 3).map((c) => ({
+      subject: c.title.length > 18 ? `${c.title.slice(0, 16)}…` : c.title,
+      politics: 0,
+      economy: Math.round((c.severity / 5) * 100),
+    })),
   ];
 
   const tabs = [
@@ -761,18 +784,23 @@ export function StrategicOutlookPanel() {
                 <div className="space-y-5">
                   <ExecutiveNarrativeCard narrative={data.narrative} t={t} />
 
-                  {/* Challenge severity chart — vertical bars so full Bengali labels fit */}
+                  {/* Each bar = one named challenge; height = intensity % */}
                   {challengeBarData.length > 0 && (
                     <IntelCard padding="sm">
-                      <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                        {t("challengeIntensity")}
-                      </p>
+                      <div className="mb-3">
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                          {t("challengeIntensity")}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t("challengeIntensityHint")}
+                        </p>
+                      </div>
                       <ResponsiveContainer
                         width="100%"
                         height={
                           layout.narrow
-                            ? Math.max(layout.chartHeightMd, challengeBarData.length * 36)
-                            : layout.chartHeightMd
+                            ? Math.max(layout.chartHeightMd, challengeBarData.length * 40)
+                            : Math.max(layout.chartHeightMd, 280)
                         }
                       >
                         <BarChart
@@ -780,8 +808,8 @@ export function StrategicOutlookPanel() {
                           layout={layout.narrow ? "vertical" : "horizontal"}
                           margin={
                             layout.narrow
-                              ? { top: 4, right: 12, left: 4, bottom: 4 }
-                              : { top: 4, right: 12, left: 8, bottom: layout.tablet ? 56 : 90 }
+                              ? { top: 4, right: 48, left: 4, bottom: 4 }
+                              : { top: 28, right: 12, left: 8, bottom: layout.tablet ? 64 : 96 }
                           }
                         >
                           <CartesianGrid
@@ -794,14 +822,15 @@ export function StrategicOutlookPanel() {
                             <>
                               <XAxis
                                 type="number"
-                                domain={[0, 5]}
-                                ticks={[1, 2, 3, 4, 5]}
+                                domain={[0, 100]}
+                                ticks={[0, 25, 50, 75, 100]}
                                 tick={layout.tickMuted}
+                                tickFormatter={(v) => `${v}%`}
                               />
                               <YAxis
                                 type="category"
-                                dataKey="name"
-                                width={layout.yAxisCategoryWidth}
+                                dataKey="shortLabel"
+                                width={Math.max(layout.yAxisCategoryWidth, 120)}
                                 tick={layout.tick}
                                 interval={0}
                               />
@@ -809,47 +838,97 @@ export function StrategicOutlookPanel() {
                           ) : (
                             <>
                               <XAxis
-                                dataKey="name"
+                                dataKey="shortLabel"
                                 tick={layout.tick}
                                 interval={0}
-                                angle={layout.tablet ? -22 : -38}
+                                angle={layout.tablet ? -18 : -32}
                                 textAnchor="end"
-                                height={layout.tablet ? 56 : 90}
+                                height={layout.tablet ? 64 : 96}
                               />
                               <YAxis
-                                domain={[0, 5]}
-                                ticks={[1, 2, 3, 4, 5]}
+                                domain={[0, 100]}
+                                ticks={[0, 25, 50, 75, 100]}
                                 tick={layout.tickMuted}
-                                width={layout.yAxisNumberWidth}
+                                width={layout.yAxisNumberWidth + 8}
+                                tickFormatter={(v) => `${v}%`}
                               />
                             </>
                           )}
-                          <Tooltip {...chartTooltipProps}
-                            formatter={(v, _n, p) => [
-                              `${String(v)}/5`,
-                              (p.payload as { domain?: string } | undefined)?.domain === "politics" ? t("politics") : t("economy"),
-                            ]} />
+                          <Tooltip
+                            {...chartTooltipProps}
+                            labelFormatter={(_label, payload) => {
+                              const row = payload?.[0]?.payload as
+                                | { label?: string; domain?: string }
+                                | undefined;
+                              return row?.label ?? "";
+                            }}
+                            formatter={(v, _n, p) => {
+                              const row = p.payload as
+                                | { domain?: string; severity?: number }
+                                | undefined;
+                              const domainLabel =
+                                row?.domain === "politics" ? t("politics") : t("economy");
+                              return [`${String(v)}%`, domainLabel];
+                            }}
+                          />
                           <Bar
-                            dataKey="value"
+                            dataKey="pct"
+                            name={t("severity")}
                             radius={layout.narrow ? [0, 5, 5, 0] : [5, 5, 0, 0]}
                             maxBarSize={layout.barMaxSize}
                           >
                             {challengeBarData.map((e, i) => (
-                              <Cell key={i}
+                              <Cell
+                                key={e.id}
                                 fill={e.domain === "politics" ? "#a855f7" : "#f59e0b"}
-                                fillOpacity={0.82} />
+                                fillOpacity={0.85}
+                              />
                             ))}
+                            <LabelList
+                              dataKey="pct"
+                              position={layout.narrow ? "right" : "top"}
+                              formatter={(v: number) => `${v}%`}
+                              style={{
+                                fill: "#e2e8f0",
+                                fontSize: 11,
+                                fontWeight: 700,
+                              }}
+                            />
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
-                      <div className="mt-2 flex gap-5 text-[11px] text-muted-foreground">
+                      <div className="mt-3 flex flex-wrap gap-5 text-[11px] text-muted-foreground">
                         <span className="flex items-center gap-1.5">
-                          <span className="h-2.5 w-2.5 rounded-sm bg-purple-500/80 inline-block" />{t("politics")}
+                          <span className="inline-block h-2.5 w-2.5 rounded-sm bg-purple-500/80" />
+                          {t("politics")}
                         </span>
                         <span className="flex items-center gap-1.5">
-                          <span className="h-2.5 w-2.5 rounded-sm bg-amber-500/80 inline-block" />{t("economy")}
+                          <span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-500/80" />
+                          {t("economy")}
                         </span>
                       </div>
+                      {/* Explicit legend: which bar = which challenge */}
+                      <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                        {challengeBarData.map((row) => (
+                          <li
+                            key={row.id}
+                            className="flex items-start gap-2 rounded-md border border-border/30 bg-background/40 px-2.5 py-1.5 text-[11px]"
+                          >
+                            <span
+                              className={cn(
+                                "mt-1 h-2 w-2 shrink-0 rounded-sm",
+                                row.domain === "politics" ? "bg-purple-500" : "bg-amber-500",
+                              )}
+                            />
+                            <span className="min-w-0 flex-1 leading-snug text-foreground/90">
+                              {row.label}
+                            </span>
+                            <span className="shrink-0 font-semibold tabular-nums text-foreground">
+                              {row.pct}%
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
                     </IntelCard>
                   )}
 

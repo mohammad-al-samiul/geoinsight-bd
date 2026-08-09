@@ -6,11 +6,11 @@
 # Usage:
 #   cp .env.ollama.example .env.ollama
 #   docker compose -f docker-compose.ollama.yml --env-file .env.ollama up -d
-#   docker exec geoinsight-ollama ollama pull llama3.1:8b
+#   docker exec geoinsight-ollama ollama pull gpt-oss:20b
 #
 # Then on the APP VPS set:
 #   OLLAMA_URL=http://<AI_SERVER_PRIVATE_OR_PUBLIC_IP>:11434
-#   OLLAMA_MODEL=llama3.1:8b
+#   OLLAMA_MODEL=gpt-oss:20b
 #   LLM_PROVIDER=ollama
 
 name: geoinsight-ollama

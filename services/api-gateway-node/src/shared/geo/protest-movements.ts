@@ -5,8 +5,14 @@
 
 import { extractNewsPlaces } from "./news-place-matcher";
 import { extractNewsImpact, type NewsImpactExtract } from "../impact/news-impact";
+import {
+  inferProtestEventTime,
+  isHistoricalTemporal,
+  type TemporalClass,
+} from "./protest-event-time";
+import bdDistricts from "./data/bd-districts.json";
 
-export type MovementStatus = "active" | "recent" | "cooling";
+export type MovementStatus = "active" | "recent" | "cooling" | "historical";
 
 export interface ProtestMovementArticle {
   id: string;
@@ -23,6 +29,10 @@ export interface ProtestMovement {
   theme_id: string;
   theme: string;
   theme_bn: string;
+  /** Political actor / party organizing or leading the protest */
+  party_id: string;
+  party: string;
+  party_bn: string;
   place: string;
   place_bn: string;
   district: string | null;
@@ -30,6 +40,11 @@ export interface ProtestMovement {
   status: MovementStatus;
   status_bn: string;
   status_en: string;
+  /** When the protest itself happened (inferred) — not news publish time */
+  event_at: string;
+  event_period_en: string;
+  event_period_bn: string;
+  temporal_class: TemporalClass;
   first_seen_at: string;
   last_seen_at: string;
   article_count: number;
@@ -38,6 +53,73 @@ export interface ProtestMovement {
   summary_bn: string;
   summary_en: string;
   articles: ProtestMovementArticle[];
+  /** Map pin (district centroid / national fallback) */
+  lat: number | null;
+  lng: number | null;
+  /** 0–1 confidence from unique outlets × article volume */
+  source_confidence: number;
+  unique_sources: number;
+  /** Chronological event trail for timeline UI */
+  timeline: Array<{ at: string; title: string; source_name: string; url: string }>;
+}
+
+const DISTRICT_COORDS = new Map(
+  (bdDistricts as { districts: Array<{ name: string; lat: string; long: string }> }).districts.map(
+    (d) => [d.name.toLowerCase(), { lat: Number(d.lat), lng: Number(d.long) }] as const,
+  ),
+);
+
+const DIVISION_COORDS: Record<string, { lat: number; lng: number }> = {
+  dhaka: { lat: 23.81, lng: 90.41 },
+  chattogram: { lat: 22.34, lng: 91.83 },
+  chittagong: { lat: 22.34, lng: 91.83 },
+  khulna: { lat: 22.85, lng: 89.55 },
+  rajshahi: { lat: 24.37, lng: 88.6 },
+  sylhet: { lat: 24.9, lng: 91.87 },
+  barishal: { lat: 22.7, lng: 90.37 },
+  barisal: { lat: 22.7, lng: 90.37 },
+  rangpur: { lat: 25.75, lng: 89.25 },
+  mymensingh: { lat: 24.75, lng: 90.4 },
+};
+
+function coordsForPlace(district: string | null, division: string | null, place: string): {
+  lat: number | null;
+  lng: number | null;
+} {
+  const candidates = [district, place, division]
+    .filter(Boolean)
+    .map((s) =>
+      String(s)
+        .toLowerCase()
+        .replace("chittagong", "chattogram")
+        .replace("barisal", "barishal")
+        .trim(),
+    );
+
+  for (const key of candidates) {
+    const hit = DISTRICT_COORDS.get(key);
+    if (hit && Number.isFinite(hit.lat) && Number.isFinite(hit.lng)) return hit;
+  }
+  for (const key of candidates) {
+    const div = DIVISION_COORDS[key];
+    if (div) return div;
+  }
+  if (place === "National") return { lat: 23.685, lng: 90.3563 };
+  return { lat: null, lng: null };
+}
+
+function sourceConfidence(articles: ProtestMovementArticle[]): {
+  source_confidence: number;
+  unique_sources: number;
+} {
+  const unique = new Set(articles.map((a) => a.source_name.trim().toLowerCase()).filter(Boolean));
+  const unique_sources = unique.size || 1;
+  const volume = Math.min(1, articles.length / 6);
+  const diversity = Math.min(1, unique_sources / 4);
+  return {
+    unique_sources,
+    source_confidence: Number((0.35 * volume + 0.65 * diversity).toFixed(2)),
+  };
 }
 
 export interface MovementSignalInput {
@@ -60,6 +142,19 @@ const THEME_RULES: Array<{
   label_bn: string;
   patterns: RegExp[];
 }> = [
+  {
+    id: "july_uprising",
+    label_en: "July 2024 uprising (historical)",
+    label_bn: "জুলাই ২০২৪ অভ্যুত্থান (ঐতিহাসিক)",
+    patterns: [
+      /জুলাই\s*(?:মাসের?\s*)?(?:আন্দোলন|অভ্যুত্থান|বিপ্লব|গণঅভ্যুত্থান)/,
+      /জুলাই.?আগস্ট/,
+      /july\s*(?:uprising|revolution|movement|massacre)/i,
+      /anti-?discrimination\s*student\s*movement/i,
+      /৫\s*আগস্ট/,
+      /5(?:th)?\s*august\s*2024/i,
+    ],
+  },
   {
     id: "hsc_exam",
     label_en: "HSC exam protest",
@@ -113,15 +208,70 @@ const THEME_RULES: Array<{
   },
   {
     id: "power",
-    label_en: "Load-shedding / power protest",
-    label_bn: "লোডশেডিং/বিদ্যুৎ আন্দোলন",
-    patterns: [/বিদ্যুৎ/, /লোডশেডিং/, /load.?shedding/i, /electricity/i, /blackout/i, /পাওয়ার কাট/],
+    label_en: "Electricity tariff / load-shedding protest",
+    label_bn: "বিদ্যুৎ দাম/লোডশেডিং আন্দোলন",
+    patterns: [
+      /বিদ্যুৎ/,
+      /বিদ্যুত/,
+      /লোডশেডিং/,
+      /load.?shedding/i,
+      /electricity/i,
+      /power\s*(tariff|price|bill|hike)/i,
+      /blackout/i,
+      /পাওয়ার কাট/,
+      /ডিইএসসিও/,
+      /\bdesco\b/i,
+      /\bpdb\b/i,
+      /পাওয়ার ডেভেলপমেন্ট/,
+      /বিদ্যুৎ\s*(দাম|বিল|মূল্য)/,
+      /(দাম|মূল্য|বিল).{0,12}বিদ্যুৎ/,
+      /বিদ্যুৎ.{0,12}(দাম|মূল্য|বিল|বৃদ্ধি)/,
+      /electricity\s*(price|tariff|rate)/i,
+    ],
   },
   {
     id: "gas_fuel",
-    label_en: "Gas / fuel protest",
-    label_bn: "গ্যাস/জ্বালানি আন্দোলন",
-    patterns: [/গ্যাস/, /\bgas\b/i, /জ্বালানি/, /petrol/i, /octane/i, /সিএনজি/, /\bcng\b/i, /ডিজেল/, /diesel/i],
+    label_en: "Gas / fuel price protest",
+    label_bn: "গ্যাস/জ্বালানি দাম আন্দোলন",
+    patterns: [
+      /গ্যাস/,
+      /\bgas\b/i,
+      /জ্বালানি/,
+      /petrol/i,
+      /octane/i,
+      /সিএনজি/,
+      /\bcng\b/i,
+      /ডিজেল/,
+      /diesel/i,
+      /তিতাস/,
+      /\btitas\b/i,
+      /\blng\b/i,
+      /এলএনজি/,
+      /গ্যাস\s*(দাম|মূল্য|বিল)/,
+      /(দাম|মূল্য|বিল).{0,12}গ্যাস/,
+      /গ্যাস.{0,12}(দাম|মূল্য|বিল|বৃদ্ধি)/,
+      /fuel\s*(price|tariff|hike)/i,
+      /gas\s*(price|tariff|hike)/i,
+    ],
+  },
+  {
+    id: "political_opposition",
+    label_en: "Opposition / political protest",
+    label_bn: "বিরোধী দল/রাজনৈতিক আন্দোলন",
+    patterns: [
+      /বিরোধী\s*দল/,
+      /বিরোধী\s*নেতা/,
+      /সরকার\s*বিরোধী/,
+      /বিএনপি/,
+      /\bbnp\b/i,
+      /জামায়াত/,
+      /জাতীয়\s*পার্টি/,
+      /opposition\s*(party|leader|rally|protest)/i,
+      /anti-?government/i,
+      /প্রতিবাদ\s*সভা/,
+      /গণসমাবেশ/,
+      /রাজনৈতিক\s*(সমাবেশ|মিছিল|আন্দোলন)/,
+    ],
   },
   {
     id: "law_bill",
@@ -173,23 +323,131 @@ const THEME_RULES: Array<{
   },
 ];
 
-/** Stable display order for category sections */
+const PARTY_RULES: Array<{
+  id: string;
+  label_en: string;
+  label_bn: string;
+  patterns: RegExp[];
+}> = [
+  {
+    id: "bnp",
+    label_en: "BNP",
+    label_bn: "বিএনপি",
+    patterns: [/বিএনপি/, /\bbnp\b/i, /bangladesh nationalist party/i, /ছাত্রদল/],
+  },
+  {
+    id: "jamaat",
+    label_en: "Jamaat-e-Islami",
+    label_bn: "জামায়াতে ইসলামী",
+    patterns: [/জামায়াত/, /জামায়াত/, /jamaat/i, /শিবির/, /islami chhatra shibir/i],
+  },
+  {
+    id: "ncp",
+    label_en: "NCP",
+    label_bn: "এনসিপি",
+    patterns: [
+      /\bncp\b/i,
+      /এনসিপি/,
+      /জাতীয় নাগরিক পার্টি/,
+      /জাতীয় নাগরিক পার্টি/,
+      /national citizen(?:s)? party/i,
+    ],
+  },
+  {
+    id: "jatiya_party",
+    label_en: "Jatiya Party",
+    label_bn: "জাতীয় পার্টি",
+    patterns: [/জাতীয় পার্টি/, /জাতীয় পার্টি/, /jatiya party/i],
+  },
+  {
+    id: "awami_league",
+    label_en: "Awami League",
+    label_bn: "আওয়ামী লীগ",
+    patterns: [/আওয়ামী লীগ/, /আওয়ামী লীগ/, /awami league/i, /ছাত্রলীগ/],
+  },
+  {
+    id: "left_alliance",
+    label_en: "Left / alliance",
+    label_bn: "বাম/জোট",
+    patterns: [/বামপন্থী/, /কমিউনিস্ট/, /\bcpb\b/i, /বাসদ/, /গণফোরাম/, /left alliance/i],
+  },
+  {
+    id: "student_org",
+    label_en: "Student organizations",
+    label_bn: "ছাত্র সংগঠন",
+    patterns: [/ছাত্র সংগঠন/, /ছাত্রসমাজ/, /student union/i, /সংশ্লিষ্ট ছাত্র/],
+  },
+  {
+    id: "labour_union",
+    label_en: "Labour / trade union",
+    label_bn: "শ্রমিক সংগঠন",
+    patterns: [/শ্রমিক সংঘ/, /ট্রেড ইউনিয়ন/, /trade union/i, /গার্মেন্ট শ্রমিক/, /শ্রমিক আন্দোলন/],
+  },
+  {
+    id: "civil_society",
+    label_en: "Civil society / citizens",
+    label_bn: "নাগরিক সমাজ",
+    patterns: [/নাগরিক সমাজ/, /civil society/i, /মানবাধিকার/, /সাংবাদিক/, /journalist/i],
+  },
+];
+
+function pickParty(text: string): { id: string; label_en: string; label_bn: string } {
+  for (const rule of PARTY_RULES) {
+    if (rule.patterns.some((p) => p.test(text))) {
+      return { id: rule.id, label_en: rule.label_en, label_bn: rule.label_bn };
+    }
+  }
+  return {
+    id: "unaffiliated",
+    label_en: "Unaffiliated / public",
+    label_bn: "অদলীয় / সাধারণ জনতা",
+  };
+}
+
+/**
+ * When multiple themes match one article, prefer issue/utility/politics over
+ * broad student/exam tags so gas–power price protests are not buried.
+ */
+const THEME_MATCH_PRIORITY: Record<string, number> = {
+  july_uprising: 1,
+  power: 10,
+  gas_fuel: 10,
+  hartal_blockade: 20,
+  political_opposition: 30,
+  wage: 40,
+  road_transport: 45,
+  corruption: 50,
+  law_bill: 55,
+  quota: 60,
+  farmer: 65,
+  land_eviction: 70,
+  water_flood: 75,
+  minority: 80,
+  hsc_exam: 90,
+  ssc_exam: 91,
+  student: 95,
+  general: 100,
+};
+
+/** Stable display order for category sections — issue themes first */
 export const THEME_DISPLAY_ORDER = [
-  "hsc_exam",
-  "ssc_exam",
-  "student",
-  "corruption",
-  "road_transport",
   "power",
   "gas_fuel",
-  "law_bill",
+  "political_opposition",
+  "hartal_blockade",
+  "road_transport",
   "wage",
+  "corruption",
+  "law_bill",
   "quota",
+  "july_uprising",
   "farmer",
   "land_eviction",
   "water_flood",
-  "hartal_blockade",
   "minority",
+  "hsc_exam",
+  "ssc_exam",
+  "student",
   "general",
 ] as const;
 
@@ -197,16 +455,20 @@ const ACTIVE_DAYS = 5;
 const RECENT_DAYS = 14;
 
 function pickTheme(text: string): { id: string; label_en: string; label_bn: string } {
-  for (const rule of THEME_RULES) {
-    if (rule.patterns.some((p) => p.test(text))) {
-      return { id: rule.id, label_en: rule.label_en, label_bn: rule.label_bn };
-    }
+  const hits = THEME_RULES.filter((rule) => rule.patterns.some((p) => p.test(text)));
+  if (hits.length === 0) {
+    return {
+      id: "general",
+      label_en: "Public protest",
+      label_bn: "জন আন্দোলন / বিক্ষোভ",
+    };
   }
-  return {
-    id: "general",
-    label_en: "Public protest",
-    label_bn: "জন আন্দোলন / বিক্ষোভ",
-  };
+  hits.sort(
+    (a, b) =>
+      (THEME_MATCH_PRIORITY[a.id] ?? 99) - (THEME_MATCH_PRIORITY[b.id] ?? 99),
+  );
+  const best = hits[0]!;
+  return { id: best.id, label_en: best.label_en, label_bn: best.label_bn };
 }
 
 function resolvePlace(input: MovementSignalInput): {
@@ -258,12 +520,26 @@ function maxImpact(a: NewsImpactExtract, b: NewsImpactExtract): NewsImpactExtrac
   };
 }
 
-function statusFor(lastSeen: Date, now: Date): {
+function statusFor(
+  eventAt: Date,
+  now: Date,
+  temporal: TemporalClass,
+): {
   status: MovementStatus;
   status_bn: string;
   status_en: string;
 } {
-  const ageDays = (now.getTime() - lastSeen.getTime()) / 86_400_000;
+  if (isHistoricalTemporal(temporal)) {
+    return {
+      status: "historical",
+      status_bn:
+        temporal === "commemoration" ? "ঐতিহাসিক / স্মরণসূচক" : "ঐতিহাসিক আন্দোলন",
+      status_en:
+        temporal === "commemoration" ? "Historical / commemorative" : "Historical",
+    };
+  }
+  // Live protests: age by when the event happened, not by fresh commentary alone
+  const ageDays = (now.getTime() - eventAt.getTime()) / 86_400_000;
   if (ageDays <= ACTIVE_DAYS) {
     return { status: "active", status_bn: "চলমান / সক্রিয়", status_en: "Active now" };
   }
@@ -304,6 +580,10 @@ export function clusterProtestMovements(
     themeId: string;
     themeEn: string;
     themeBn: string;
+    partyId: string;
+    partyEn: string;
+    partyBn: string;
+    partyVotes: Map<string, number>;
     place: string;
     placeBn: string;
     district: string | null;
@@ -314,16 +594,24 @@ export function clusterProtestMovements(
     first: Date;
     last: Date;
     bestTitle: string;
+    eventAt: Date;
+    temporalClass: TemporalClass;
+    periodEn: string;
+    periodBn: string;
+    eraId: string;
   };
 
   const buckets = new Map<string, Bucket>();
 
   for (const signal of eligible) {
     const text = `${signal.title} ${signal.summary ?? ""}`;
+    const publishedAt = new Date(signal.published_at!);
+    const eventTime = inferProtestEventTime(signal.title, signal.summary, publishedAt, now);
     const theme = pickTheme(text);
+    const party = pickParty(text);
     const place = resolvePlace(signal);
-    const key = `${theme.id}::${place.place.toLowerCase()}`;
-    const at = new Date(signal.published_at!);
+    // Issue + party + place + era — July 2024 news must not merge into today's protests
+    const key = `${theme.id}::${party.id}::${place.place.toLowerCase()}::${eventTime.era_id}`;
     const impact =
       signal.impact.deaths + signal.impact.injuries > 0
         ? signal.impact
@@ -343,6 +631,10 @@ export function clusterProtestMovements(
         themeId: theme.id,
         themeEn: theme.label_en,
         themeBn: theme.label_bn,
+        partyId: party.id,
+        partyEn: party.label_en,
+        partyBn: party.label_bn,
+        partyVotes: new Map([[party.id, 1]]),
         place: place.place,
         placeBn: place.place_bn,
         district: place.district,
@@ -350,9 +642,14 @@ export function clusterProtestMovements(
         severity: signal.severity,
         impact: { ...impact },
         articles: [article],
-        first: at,
-        last: at,
+        first: publishedAt,
+        last: publishedAt,
         bestTitle: cleanHeadline(signal.title),
+        eventAt: eventTime.event_at,
+        temporalClass: eventTime.temporal_class,
+        periodEn: eventTime.period_en,
+        periodBn: eventTime.period_bn,
+        eraId: eventTime.era_id,
       });
       continue;
     }
@@ -360,10 +657,21 @@ export function clusterProtestMovements(
     prev.severity = Math.max(prev.severity, signal.severity);
     prev.impact = maxImpact(prev.impact, impact);
     prev.articles.push(article);
-    if (at < prev.first) prev.first = at;
-    if (at > prev.last) {
-      prev.last = at;
+    prev.partyVotes.set(party.id, (prev.partyVotes.get(party.id) ?? 0) + 1);
+    if (publishedAt < prev.first) prev.first = publishedAt;
+    if (publishedAt > prev.last) {
+      prev.last = publishedAt;
       prev.bestTitle = cleanHeadline(signal.title);
+    }
+    // Prefer earliest event_at within the era; keep strongest historical class
+    if (eventTime.event_at < prev.eventAt) prev.eventAt = eventTime.event_at;
+    if (
+      eventTime.temporal_class === "commemoration" ||
+      (eventTime.temporal_class === "historical" && prev.temporalClass === "live")
+    ) {
+      prev.temporalClass = eventTime.temporal_class;
+      prev.periodEn = eventTime.period_en;
+      prev.periodBn = eventTime.period_bn;
     }
     if (!prev.district && place.district) prev.district = place.district;
     if (!prev.division && place.division) prev.division = place.division;
@@ -377,27 +685,64 @@ export function clusterProtestMovements(
       continue;
     }
 
-    const st = statusFor(b.last, now);
+    // july_uprising theme is always historical once past the live window
+    let temporal = b.temporalClass;
+    if (b.themeId === "july_uprising" || b.eraId !== "live") {
+      if (!isHistoricalTemporal(temporal)) temporal = "historical";
+    }
+
+    const st = statusFor(b.eventAt, now, temporal);
     const deaths = b.impact.deaths;
     const injuries = b.impact.injuries;
     const damage = b.impact.homes_damaged + b.impact.damage_mentions;
 
+    // Majority party vote across articles in this bucket
+    let partyId = b.partyId;
+    let partyEn = b.partyEn;
+    let partyBn = b.partyBn;
+    let bestVotes = 0;
+    for (const [pid, votes] of b.partyVotes) {
+      if (votes > bestVotes) {
+        bestVotes = votes;
+        const rule = PARTY_RULES.find((r) => r.id === pid);
+        if (rule) {
+          partyId = rule.id;
+          partyEn = rule.label_en;
+          partyBn = rule.label_bn;
+        } else if (pid === "unaffiliated") {
+          partyId = "unaffiliated";
+          partyEn = "Unaffiliated / public";
+          partyBn = "অদলীয় / সাধারণ জনতা";
+        }
+      }
+    }
+
+    const whenBn = `সময়: ${b.periodBn}`;
+    const whenEn = `when: ${b.periodEn}`;
     const summary_bn = [
       `${b.placeBn}-এ ${b.themeBn}`,
+      whenBn,
+      `দল: ${partyBn}`,
+      b.division ? `বিভাগ: ${b.division}` : null,
       `${b.articles.length}টি সংবাদ`,
       deaths > 0 ? `নিহত ${deaths}` : null,
       injuries > 0 ? `আহত ${injuries}` : null,
       damage > 0 ? `ক্ষতির উল্লেখ` : null,
+      st.status === "historical" ? "আজকের চলমান আন্দোলন নয়" : null,
     ]
       .filter(Boolean)
       .join(" · ");
 
     const summary_en = [
       `${b.themeEn} in ${b.place}`,
+      whenEn,
+      `party: ${partyEn}`,
+      b.division ? `division: ${b.division}` : null,
       `${b.articles.length} reports`,
       deaths > 0 ? `${deaths} dead` : null,
       injuries > 0 ? `${injuries} injured` : null,
       damage > 0 ? `damage reported` : null,
+      st.status === "historical" ? "not an active protest today" : null,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -405,14 +750,27 @@ export function clusterProtestMovements(
     const sortedArticles = [...b.articles].sort(
       (a, c) => new Date(c.published_at).getTime() - new Date(a.published_at).getTime(),
     );
+    const coords = coordsForPlace(b.district, b.division, b.place);
+    const conf = sourceConfidence(b.articles);
+    const timeline = [...sortedArticles]
+      .reverse()
+      .map((a) => ({
+        at: a.published_at,
+        title: a.title,
+        source_name: a.source_name,
+        url: a.url,
+      }));
 
     movements.push({
       id: `mv-${key.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`,
-      title: `${b.themeEn} — ${b.place}`,
-      title_bn: `${b.themeBn} — ${b.placeBn}`,
+      title: `${b.themeEn} — ${b.place} (${partyEn})`,
+      title_bn: `${b.themeBn} — ${b.placeBn} (${partyBn})`,
       theme_id: b.themeId,
       theme: b.themeEn,
       theme_bn: b.themeBn,
+      party_id: partyId,
+      party: partyEn,
+      party_bn: partyBn,
       place: b.place,
       place_bn: b.placeBn,
       district: b.district,
@@ -420,6 +778,10 @@ export function clusterProtestMovements(
       status: st.status,
       status_bn: st.status_bn,
       status_en: st.status_en,
+      event_at: b.eventAt.toISOString(),
+      event_period_en: b.periodEn,
+      event_period_bn: b.periodBn,
+      temporal_class: temporal,
       first_seen_at: b.first.toISOString(),
       last_seen_at: b.last.toISOString(),
       article_count: b.articles.length,
@@ -428,14 +790,22 @@ export function clusterProtestMovements(
       summary_bn,
       summary_en,
       articles: sortedArticles.slice(0, 6),
+      lat: coords.lat,
+      lng: coords.lng,
+      source_confidence: conf.source_confidence,
+      unique_sources: conf.unique_sources,
+      timeline,
     });
   }
 
-  // Prefer active, then higher severity / casualties / article count
+  // Live first, then recent; historical last (sorted by event time descending)
   movements.sort((a, b) => {
-    const statusRank = { active: 0, recent: 1, cooling: 2 } as const;
+    const statusRank = { active: 0, recent: 1, cooling: 2, historical: 3 } as const;
     const sr = statusRank[a.status] - statusRank[b.status];
     if (sr !== 0) return sr;
+    if (a.status === "historical" && b.status === "historical") {
+      return new Date(b.event_at).getTime() - new Date(a.event_at).getTime();
+    }
     const ca =
       a.impact.deaths * 100 + a.impact.injuries * 10 + a.article_count + a.severity;
     const cb =
@@ -443,5 +813,5 @@ export function clusterProtestMovements(
     return cb - ca;
   });
 
-  return movements.slice(0, 40);
+  return movements.slice(0, 48);
 }

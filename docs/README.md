@@ -5,17 +5,31 @@
 
 | Document | Audience | কী আছে |
 |----------|----------|--------|
-| **[SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md)** | Architect / reviewer | HLD, LLD, ERD, NFR, security, ADR — incl. **Anti-Phishing**, **Proximity geo-fence**, **Face Intel** |
+| **[SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md)** | Architect / reviewer | HLD, LLD, ERD, NFR, security, ADR — incl. Narrative Shield, Unrest, Outlook, Divisional Crisis, Weather, DSS modules |
 | **[DEPLOYMENT_AND_OPS.md](./DEPLOYMENT_AND_OPS.md)** | DevOps / operator | CI/CD (`deploy-vps.yml`), Hostinger VPS, slim compose, performance, day-to-day ops |
 | **[OLLAMA_PRODUCTION.md](./OLLAMA_PRODUCTION.md)** | AI ops | আলাদা AI server, `OLLAMA_URL`, GPU optional, local Windows tip |
 
-### New DSS modules (see System Design §২.১২–২.১৪)
+### Service READMEs
+
+| Service | Path |
+|---------|------|
+| API Gateway | [`services/api-gateway-node/README.md`](../services/api-gateway-node/README.md) |
+| AI Analytics | [`services/ai-analytics-python/README.md`](../services/ai-analytics-python/README.md) |
+| Dashboard | [`web/dashboard-nextjs/README.md`](../web/dashboard-nextjs/README.md) |
+
+### DSS & intel modules (see System Design §২.১২–২.২০)
 
 | Module | Dashboard | AI prefix | Gateway |
 |--------|-----------|-----------|---------|
 | Anti-Phishing | `/anti-phishing` | `/api/v1/phishing` | `/intelligence/phishing/*` |
-| Proximity Map | `/proximity` | `/api/v1/proximity` | `/intelligence/proximity/*` |
-| Face Intel | `/face-intel` | `/api/v1/face-intel` | `/intelligence/face-intel/*` |
+| Proximity Map | (panel / API) | `/api/v1/proximity` | `/intelligence/proximity/*` |
+| Face Intel | (panel / API) | `/api/v1/face-intel` | `/intelligence/face-intel/*` |
+| Narrative Shield | `/narrative-shield` | `/api/v1/narrative-shield` | `/narrative-shield/*` |
+| Unrest Pulse | `/unrest` | — (gateway analytics) | `/unrest/*` |
+| Strategic Outlook | `/outlook` | `/api/v1/outlook` | `/outlook/*` |
+| Divisional Crisis | `/divisional-crisis` | — | `/divisional-crisis/*` |
+| Weather | embedded in `/hazards` | `/api/v1/weather` | `/weather/*` |
+| Ingestion / Pipeline / Intel | ops APIs | `/api/v1/ingestion` | `/ingestion/*`, `/pipeline/*`, `/intel/*` |
 
 ### দ্রুত নেভিগেশন
 
@@ -25,6 +39,7 @@ README (quick start / features)
    ├─► docs/SYSTEM_DESIGN.md          ← কেন এমন architecture
    ├─► docs/DEPLOYMENT_AND_OPS.md     ← কীভাবে CI/CD + VPS
    │       └─► docs/OLLAMA_PRODUCTION.md  ← LLM server detail
+   ├─► services/*/README.md           ← per-service runbook
    └─► .env.example / .env.production.example
 ```
 
@@ -34,6 +49,7 @@ README (quick start / features)
 |------|-----|
 | [`.env.example`](../.env.example) | Local Windows + Docker Desktop |
 | [`.env.production.example`](../.env.production.example) | Hostinger / production VPS |
+| [`.env.ollama.example`](../.env.ollama.example) | Dedicated Ollama host |
 
 ### Related scripts & compose
 

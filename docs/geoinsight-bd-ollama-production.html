@@ -144,7 +144,7 @@ footer .mono{color:var(--teal);}
       <p class="bn-lead">GeoInsight BD-এর জন্য sovereign LLM কীভাবে আলাদা AI server-এ চালানো হয়, app VPS-কে হালকা রেখে।</p>
       <p class="sub">Setup, firewall rules, local dev fallback, GPU acceleration, আর Ollama down হলে কী হয় — সব এক জায়গায়।</p>
       <div class="hero-chips">
-        <span class="chip"><b>Model</b> · llama3.1:8b</span>
+        <span class="chip"><b>Model</b> · gpt-oss:20b</span>
         <span class="chip"><b>Port</b> · :11434</span>
         <span class="chip"><b>Placement</b> · Separate AI server</span>
         <span class="chip"><b>RAM</b> · ≥16GB recommended</span>
@@ -166,7 +166,7 @@ footer .mono{color:var(--teal);}
         <rect x="240" y="40" width="170" height="140" rx="10" fill="#FCEFD8" stroke="#B9873C"/>
         <text x="325" y="62" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" font-weight="600" fill="#7A5A20">AI Server (≥16GB/GPU)</text>
         <rect x="256" y="80" width="138" height="30" rx="5" fill="#B9873C"/><text x="325" y="100" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#fff">Ollama :11434</text>
-        <rect x="256" y="116" width="138" height="28" rx="5" fill="#fff" stroke="#B9873C"/><text x="325" y="134" text-anchor="middle" font-family="IBM Plex Mono" font-size="8.5" fill="#7A5A20">llama3.1:8b</text>
+        <rect x="256" y="116" width="138" height="28" rx="5" fill="#fff" stroke="#B9873C"/><text x="325" y="134" text-anchor="middle" font-family="IBM Plex Mono" font-size="8.5" fill="#7A5A20">gpt-oss:20b</text>
         <rect x="256" y="148" width="138" height="26" rx="5" fill="#fff" stroke="#DAD2B8" stroke-dasharray="3,2"/><text x="325" y="165" text-anchor="middle" font-family="IBM Plex Mono" font-size="8" fill="#4C5C53">optional: Bangla-BERT</text>
 
         <path d="M180,105 L238,105" stroke="#4C5C53" fill="none" marker-end="url(#ha)"/>
@@ -195,7 +195,7 @@ footer .mono{color:var(--teal);}
     <!-- ============ 1 ============ -->
     <section id="s1">
       <div class="sec-head"><span class="sec-num">০১</span><h2>AI Server Setup</h2></div>
-      <p class="sec-intro">AI machine-এ repo clone বা copy করার পর setup script চালান — এটা <span class="mono">docker-compose.ollama.yml</span> স্টার্ট করে, <span class="mono">llama3.1:8b</span> pull করে, আর UFW থাকলে শুধু app VPS-কে allow করে।</p>
+      <p class="sec-intro">AI machine-এ repo clone বা copy করার পর setup script চালান — এটা <span class="mono">docker-compose.ollama.yml</span> স্টার্ট করে, <span class="mono">gpt-oss:20b</span> pull করে, আর UFW থাকলে শুধু app VPS-কে allow করে।</p>
       <div class="code-block">
         <div class="cb-bar"><span>AI machine</span><span class="dots"><span></span><span></span><span></span></span></div>
         <pre># clone or copy repo onto the AI machine
@@ -224,7 +224,7 @@ bash deploy/scripts/vps-point-ollama.sh http://&lt;AI_SERVER_IP&gt;:11434</pre>
         <div class="cb-bar"><span>.env</span><span class="dots"><span></span><span></span><span></span></span></div>
         <pre>LLM_PROVIDER=ollama
 OLLAMA_URL=http://&lt;AI_SERVER_IP&gt;:11434
-OLLAMA_MODEL=llama3.1:8b
+OLLAMA_MODEL=gpt-oss:20b
 SENTIMENT_USE_MOCK=true</pre>
       </div>
       <p class="sec-intro">… আর <span class="mono">geoinsight-ai-analytics</span> recreate করে।</p>

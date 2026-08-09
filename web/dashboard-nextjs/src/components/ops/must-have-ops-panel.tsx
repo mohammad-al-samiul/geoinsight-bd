@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AppSelect } from "@/components/ui/app-select";
 import {
   Workflow,
   ShieldCheck,
@@ -525,14 +526,18 @@ export function MustHaveOpsPanel() {
                 className="h-8 w-44 pl-8 text-xs sm:w-60"
               />
             </div>
-            <select value={statusFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value)}
-              aria-label="Filter complaints by status" className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground">
-              <option value="ALL">All Status</option>
-              <option value="SUBMITTED">Submitted</option>
-              <option value="IN_REVIEW">In Review</option>
-              <option value="ASSIGNED">Assigned</option>
-              <option value="RESOLVED">Resolved</option>
-            </select>
+            <AppSelect
+              value={statusFilter}
+              onValueChange={setStatusFilter}
+              triggerClassName="min-w-[8rem]"
+              options={[
+                { value: "ALL", label: "All Status" },
+                { value: "SUBMITTED", label: "Submitted" },
+                { value: "IN_REVIEW", label: "In Review" },
+                { value: "ASSIGNED", label: "Assigned" },
+                { value: "RESOLVED", label: "Resolved" },
+              ]}
+            />
           </div>
         )}
       </div>
@@ -774,16 +779,18 @@ export function MustHaveOpsPanel() {
                 </div>
                 <div>
                   <label className="font-semibold text-foreground">Category</label>
-                  <select
-                    className="mt-1 w-full rounded-md border border-input bg-background p-2 text-xs"
+                  <AppSelect
+                    className="mt-1 w-full"
+                    triggerClassName="w-full"
                     value={newComplaintCategory}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNewComplaintCategory(e.target.value as any)}
-                  >
-                    <option value="Infrastructure">Infrastructure</option>
-                    <option value="Disaster">Disaster</option>
-                    <option value="Agri-Market">Agri-Market</option>
-                    <option value="Healthcare">Healthcare</option>
-                  </select>
+                    onValueChange={(value) => setNewComplaintCategory(value as typeof newComplaintCategory)}
+                    options={[
+                      { value: "Infrastructure", label: "Infrastructure" },
+                      { value: "Disaster", label: "Disaster" },
+                      { value: "Agri-Market", label: "Agri-Market" },
+                      { value: "Healthcare", label: "Healthcare" },
+                    ]}
+                  />
                 </div>
               </div>
             </div>
@@ -824,15 +831,17 @@ export function MustHaveOpsPanel() {
               <div className="space-y-3 text-xs">
                 <div>
                   <label className="font-semibold text-foreground">{t("notifications.targetRole")}</label>
-                  <select
-                    className="mt-1 w-full rounded-md border border-input bg-background p-2 text-xs"
+                  <AppSelect
+                    className="mt-1 w-full"
+                    triggerClassName="w-full"
                     value={broadcastTarget}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setBroadcastTarget(e.target.value as any)}
-                  >
-                    <option value="DC">Deputy Commissioners (All 64 Districts)</option>
-                    <option value="PMO">PMO Command Analysts</option>
-                    <option value="MINISTER">Cabinet Ministers Desk</option>
-                  </select>
+                    onValueChange={(value) => setBroadcastTarget(value as typeof broadcastTarget)}
+                    options={[
+                      { value: "DC", label: "Deputy Commissioners (All 64 Districts)" },
+                      { value: "PMO", label: "PMO Command Analysts" },
+                      { value: "MINISTER", label: "Cabinet Ministers Desk" },
+                    ]}
+                  />
                 </div>
 
                 <div>

@@ -1,12 +1,6 @@
-import { ModuleCinematicLoader } from "@/components/ui/module-motion";
+import { RouteSkeleton } from "@/components/ui/skeleton";
 
-/** Shared route-transition screen before any dashboard module is ready. */
+/** Soft in-chrome route transition — never a full-screen splash. */
 export default function DashboardLoading() {
-  return (
-    <ModuleCinematicLoader
-      bn
-      fullScreen
-      label="জাতীয় কমান্ড ডেটা সিঙ্ক হচ্ছে…"
-    />
-  );
+  return <RouteSkeleton />;
 }

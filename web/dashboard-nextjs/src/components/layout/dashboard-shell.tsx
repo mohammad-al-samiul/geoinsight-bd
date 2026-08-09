@@ -8,11 +8,19 @@ import { DataFlowBackground } from "@/components/ui/data-flow-background";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { loadAdminHierarchy } from "@/lib/admin-hierarchy";
+import { fetchSocketToken } from "@/lib/socket-token";
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
+
+  // Warm shared caches as soon as chrome mounts — before modules ask for them.
+  useEffect(() => {
+    void loadAdminHierarchy();
+    void fetchSocketToken();
+  }, []);
 
   // Desktop feed open by default; stay closed on smaller screens until toggled.
   useEffect(() => {
@@ -61,11 +69,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           {feedOpen && (
             <aside
               className={cn(
-                "relative z-10 hidden w-[min(100%,340px)] shrink-0 border-l border-border/50",
-                "bg-sidebar/80 p-3 backdrop-blur-md xl:block",
+                "relative z-10 hidden h-full min-h-0 w-[min(100%,360px)] shrink-0 flex-col border-l border-border/50",
+                "bg-sidebar/80 p-3 backdrop-blur-md xl:flex",
               )}
             >
-              <AnomalyFeedPanel compact className="h-full" />
+              <AnomalyFeedPanel compact className="h-full min-h-0" />
             </aside>
           )}
 

@@ -6,12 +6,9 @@ import { cn } from "@/lib/utils";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IntelCard } from "@/components/ui/intel-card";
-import {
-  AnimatedContent,
-  ModuleCinematicLoader,
-  ModulePageAura,
-} from "@/components/ui/module-motion";
-import { useLocale, useTranslations } from "next-intl";
+import { AnimatedContent, ModulePageAura } from "@/components/ui/module-motion";
+import { ModuleContentSkeleton } from "@/components/ui/skeleton";
+import { useTranslations } from "next-intl";
 import { Children, memo, type ReactNode } from "react";
 
 interface ModuleShellProps {
@@ -22,7 +19,9 @@ interface ModuleShellProps {
   onRetry?: () => void;
   stats?: ReactNode;
   children: ReactNode;
-  /** Override loading copy */
+  /** Optional custom progressive placeholder (defaults to ModuleContentSkeleton). */
+  loadingFallback?: ReactNode;
+  /** @deprecated Kept for call-site compatibility; progressive skeletons replaced cinematic copy. */
   loadingLabel?: string;
 }
 
@@ -34,34 +33,19 @@ export function ModuleShell({
   onRetry,
   stats,
   children,
-  loadingLabel,
+  loadingFallback,
 }: ModuleShellProps) {
   useAdminHierarchy();
   const t = useTranslations("common");
-  const locale = useLocale();
-  const bn = locale === "bn";
-
-  // Initial payloads should feel intentional, not like an empty page with a
-  // small spinner. Every module that uses ModuleShell inherits this screen.
-  if (loading) {
-    return (
-      <ModuleCinematicLoader
-        bn={bn}
-        active
-        fullScreen
-        label={loadingLabel ?? (bn ? "লাইভ ডেটা প্রস্তুত হচ্ছে…" : "Preparing live data…")}
-      />
-    );
-  }
 
   return (
     <div className="relative mx-auto max-w-7xl space-y-7">
       <ModulePageAura />
 
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
         className="surface-hero intel-rail relative z-10 px-3 py-5 sm:px-5 sm:py-6"
       >
         <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -113,10 +97,14 @@ export function ModuleShell({
         </motion.div>
       )}
 
-      {stats && <div className="relative z-10">{stats}</div>}
+      {stats && !loading ? <div className="relative z-10">{stats}</div> : null}
 
       <div className="relative z-10">
-        <AnimatedContent>{children}</AnimatedContent>
+        {loading ? (
+          (loadingFallback ?? <ModuleContentSkeleton />)
+        ) : (
+          <AnimatedContent>{children}</AnimatedContent>
+        )}
       </div>
     </div>
   );

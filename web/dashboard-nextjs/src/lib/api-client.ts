@@ -43,7 +43,12 @@ function redirectToForbidden(reason: string) {
   window.location.href = `/forbidden?reason=${encodeURIComponent(reason)}`;
 }
 
-export async function apiClient<T = unknown>(
+/** In-flight GET dedupe + short TTL so parallel mounts share one network hop. */
+const getInflight = new Map<string, Promise<unknown>>();
+const getCache = new Map<string, { at: number; value: unknown }>();
+const GET_CACHE_TTL_MS = 8_000;
+
+async function apiClientUncached<T = unknown>(
   path: string,
   init: RequestInit = {},
   retried = false,
@@ -77,7 +82,7 @@ export async function apiClient<T = unknown>(
 
   if (res.status === 401 && !retried) {
     const refreshed = await tryRefresh();
-    if (refreshed) return apiClient<T>(path, init, true);
+    if (refreshed) return apiClientUncached<T>(path, init, true);
     redirectToLogin();
     throw new ApiClientError(401, "Session expired");
   }
@@ -106,6 +111,42 @@ export async function apiClient<T = unknown>(
   }
 
   return body as T;
+}
+
+export async function apiClient<T = unknown>(
+  path: string,
+  init: RequestInit = {},
+  retried = false,
+): Promise<T> {
+  const normalized = path.replace(/^\//, "");
+  const method = (init.method ?? "GET").toUpperCase();
+  const isGet = method === "GET" || method === "HEAD";
+  const skipCache = Boolean(init.cache === "no-store" || init.signal || init.body);
+
+  if (!isGet || skipCache || retried) {
+    return apiClientUncached<T>(path, init, retried);
+  }
+
+  const key = normalized;
+  const hit = getCache.get(key);
+  if (hit && Date.now() - hit.at < GET_CACHE_TTL_MS) {
+    return hit.value as T;
+  }
+
+  const existing = getInflight.get(key);
+  if (existing) return existing as Promise<T>;
+
+  const promise = apiClientUncached<T>(path, init, retried)
+    .then((value) => {
+      getCache.set(key, { at: Date.now(), value });
+      return value;
+    })
+    .finally(() => {
+      getInflight.delete(key);
+    });
+
+  getInflight.set(key, promise);
+  return promise;
 }
 
 export async function authFetch<T = unknown>(

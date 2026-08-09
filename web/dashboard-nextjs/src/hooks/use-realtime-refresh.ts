@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSocket } from "@/hooks/use-socket";
+import { fetchSocketToken } from "@/lib/socket-token";
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -18,12 +19,7 @@ export function useRealtimeRefresh(
   const [socketToken, setSocketToken] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/auth/socket-token", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (json?.success) setSocketToken(json.data.token);
-      })
-      .catch(() => setSocketToken(null));
+    void fetchSocketToken().then(setSocketToken);
   }, []);
 
   const onRefresh = useCallback(() => {

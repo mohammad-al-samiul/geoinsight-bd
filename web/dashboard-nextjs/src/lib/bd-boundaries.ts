@@ -31,7 +31,12 @@ const DISTRICT_BOUNDARIES =
   );
 
 function canonicalDivisionName(name: string): string {
-  return name.toLowerCase().replace("chittagong", "chattogram").trim();
+  return name
+    .toLowerCase()
+    .replace("chittagong", "chattogram")
+    .replace("rajshani", "rajshahi") // typo in source GeoJSON
+    .replace("barisal", "barishal")
+    .trim();
 }
 
 function realUnitGeometry(unit: AdminUnit): Geometry | null {

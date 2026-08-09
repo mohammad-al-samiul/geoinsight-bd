@@ -16,7 +16,7 @@ export default function AlertsPage() {
         <p className="mt-1 text-sm text-muted-foreground">{t("pageDescription")}</p>
       </div>
       <PredictiveAlertsPanel />
-      <AnomalyFeedPanel fullScreenLoading />
+      <AnomalyFeedPanel />
     </div>
   );
 }

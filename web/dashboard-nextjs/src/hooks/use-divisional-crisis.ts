@@ -7,10 +7,13 @@ import { apiClient } from "@/lib/api-client";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import {
   BANGLADESH_DIVISIONS_DATA,
+  DIVISION_MAP_CENTROIDS_LATLNG,
+  DIVISION_SHORTAGE_SITES,
   LIVE_INCIDENT_ALERTS,
   DivisionCrisisData,
   DistrictInfo,
   LiveIncidentAlert,
+  ShortageSite,
 } from "@/lib/divisional-crisis-data";
 
 export type SortOption = "severity" | "cases" | "gas" | "power" | "name";
@@ -49,6 +52,10 @@ export interface DivisionalLivePulse {
   divisions: Array<{
     division: string;
     riskScore: number;
+    signalCount?: number;
+    criticalSignalCount?: number;
+    grievanceArticleCount?: number;
+    weatherStress?: number;
   }>;
 }
 
@@ -75,6 +82,9 @@ export function useDivisionalCrisis() {
   const [livePulse, setLivePulse] = useState<DivisionalLivePulse | null>(null);
   const [loading, setLoading] = useState(true);
   const [liveError, setLiveError] = useState<string | null>(null);
+  /** 0–23 clock hour for heatmap scrub; null = live clock */
+  const [timelineHour, setTimelineHour] = useState<number | null>(null);
+  const [timelinePlaying, setTimelinePlaying] = useState(false);
   const hasDataRef = useRef(false);
 
   const loadLivePulse = useCallback(async () => {
@@ -101,6 +111,17 @@ export function useDivisionalCrisis() {
   }, [loadLivePulse]);
   useRealtimeRefresh(loadLivePulse, true, true);
 
+  useEffect(() => {
+    if (!timelinePlaying) return;
+    const id = window.setInterval(() => {
+      setTimelineHour((prev) => {
+        const base = prev ?? new Date().getHours();
+        return (base + 1) % 24;
+      });
+    }, 900);
+    return () => window.clearInterval(id);
+  }, [timelinePlaying]);
+
   // Speech synthesis state
   const [isSpeechPlaying, setIsSpeechPlaying] = useState(false);
 
@@ -120,13 +141,58 @@ export function useDivisionalCrisis() {
         );
         if (!live) return division;
 
+        // Live pulse nudges severity + resource stress so map/charts keep moving
+        // with realtime signals (weather / alerts / grievance articles).
+        const stress = Math.max(0, (live.riskScore - 40) / 100);
+        const signalBump = Math.min(
+          12,
+          (live.signalCount ?? 0) * 1.5 + (live.criticalSignalCount ?? 0) * 3,
+        );
+        const weatherStress = live.weatherStress ?? 0;
+
         return {
           ...division,
-          // Live score derives from current weather, verified signals and
-          // grievance news; baseline crime/resource values stay labelled estimates.
-          overallSeverityScore: Math.round(
-            division.overallSeverityScore * 0.7 + live.riskScore * 0.3,
+          overallSeverityScore: Math.min(
+            100,
+            Math.round(division.overallSeverityScore * 0.65 + live.riskScore * 0.35),
           ),
+          resources: {
+            ...division.resources,
+            gas: {
+              ...division.resources.gas,
+              deficitPercentage: Math.min(
+                100,
+                Math.round(division.resources.gas.deficitPercentage * (1 + stress * 0.2) + signalBump * 0.35),
+              ),
+            },
+            fuelOil: {
+              ...division.resources.fuelOil,
+              stockDeficitPercentage: Math.min(
+                100,
+                Math.round(
+                  division.resources.fuelOil.stockDeficitPercentage * (1 + stress * 0.18) +
+                    signalBump * 0.25,
+                ),
+              ),
+            },
+            electricity: {
+              ...division.resources.electricity,
+              avgLoadSheddingHours: Number(
+                Math.min(
+                  12,
+                  division.resources.electricity.avgLoadSheddingHours * (1 + stress * 0.22) +
+                    weatherStress / 40,
+                ).toFixed(1),
+              ),
+            },
+            water: {
+              ...division.resources.water,
+              scarcityIndex: Math.min(
+                100,
+                Math.round(division.resources.water.scarcityIndex * (1 + stress * 0.12) + weatherStress * 0.4),
+              ),
+            },
+          },
         };
       }),
     [livePulse],
@@ -138,22 +204,31 @@ export function useDivisionalCrisis() {
     return getUnitById(globalAdminFilter.divisionId);
   }, [globalAdminFilter.divisionId]);
 
-  // Compute stress-test & tactical reallocation modified severity score and values
+  // Compute stress-test, timeline scrub & tactical reallocation modified values
   const divisionsWithModifiers = useMemo(() => {
     const surge = filters.stressSurgePercentage;
     const { sourceDivId, targetDivId, policeUnitsShifted, gasUnitsShifted } = reallocation;
+    const hour = timelineHour ?? new Date().getHours();
+    // Evening peak (18–22) and morning rush (7–9) amplify gas/power/fuel stress
+    const peakFactor =
+      hour >= 18 && hour <= 22 ? 1.18 : hour >= 7 && hour <= 9 ? 1.1 : hour >= 0 && hour <= 5 ? 0.92 : 1;
 
     return divisions.map((div) => {
-      let simulatedGasDeficit = div.resources.gas.deficitPercentage;
-      let simulatedLoadShedding = div.resources.electricity.avgLoadSheddingHours;
-      let simulatedFuelDeficit = div.resources.fuelOil.stockDeficitPercentage;
-      let simulatedSeverity = div.overallSeverityScore;
+      let simulatedGasDeficit = Math.round(div.resources.gas.deficitPercentage * peakFactor);
+      let simulatedLoadShedding = Number((div.resources.electricity.avgLoadSheddingHours * peakFactor).toFixed(1));
+      let simulatedFuelDeficit = Math.round(div.resources.fuelOil.stockDeficitPercentage * peakFactor);
+      let simulatedWater = Math.round(div.resources.water.scarcityIndex * (hour >= 11 && hour <= 16 ? 1.08 : 1));
+      let simulatedSeverity = Math.min(
+        100,
+        Math.round(div.overallSeverityScore * (0.9 + (peakFactor - 1) * 1.2)),
+      );
 
       // 1. Stress surge calculation
       if (surge > 0) {
         simulatedGasDeficit = Math.min(100, Math.round(simulatedGasDeficit * (1 + surge / 100)));
         simulatedLoadShedding = Number((simulatedLoadShedding * (1 + surge / 100)).toFixed(1));
         simulatedFuelDeficit = Math.min(100, Math.round(simulatedFuelDeficit * (1 + surge / 100)));
+        simulatedWater = Math.min(100, Math.round(simulatedWater * (1 + surge / 200)));
         simulatedSeverity = Math.min(100, Math.round(simulatedSeverity + surge * 0.45));
       }
 
@@ -170,25 +245,29 @@ export function useDivisionalCrisis() {
 
       return {
         ...div,
-        overallSeverityScore: simulatedSeverity,
+        overallSeverityScore: Math.min(100, Math.max(0, simulatedSeverity)),
         resources: {
           ...div.resources,
           gas: {
             ...div.resources.gas,
-            deficitPercentage: simulatedGasDeficit,
+            deficitPercentage: Math.min(100, simulatedGasDeficit),
           },
           fuelOil: {
             ...div.resources.fuelOil,
-            stockDeficitPercentage: simulatedFuelDeficit,
+            stockDeficitPercentage: Math.min(100, simulatedFuelDeficit),
           },
           electricity: {
             ...div.resources.electricity,
-            avgLoadSheddingHours: simulatedLoadShedding,
+            avgLoadSheddingHours: Math.min(12, simulatedLoadShedding),
+          },
+          water: {
+            ...div.resources.water,
+            scarcityIndex: Math.min(100, simulatedWater),
           },
         },
       };
     });
-  }, [divisions, filters.stressSurgePercentage, reallocation]);
+  }, [divisions, filters.stressSurgePercentage, reallocation, timelineHour]);
 
   const filteredDivisions = useMemo(() => {
     return divisionsWithModifiers
@@ -214,7 +293,17 @@ export function useDivisionalCrisis() {
           return false;
         }
 
-        // 4. Search query match
+        // 4. Category focus (soft-filter: keep all when "all")
+        if (filters.categoryFilter !== "all") {
+          const cat = filters.categoryFilter;
+          if (cat === "crime" && div.crime.crimeRatePer100k < 25) return false;
+          if (cat === "gas" && div.resources.gas.deficitPercentage < 20) return false;
+          if (cat === "fuel" && div.resources.fuelOil.stockDeficitPercentage < 15) return false;
+          if (cat === "electricity" && div.resources.electricity.avgLoadSheddingHours < 3) return false;
+          if (cat === "water" && div.resources.water.scarcityIndex < 40) return false;
+        }
+
+        // 5. Search query match
         if (filters.searchQuery.trim()) {
           const query = filters.searchQuery.toLowerCase();
           const matchName =
@@ -238,7 +327,15 @@ export function useDivisionalCrisis() {
         if (filters.sortBy === "name") return a.nameEn.localeCompare(b.nameEn);
         return 0;
       });
-  }, [divisionsWithModifiers, globalDivisionUnit, filters.divisionId, filters.riskFilter, filters.searchQuery, filters.sortBy]);
+  }, [
+    divisionsWithModifiers,
+    globalDivisionUnit,
+    filters.divisionId,
+    filters.riskFilter,
+    filters.searchQuery,
+    filters.sortBy,
+    filters.categoryFilter,
+  ]);
 
   // Filtered live incident alerts
   const liveAlerts = useMemo(() => {
@@ -246,9 +343,22 @@ export function useDivisionalCrisis() {
     return alertsList.filter((a) => a.divisionId === filters.divisionId);
   }, [filters.divisionId, alertsList]);
 
-  // Add Citizen Report handler
+  // Add Citizen Report handler (with map pin near division centroid)
   const addCitizenReport = (payload: CitizenReportPayload) => {
     const targetDiv = divisions.find((d) => d.id === payload.divisionId) || divisions[0];
+    const centroid = DIVISION_MAP_CENTROIDS_LATLNG[payload.divisionId] || { lat: 23.81, lng: 90.41 };
+    const jitter = () => (Math.random() - 0.5) * 0.12;
+    const kindGuess =
+      /গ্যাস|gas|cng/i.test(payload.category)
+        ? ("gas" as const)
+        : /তেল|fuel|diesel|octane/i.test(payload.category)
+          ? ("fuel" as const)
+          : /বিদ্যুৎ|power|load/i.test(payload.category)
+            ? ("power" as const)
+            : /পানি|water/i.test(payload.category)
+              ? ("water" as const)
+              : ("other" as const);
+
     const newAlert: LiveIncidentAlert = {
       id: `citizen-${Date.now()}`,
       divisionId: payload.divisionId,
@@ -260,42 +370,92 @@ export function useDivisionalCrisis() {
       titleBn: `[নাগরিক রিপোর্ট] ${payload.category}: ${payload.title}`,
       locationEn: payload.location,
       locationBn: payload.location,
+      lat: centroid.lat + jitter(),
+      lng: centroid.lng + jitter(),
+      source: "citizen",
+      kind: kindGuess,
     };
 
     setAlertsList((prev) => [newAlert, ...prev]);
   };
 
-  // Web Speech API Voice Briefing in Bangla
+  const addAlertFromShortageSite = useCallback((site: ShortageSite) => {
+    const targetDiv = divisions.find((d) => d.id === site.divisionId);
+    if (!targetDiv) return;
+    const newAlert: LiveIncidentAlert = {
+      id: `pin-alert-${site.id}-${Date.now()}`,
+      divisionId: site.divisionId,
+      divisionNameBn: targetDiv.nameBn,
+      divisionNameEn: targetDiv.nameEn,
+      timestamp: "সবেমাত্র (Map Pin Alert)",
+      severity: site.severity === "critical" ? "critical" : site.severity === "high" ? "warning" : "info",
+      titleEn: `Site alert: ${site.nameEn}`,
+      titleBn: `সাইট অ্যালার্ট: ${site.nameBn}`,
+      locationEn: site.detailEn,
+      locationBn: site.detailBn,
+      lat: site.lat,
+      lng: site.lng,
+      source: "pin-alert",
+      kind: site.kind,
+    };
+    setAlertsList((prev) => [newAlert, ...prev]);
+  }, [divisions]);
+
+  const voiceHandleRef = useRef<{ stop: () => void } | null>(null);
+
+  // Web Speech API Voice Briefing in Bangla (normalized + best bn voice)
   const playVoiceBriefing = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       alert("Voice synthesis is not supported in this browser.");
       return;
     }
 
-    window.speechSynthesis.cancel();
-
+    voiceHandleRef.current?.stop();
     const topDiv = filteredDivisions[0];
-    const speechText = `বাংলাদেশে আটটি বিভাগের মধ্যে বর্তমানে সর্বোচ্চ ঝুঁকিপূর্ণ বিভাগ হলো ${topDiv?.nameBn || "ঢাকা"}। ` +
+    const criticalSites = DIVISION_SHORTAGE_SITES.filter((site) => {
+      const div = filteredDivisions.find((d) => d.id === site.divisionId);
+      if (!div) return false;
+      if (site.kind === "gas") return div.resources.gas.deficitPercentage >= 45;
+      if (site.kind === "fuel") return div.resources.fuelOil.stockDeficitPercentage >= 25;
+      if (site.kind === "power") return div.resources.electricity.avgLoadSheddingHours >= 5;
+      return div.resources.water.scarcityIndex >= 55;
+    }).slice(0, 4);
+    const pinLine =
+      criticalSites.length > 0
+        ? ` সংকটজনক পয়েন্ট: ${criticalSites
+            .map((s) => `${s.nameBn} (${filteredDivisions.find((d) => d.id === s.divisionId)?.nameBn || ""})`)
+            .join(", ")}।`
+        : "";
+    const speechText =
+      `বাংলাদেশে আটটি বিভাগের মধ্যে বর্তমানে সর্বোচ্চ ঝুঁকিপূর্ণ বিভাগ হলো ${topDiv?.nameBn || "ঢাকা"}। ` +
       `যেখানে ক্রাইসিস স্কোর ${topDiv?.overallSeverityScore || 88}। ` +
-      `গড় গ্যাস ঘাটতি ${summaryStats.avgGasDeficit} শতাংশ এবং দৈনিক লোডশেডিং গড়ে ${summaryStats.avgLoadShedding} ঘণ্টা। ` +
-      `নিরাপত্তা নিশ্চিতকরণে পুলিশ ও র্যাবের পেট্রোলিং জোরদার করা হয়েছে।`;
+      `গড় গ্যাস ঘাটতি ${summaryStats.avgGasDeficit} শতাংশ এবং দৈনিক লোডশেডিং গড়ে ${summaryStats.avgLoadShedding} ঘণ্টা।` +
+      pinLine +
+      ` নিরাপত্তা নিশ্চিতকরণে পুলিশ ও র্যাবের পেট্রোলিং জোরদার করা হয়েছে।`;
 
-    const utterance = new SpeechSynthesisUtterance(speechText);
-    utterance.lang = "bn-BD";
-    utterance.rate = 0.95;
-
-    utterance.onstart = () => setIsSpeechPlaying(true);
-    utterance.onend = () => setIsSpeechPlaying(false);
-    utterance.onerror = () => setIsSpeechPlaying(false);
-
-    window.speechSynthesis.speak(utterance);
+    void import("@/lib/bangla-tts").then(({ speakPreparedText }) => {
+      void speakPreparedText({
+        text: speechText,
+        lang: "bn",
+        onStart: () => setIsSpeechPlaying(true),
+        onEnd: () => {
+          setIsSpeechPlaying(false);
+          voiceHandleRef.current = null;
+        },
+        onError: () => setIsSpeechPlaying(false),
+      }).then((handle) => {
+        voiceHandleRef.current = handle;
+      });
+    });
   };
 
   const stopVoiceBriefing = () => {
+    voiceHandleRef.current?.stop();
+    voiceHandleRef.current = null;
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
-      setIsSpeechPlaying(false);
     }
+    setIsSpeechPlaying(false);
   };
 
   // Aggregate statistics across filtered divisions
@@ -467,6 +627,8 @@ export function useDivisionalCrisis() {
     liveError,
     reloadLivePulse: loadLivePulse,
     divisions,
+    /** All 8 divisions with live + stress + timeline + reallocation (unfiltered) */
+    mapDivisions: divisionsWithModifiers,
     filteredDivisions,
     filters,
     setFilters,
@@ -486,6 +648,11 @@ export function useDivisionalCrisis() {
     setReallocation,
     liveAlerts,
     addCitizenReport,
+    addAlertFromShortageSite,
+    timelineHour,
+    setTimelineHour,
+    timelinePlaying,
+    setTimelinePlaying,
     playVoiceBriefing,
     stopVoiceBriefing,
     isSpeechPlaying,

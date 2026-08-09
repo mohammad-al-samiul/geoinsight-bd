@@ -101,6 +101,10 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 | **Phishing** | Anti-Phishing Shield — official `.gov.bd` digital signatures + TF-IDF/Levenshtein lookalike RED_FLAG |
 | **Proximity** | Interactive geo-fence (Shapely) — VIP/critical polygon INSIDE / APPROACHING alerts |
 | **Face Intel** | OpenCV face match → VIP Ethical Report Card (6-month Prisma window) |
+| **Narrative Shield** | Hostile narrative classify / fact-check / Ollama RAG debunk |
+| **Outlook** | Strategic politics & economy outlook from news + unrest |
+| **Weather** | Open-Meteo + GDACS/ReliefWeb → flood/cyclone/heat stress |
+| **Ingestion** | BD RSS + Google News fetch, geo-match, Bangla sentiment |
 
 ### ২.৮ Public Feeds (Unauthenticated)
 
@@ -161,6 +165,67 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 | **UI** | `/face-intel` — webcam/upload + VIP gallery; **Real-time Alert Overlay Card** |
 
 **Split rationale:** CV in Python; SQL windowing + RBAC in Node (same pattern as Accountability).
+
+### ২.১৫ Narrative Shield (Counter-Disinfo DSS)
+
+**Goal:** Detect, classify, fact-check, and debunk hostile narratives from open news sources.
+
+| Layer | Behavior |
+|-------|----------|
+| **AI** | Keyword category scoring; SHA-256 fingerprint dedup; trust allow/block lists; Google verify + optional Serper/CSE; Ollama RAG debunk (rule templates fallback); threat bands `0.30 / 0.55 / 0.80` |
+| **Gateway** | `/narrative-shield/feed`, `/stats`, `/refresh`, `/debunk`, `/escalate`, `/dismiss`, `/bulk`, `/dedup`, `/export`, `/reset` |
+| **Store** | Prisma `NarrativeSignal`, `NarrativeAuditLog` |
+| **UI** | `/narrative-shield` |
+| **RBAC** | Read/act: PMO, MINISTER, DC · Ops (refresh/bulk/export): PMO, MINISTER · Reset: PMO |
+
+### ২.১৬ Unrest Pulse
+
+**Goal:** Protest / public-unrest signal from ingested news — district scores + movement clusters.
+
+| Layer | Behavior |
+|-------|----------|
+| **Gateway-only** | BN/EN keyword categories; sports-noise filter; BD relevance gate; `unrest_score`; `clusterProtestMovements`; Redis cache |
+| **Snapshot** | `IntelAnalysisSnapshot` kind `UNREST` |
+| **Routes** | `GET /unrest/pulse`, `POST /unrest/refresh` |
+| **UI** | `/unrest` |
+
+### ২.১৭ Strategic Outlook
+
+**Goal:** Politics / economy thematic outlook + scenarios for PMO briefing.
+
+| Layer | Behavior |
+|-------|----------|
+| **AI** | `POST /outlook/generate` — Ollama structured output (challenges / direction / scenarios) with fallback |
+| **Gateway** | `GET /outlook/strategic`, `POST /outlook/refresh` — news themes + unrest summary → AI |
+| **Snapshot** | kind `OUTLOOK` |
+| **UI** | `/outlook` |
+
+### ২.১৮ Divisional Crisis Pulse
+
+**Goal:** Division-level composite risk (not official crime telemetry).
+
+| Layer | Behavior |
+|-------|----------|
+| **Gateway** | `GET /divisional-crisis/pulse` — 48h window: weather stress + alert severity + grievance articles |
+| **Sources** | `live_signals`, `external_articles`, `open_meteo` |
+| **UI** | `/divisional-crisis` (sidebar minTier 4 — all roles) |
+
+### ২.১৯ Weather & Hazards Feed
+
+| Layer | Behavior |
+|-------|----------|
+| **AI** | `GET /weather/fetch` — Open-Meteo, GDACS, ReliefWeb; heat-index; monsoon-aware risk 1–5 |
+| **Gateway** | `GET /weather/live` |
+| **Store** | `WeatherObservation`, `DisasterAlert` |
+| **UI** | Embedded in `/hazards` (no dedicated weather page) |
+
+### ২.২০ Ingestion, Pipeline & Intel Store
+
+| Module | Role |
+|--------|------|
+| **Ingestion** | AI fetch RSS/Google News → geo-match → Bangla-BERT → Gateway upsert `ExternalArticle` |
+| **Pipeline** | Interval workers + `POST /pipeline/sync/:job` for news, weather, unrest, narrative, outlook, briefing, commodities, … |
+| **Intel** | Read APIs for `IntelAnalysisSnapshot`, `PipelineJobRun`, `IngestionSyncRun` |
 
 ---
 
@@ -308,7 +373,16 @@ services/api-gateway-node/src/
 │   ├── project/           # projects + milestones
 │   ├── alert/             # red flag alerts
 │   ├── dashboard/         # aggregated dashboard data
-│   ├── intelligence/      # proxy to AI (heatmap, predictive...)
+│   ├── briefing/          # morning briefing proxy
+│   ├── intelligence/      # proxy to AI (heatmap, predictive, phishing…)
+│   ├── narrative-shield/  # counter-disinfo ops + AI classify/debunk
+│   ├── unrest/            # protest pulse from ExternalArticle
+│   ├── outlook/           # strategic outlook + AI generate
+│   ├── divisional-crisis/ # division risk composite
+│   ├── weather/           # live weather / disaster alerts
+│   ├── ingestion/         # news sync + article queries
+│   ├── pipeline/          # cron + manual sync jobs
+│   ├── intel/             # snapshot & run history APIs
 │   ├── sovereign/         # sovereign LLM proxy
 │   ├── blockchain/        # Fabric client + retry worker
 │   ├── public-feed/       # 333/999 streams
@@ -333,10 +407,14 @@ services/ai-analytics-python/app/
 │   ├── sentiment/         # Bangla-BERT inference
 │   ├── arbitrage/         # scrape + cache + worker
 │   ├── sovereign_llm/     # Ollama client
+│   ├── narrative_shield/  # classify, fact-check, RAG debunk
+│   ├── outlook/           # strategic outlook generation
+│   ├── weather/           # Open-Meteo + disaster feeds
+│   ├── ingestion/         # RSS / Google News fetch + geo-match
 │   ├── documents/         # document intelligence
 │   ├── accountability/    # peer KPI / alert formula scores
 │   ├── hazards/           # hazard overlay scoring
-│   ├── phishing/          # Anti-Phishing Shield (signatures + similarity)
+│   ├── phishing/          # Anti-Phishing Shield
 │   ├── proximity/         # Shapely geo-fence + live VIP tracks
 │   ├── face_intel/        # OpenCV face match + VIP gallery
 │   └── ...
@@ -344,8 +422,8 @@ services/ai-analytics-python/app/
 └── infrastructure/messaging/consumer.py  # RabbitMQ worker
 ```
 
-**Dashboard routes (new DSS pages):** `/anti-phishing`, `/proximity`, `/face-intel`  
-**Gateway proxies:** `intelligence/phishing/*`, `intelligence/proximity/*`, `intelligence/face-intel/*`
+**Primary dashboard routes:** `/`, `/briefing`, `/narrative-shield`, `/outlook`, `/unrest`, `/divisional-crisis`, `/anti-phishing`, `/hazards`, `/agro`, `/procurement`, `/kpis`, `/projects`, `/alerts`, `/documents`, `/audit-trail`, `/notifications`, `/representatives`, `/map`  
+**Gateway proxies (examples):** `intelligence/*`, `narrative-shield/*`, `outlook/*`, `unrest/*`, `weather/*`, `ingestion/*`, `pipeline/*`
 
 ### ৫.৩ Database Read/Write Split
 
@@ -543,6 +621,66 @@ erDiagram
         varchar resource
         enum action
     }
+
+    ExternalArticle ||--o{ NarrativeSignal : "may seed"
+    User ||--o{ NarrativeAuditLog : "acts on"
+    NarrativeSignal ||--o{ NarrativeAuditLog : "audited"
+
+    ExternalArticle {
+        uuid id PK
+        varchar url UK
+        text title
+        text body
+        varchar district_code
+        float sentiment_score
+        timestamptz published_at
+    }
+
+    NarrativeSignal {
+        uuid id PK
+        enum threat_level
+        enum category
+        enum status
+        enum fact_check_status
+        varchar fingerprint
+    }
+
+    WeatherObservation {
+        uuid id PK
+        varchar location_key
+        float temp_c
+        int flood_risk
+        int cyclone_risk
+        int heat_risk
+    }
+
+    DisasterAlert {
+        uuid id PK
+        varchar source
+        varchar event_type
+        int severity
+        jsonb geo
+    }
+
+    IntelAnalysisSnapshot {
+        uuid id PK
+        enum kind
+        jsonb payload
+        timestamptz created_at
+    }
+
+    PipelineJobRun {
+        uuid id PK
+        varchar job
+        enum status
+        timestamptz started_at
+    }
+
+    IngestionSyncRun {
+        uuid id PK
+        int articles_upserted
+        enum status
+    }
 ```
 
 ### ERD Notes
@@ -551,6 +689,7 @@ erDiagram
 - `AdminUnit`: self-referencing hierarchy + denormalized ancestor IDs (trigger-maintained)
 - `RolePermission`: static **RBAC** matrix (role × resource × action)
 - `RefreshToken`: hashed token storage, rotation support
+- Intel / narrative / weather models support pipeline-driven DSS (unrest, outlook, narrative-shield, hazards)
 
 **Source of truth:** `services/api-gateway-node/prisma/schema.prisma`
 
@@ -650,7 +789,7 @@ erDiagram
 | Technology | কেন | কোন সমস্যা সমাধান করে |
 |------------|-----|------------------------|
 | **Bangla-BERT** (`l3cube-pune/bengali-sentiment-analysis`) | Pre-trained Bangla NLP | English models Bangla 333/999 text বুঝে না |
-| **Ollama + llama3.1:8b** | Local LLM, no cloud API | **Data sovereignty** — citizen data বাইরে যায় না |
+| **Ollama + gpt-oss:20b** | Local LLM, no cloud API | **Data sovereignty** — citizen data বাইরে যায় না |
 | **PyTorch + Transformers** | Industry standard ML | Model loading, inference pipeline |
 | **HuggingFace offline mode** | Tier-4 air-gapped deploy | Production-এ internet ছাড়াই model serve |
 
@@ -781,6 +920,24 @@ docker compose -f docker-compose.observability.yml up -d
 6. UI renders Real-time Alert Overlay Card
 ```
 
+### ১০.৫ Narrative Shield debunk
+
+```
+1. Pipeline / refresh ingests open news → AI classify → NarrativeSignal rows
+2. Analyst opens /narrative-shield feed (threat-sorted)
+3. POST /narrative-shield/debunk → AI fact-check + Ollama RAG (or template)
+4. Escalate / dismiss → NarrativeAuditLog; optional export CSV
+```
+
+### ১০.৬ Unrest → Outlook → Briefing chain
+
+```
+1. Ingestion sync upserts ExternalArticle (+ sentiment, geo)
+2. Unrest pulse scores districts / clusters movements → snapshot UNREST
+3. Outlook generate uses news themes + unrest summary → snapshot OUTLOOK
+4. Morning briefing can consume recent intel snapshots + KPI / alert context
+```
+
 ---
 
 ## ১১. Monorepo Structure
@@ -793,14 +950,21 @@ geoinsight-bd/
 │   ├── DEPLOYMENT_AND_OPS.md   # CI/CD + VPS
 │   └── OLLAMA_PRODUCTION.md
 ├── web/dashboard-nextjs/       # Frontend + BFF
+│   ├── README.md
 │   └── src/app/(dashboard)/
-│       ├── anti-phishing/      # Anti-Phishing Shield UI
-│       ├── proximity/          # Geo-fence map UI
-│       └── face-intel/         # Face match + Ethical Overlay
+│       ├── narrative-shield/
+│       ├── outlook/
+│       ├── unrest/
+│       ├── divisional-crisis/
+│       ├── anti-phishing/
+│       └── ...
 ├── services/
-│   ├── api-gateway-node/       # Core API + DB + Socket.io + intelligence proxies
-│   └── ai-analytics-python/    # ML / NLP / LLM / CV / phishing / proximity
-│       └── app/modules/{phishing,proximity,face_intel}/
+│   ├── api-gateway-node/       # Core API + DB + Socket.io
+│   │   └── README.md
+│   ├── ai-analytics-python/    # ML / NLP / LLM / CV / GIS
+│   │   ├── README.md
+│   │   └── app/modules/{narrative_shield,outlook,weather,ingestion,...}/
+│   └── postgres/
 ├── deploy/
 │   ├── init/                   # Postgres, RabbitMQ, MinIO init
 │   ├── nginx/                  # Production edge
@@ -859,6 +1023,9 @@ Windows Hyper-V frequently blocks `5432`, `4000`, `8000`, `9000` — তাই l
 | **Shapely geo-fence** (+ pure fallback) | Only haversine circles | Accurate campus polygons; Windows/dev without GEOS still runs |
 | **Phishing = HTML fingerprint** | Blocklists only | Catches lookalike *chrome* on non-gov domains (`RED_FLAG`) |
 | Ethical card = Node Prisma + AI match | All-in Python DB | Reuses Accountability pattern; RBAC stays at gateway |
+| Narrative/Unrest on news corpus | Manual intel desk only | Scales open-source BD news into PMO DSS with audit trail |
+| Pipeline orchestrator in Gateway | Separate Temporal/Airflow | Same deploy unit as RBAC + Prisma; enough for VPS-scale cron |
+| Weather via Open-Meteo | Paid weather API | Sovereignty-friendly, no vendor lock for flood/heat stress |
 
 ---
 
@@ -868,6 +1035,9 @@ Windows Hyper-V frequently blocks `5432`, `4000`, `8000`, `9000` — তাই l
 |----------|----------|
 | Docs index | [`docs/README.md`](./README.md) |
 | Setup & quick start | [`README.md`](../README.md) |
+| API Gateway | [`services/api-gateway-node/README.md`](../services/api-gateway-node/README.md) |
+| AI Analytics | [`services/ai-analytics-python/README.md`](../services/ai-analytics-python/README.md) |
+| Dashboard | [`web/dashboard-nextjs/README.md`](../web/dashboard-nextjs/README.md) |
 | CI/CD, VPS deploy, Ollama approach | [`DEPLOYMENT_AND_OPS.md`](./DEPLOYMENT_AND_OPS.md) |
 | Ollama production setup | [`OLLAMA_PRODUCTION.md`](./OLLAMA_PRODUCTION.md) |
 | Environment variables | [`.env.example`](../.env.example) |

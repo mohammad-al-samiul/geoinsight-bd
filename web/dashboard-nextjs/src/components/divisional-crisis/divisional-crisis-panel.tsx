@@ -68,6 +68,7 @@ import {
 import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AppSelect } from "@/components/ui/app-select";
 import { IntelCard } from "@/components/ui/intel-card";
 import { DivisionalMap } from "@/components/divisional-crisis/divisional-map";
 import {
@@ -112,6 +113,7 @@ export function DivisionalCrisisPanel() {
     loading,
     livePulse,
     divisions,
+    mapDivisions,
     filteredDivisions,
     filters,
     setFilters,
@@ -129,7 +131,13 @@ export function DivisionalCrisisPanel() {
     setSelectedDistrict,
     reallocation,
     setReallocation,
+    liveAlerts,
     addCitizenReport,
+    addAlertFromShortageSite,
+    timelineHour,
+    setTimelineHour,
+    timelinePlaying,
+    setTimelinePlaying,
     playVoiceBriefing,
     stopVoiceBriefing,
     isSpeechPlaying,
@@ -194,8 +202,8 @@ export function DivisionalCrisisPanel() {
     setTimeout(() => setDispatchSuccess(false), 4000);
   };
 
-  const handleCompareClick = (divId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleCompareClick = (divId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!compareDivisionIds) {
       const defaultOther = divisions.find((d) => d.id !== divId)?.id || "chattogram";
       setCompareDivisionIds([divId, defaultOther]);
@@ -204,6 +212,16 @@ export function DivisionalCrisisPanel() {
     } else {
       setCompareDivisionIds([compareDivisionIds[0], divId]);
     }
+  };
+
+  const handleDistrictSelect = (district: DistrictInfo, division: DivisionCrisisData) => {
+    setSelectedDistrict(district);
+    setActiveDistrictModalDiv(division);
+  };
+
+  const handlePinAlert = (site: Parameters<typeof addAlertFromShortageSite>[0]) => {
+    addAlertFromShortageSite(site);
+    setShowAutoAlertDrawer(true);
   };
 
   const criticalDivisions = filteredDivisions.filter((d) => d.overallSeverityScore >= 80);
@@ -422,29 +440,31 @@ export function DivisionalCrisisPanel() {
                 {/* Source Division */}
                 <div className="space-y-1">
                   <label className="text-muted-foreground block text-[11px] font-medium">{bn ? "উৎসহ বিভাগ (Source):" : "Source Division:"}</label>
-                  <select
+                  <AppSelect
                     value={reallocation.sourceDivId}
-                    onChange={(e) => setReallocation({ ...reallocation, sourceDivId: e.target.value })}
-                    className="w-full rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs focus:outline-none"
-                  >
-                    {divisions.map((d) => (
-                      <option key={d.id} value={d.id}>{bn ? d.nameBn : d.nameEn}</option>
-                    ))}
-                  </select>
+                    onValueChange={(value) => setReallocation({ ...reallocation, sourceDivId: value })}
+                    className="w-full"
+                    triggerClassName="w-full"
+                    options={divisions.map((d) => ({
+                      value: d.id,
+                      label: bn ? d.nameBn : d.nameEn,
+                    }))}
+                  />
                 </div>
 
                 {/* Target Division */}
                 <div className="space-y-1">
                   <label className="text-muted-foreground block text-[11px] font-medium">{bn ? "টার্গেট বিভাগ (Target):" : "Target Division:"}</label>
-                  <select
+                  <AppSelect
                     value={reallocation.targetDivId}
-                    onChange={(e) => setReallocation({ ...reallocation, targetDivId: e.target.value })}
-                    className="w-full rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs focus:outline-none"
-                  >
-                    {divisions.map((d) => (
-                      <option key={d.id} value={d.id}>{bn ? d.nameBn : d.nameEn}</option>
-                    ))}
-                  </select>
+                    onValueChange={(value) => setReallocation({ ...reallocation, targetDivId: value })}
+                    className="w-full"
+                    triggerClassName="w-full"
+                    options={divisions.map((d) => ({
+                      value: d.id,
+                      label: bn ? d.nameBn : d.nameEn,
+                    }))}
+                  />
                 </div>
 
                 {/* Police Units Slider */}
@@ -520,6 +540,15 @@ export function DivisionalCrisisPanel() {
                 </span>
               </div>
 
+              <input
+                type="range"
+                min={0}
+                max={40}
+                step={1}
+                value={filters.stressSurgePercentage}
+                onChange={(e) => setFilters({ ...filters, stressSurgePercentage: Number(e.target.value) })}
+                className="w-full accent-amber-500"
+              />
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[0, 10, 20, 30].map((surge) => (
                   <button
@@ -537,9 +566,63 @@ export function DivisionalCrisisPanel() {
                   </button>
                 ))}
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                {bn
+                  ? "স্লাইডার ম্যাপ ও রিসোর্স চার্টে একসাথে কাজ করে (হোয়াট-ইফ)।"
+                  : "Slider drives map + resource charts together (what-if)."}
+              </p>
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Live alerts / citizen feed */}
+        {liveAlerts.length > 0 ? (
+          <div className="glass-panel rounded-xl border border-rose-500/25 bg-background/70 p-3.5">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-rose-200">
+                <Radio className="h-4 w-4" />
+                {bn ? "লাইভ অ্যালার্ট ও নাগরিক রিপোর্ট" : "Live alerts & citizen reports"}
+              </h3>
+              <span className="font-mono text-[11px] text-muted-foreground">{liveAlerts.length}</span>
+            </div>
+            <ul className="grid max-h-40 gap-2 overflow-y-auto sm:grid-cols-2">
+              {liveAlerts.slice(0, 8).map((alert) => (
+                <li
+                  key={alert.id}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-xs",
+                    alert.severity === "critical"
+                      ? "border-red-500/35 bg-red-500/10"
+                      : alert.severity === "warning"
+                        ? "border-amber-500/30 bg-amber-500/10"
+                        : "border-border/40 bg-background/40",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold leading-snug text-foreground">
+                      {bn ? alert.titleBn : alert.titleEn}
+                    </p>
+                    <Badge variant="outline" className="shrink-0 text-[9px]">
+                      {alert.source === "citizen"
+                        ? bn
+                          ? "নাগরিক"
+                          : "Citizen"
+                        : alert.source === "pin-alert"
+                          ? bn
+                            ? "পিন"
+                            : "Pin"
+                          : "Ops"}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 leading-snug text-muted-foreground">
+                    {bn ? alert.locationBn : alert.locationEn}
+                  </p>
+                  <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/80">{alert.timestamp}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {/* Main Controls & Filters Bar */}
         <div className="glass-panel flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl print:hidden">
@@ -607,48 +690,68 @@ export function DivisionalCrisisPanel() {
             </div>
 
             {/* Sort Dropdown */}
-            <div className="flex items-center gap-1 bg-background/60 border border-border/50 rounded-lg px-2 py-1 text-xs">
-              <ArrowUpDown className="h-3 w-3 text-muted-foreground shrink-0" />
-              <select
-                value={filters.sortBy}
-                onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as SortOption })}
-                className="bg-transparent text-xs font-medium focus:outline-none cursor-pointer"
-              >
-                <option value="severity">{bn ? "সর্ট: ক্রাইসিস স্কোর" : "Sort: Crisis Score"}</option>
-                <option value="cases">{bn ? "সর্ট: মোট অপরাধ" : "Sort: Crime Cases"}</option>
-                <option value="gas">{bn ? "সর্ট: গ্যাস ঘাটতি" : "Sort: Gas Deficit"}</option>
-                <option value="power">{bn ? "সর্ট: লোডশেডিং" : "Sort: Load-shedding"}</option>
-                <option value="name">{bn ? "সর্ট: নাম অনুযায়ী" : "Sort: Division Name"}</option>
-              </select>
-            </div>
+            <AppSelect
+              value={filters.sortBy}
+              onValueChange={(value) => setFilters({ ...filters, sortBy: value as SortOption })}
+              icon={<ArrowUpDown className="h-3 w-3" />}
+              triggerClassName="min-w-[10.5rem]"
+              options={[
+                { value: "severity", label: bn ? "সর্ট: ক্রাইসিস স্কোর" : "Sort: Crisis Score" },
+                { value: "cases", label: bn ? "সর্ট: মোট অপরাধ" : "Sort: Crime Cases" },
+                { value: "gas", label: bn ? "সর্ট: গ্যাস ঘাটতি" : "Sort: Gas Deficit" },
+                { value: "power", label: bn ? "সর্ট: লোডশেডিং" : "Sort: Load-shedding" },
+                { value: "name", label: bn ? "সর্ট: নাম অনুযায়ী" : "Sort: Division Name" },
+              ]}
+            />
 
             {/* Risk Level Filter */}
-            <div className="flex items-center gap-1 bg-background/60 border border-border/50 rounded-lg px-2 py-1 text-xs">
-              <Filter className="h-3 w-3 text-muted-foreground shrink-0" />
-              <select
-                value={filters.riskFilter}
-                onChange={(e) => setFilters({ ...filters, riskFilter: e.target.value as RiskFilterOption })}
-                className="bg-transparent text-xs font-medium focus:outline-none cursor-pointer"
-              >
-                <option value="all">{bn ? "ঝুঁকি: সকল মাত্রা" : "Risk: All Levels"}</option>
-                <option value="Critical">{bn ? "ঝুঁকি: অতি ঝুঁকিপূর্ণ" : "Risk: Critical"}</option>
-                <option value="High Risk">{bn ? "ঝুঁকি: উচ্চ ঝুঁকিপূর্ণ" : "Risk: High Risk"}</option>
-                <option value="Moderate">{bn ? "ঝুঁকি: মাঝারি" : "Risk: Moderate"}</option>
-                <option value="Low Risk">{bn ? "ঝুঁকি: নিম্ন" : "Risk: Low Risk"}</option>
-              </select>
-            </div>
+            <AppSelect
+              value={filters.riskFilter}
+              onValueChange={(value) => setFilters({ ...filters, riskFilter: value as RiskFilterOption })}
+              icon={<Filter className="h-3 w-3" />}
+              triggerClassName="min-w-[10.5rem]"
+              options={[
+                { value: "all", label: bn ? "ঝুঁকি: সকল মাত্রা" : "Risk: All Levels" },
+                { value: "Critical", label: bn ? "ঝুঁকি: অতি ঝুঁকিপূর্ণ" : "Risk: Critical" },
+                { value: "High Risk", label: bn ? "ঝুঁকি: উচ্চ ঝুঁকিপূর্ণ" : "Risk: High Risk" },
+                { value: "Moderate", label: bn ? "ঝুঁকি: মাঝারি" : "Risk: Moderate" },
+                { value: "Low Risk", label: bn ? "ঝুঁকি: নিম্ন" : "Risk: Low Risk" },
+              ]}
+            />
+
+            {/* Category focus */}
+            <AppSelect
+              value={filters.categoryFilter}
+              onValueChange={(value) =>
+                setFilters({
+                  ...filters,
+                  categoryFilter: value as typeof filters.categoryFilter,
+                })
+              }
+              icon={<Layers className="h-3 w-3" />}
+              triggerClassName="min-w-[10.5rem]"
+              options={[
+                { value: "all", label: bn ? "ক্যাটাগরি: সব" : "Category: All" },
+                { value: "crime", label: bn ? "ক্যাটাগরি: অপরাধ" : "Category: Crime" },
+                { value: "gas", label: bn ? "ক্যাটাগরি: গ্যাস" : "Category: Gas" },
+                { value: "fuel", label: bn ? "ক্যাটাগরি: তেল" : "Category: Fuel" },
+                { value: "electricity", label: bn ? "ক্যাটাগরি: বিদ্যুৎ" : "Category: Power" },
+                { value: "water", label: bn ? "ক্যাটাগরি: পানি" : "Category: Water" },
+              ]}
+            />
 
             {/* Timeframe */}
-            <select
-              value={filters.timeframeDays}
-              onChange={(e) => setFilters({ ...filters, timeframeDays: Number(e.target.value) })}
-              className="rounded-lg border border-border/50 bg-background/60 px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value={7}>{bn ? "গত ৭ দিন" : "7 Days"}</option>
-              <option value={30}>{bn ? "গত ৩০ দিন" : "30 Days"}</option>
-              <option value={90}>{bn ? "গত ৯০ দিন" : "90 Days"}</option>
-              <option value={365}>{bn ? "গত ১ বছর" : "1 Year"}</option>
-            </select>
+            <AppSelect
+              value={String(filters.timeframeDays)}
+              onValueChange={(value) => setFilters({ ...filters, timeframeDays: Number(value) })}
+              triggerClassName="min-w-[7.5rem]"
+              options={[
+                { value: "7", label: bn ? "গত ৭ দিন" : "7 Days" },
+                { value: "30", label: bn ? "গত ৩০ দিন" : "30 Days" },
+                { value: "90", label: bn ? "গত ৯০ দিন" : "90 Days" },
+                { value: "365", label: bn ? "গত ১ বছর" : "1 Year" },
+              ]}
+            />
 
             {/* Print & Export */}
             <Button variant="outline" size="sm" onClick={handlePrintReport} className="gap-1.5 text-xs h-8">
@@ -881,9 +984,21 @@ export function DivisionalCrisisPanel() {
         {/* Tab: Geo-Spatial Interactive Heatmap */}
         {(activeTab === "overview" || activeTab === "map") && (
           <DivisionalMap
-            divisions={filteredDivisions}
+            divisions={mapDivisions}
             selectedDivisionId={filters.divisionId}
             onSelectDivision={(id) => setFilters({ ...filters, divisionId: id })}
+            liveUpdatedAt={livePulse?.generatedAt}
+            compareDivisionIds={compareDivisionIds}
+            onComparePick={(id) => handleCompareClick(id)}
+            liveAlerts={liveAlerts}
+            onAlertFromSite={handlePinAlert}
+            onSelectDistrict={handleDistrictSelect}
+            stressSurgePercentage={filters.stressSurgePercentage}
+            onStressChange={(value) => setFilters({ ...filters, stressSurgePercentage: value })}
+            timelineHour={timelineHour}
+            onTimelineHourChange={setTimelineHour}
+            timelinePlaying={timelinePlaying}
+            onTimelinePlayingChange={setTimelinePlaying}
           />
         )}
 
@@ -966,27 +1081,28 @@ export function DivisionalCrisisPanel() {
                   </div>
                 </div>
 
-                <div className="w-full" style={{ height: layout.chartHeightMd }}>
+                <div className="w-full" style={{ height: Math.max(layout.chartHeightMd, 340) }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart margin={{ top: 24, right: 28, bottom: 12, left: 28 }}>
+                    <PieChart margin={{ top: 20, right: 28, bottom: 16, left: 28 }}>
                       <Pie
                         data={aggregateCrimeTypeBreakdown}
                         cx="50%"
                         cy="50%"
-                        innerRadius={layout.pieInner}
-                        outerRadius={layout.pieOuter}
-                        paddingAngle={4}
+                        innerRadius={Math.max(48, layout.pieInner)}
+                        outerRadius={Math.min(layout.pieOuter, 88)}
+                        paddingAngle={3}
                         dataKey="value"
                         nameKey={bn ? "nameBn" : "name"}
+                        /* Percent only on the ring — full names live in the legend below */
                         label={(props) =>
                           piePercentLabel({
                             ...props,
-                            showName: layout.showPieNames,
-                            fontSize: layout.pieFontSize,
-                            offset: layout.pieLabelOffset,
+                            showName: false,
+                            fontSize: Math.max(layout.pieFontSize, 15),
+                            offset: 18,
                           })
                         }
-                        labelLine={{ stroke: "#94a3b8", strokeWidth: 1.5 }}
+                        labelLine={{ stroke: "#94a3b8", strokeWidth: 1.25 }}
                       >
                         {aggregateCrimeTypeBreakdown.map((entry, index) => (
                           <Cell key={`pie-cell-${index}`} fill={CRIME_COLORS[index % CRIME_COLORS.length]} />
@@ -994,8 +1110,8 @@ export function DivisionalCrisisPanel() {
                       </Pie>
                       <Tooltip
                         {...chartTooltipProps}
-                        formatter={(value, name, item) => [
-                          `${value.toLocaleString()} (${item.payload.percentage}%)`,
+                        formatter={(value, _name, item) => [
+                          `${Number(value).toLocaleString()} (${item.payload.percentage}%)`,
                           bn ? item.payload.nameBn : item.payload.name,
                         ]}
                       />
@@ -1003,18 +1119,25 @@ export function DivisionalCrisisPanel() {
                   </ResponsiveContainer>
                 </div>
 
-                {/* Custom Interactive Legend for Pie Chart */}
-                <div className="grid grid-cols-1 gap-2.5 text-sm pt-3 border-t border-border/40 sm:grid-cols-2">
+                {/* Full labels + % — no truncation so Bangla names stay readable */}
+                <div className="grid grid-cols-1 gap-2 pt-3 border-t border-border/40 sm:grid-cols-2">
                   {aggregateCrimeTypeBreakdown.map((item, idx) => (
-                    <div key={item.name} className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-background/30 border border-border/20">
-                      <div className="flex items-center gap-2.5 min-w-0">
+                    <div
+                      key={item.name}
+                      className="flex items-start justify-between gap-3 rounded-lg border border-border/20 bg-background/30 p-2.5"
+                    >
+                      <div className="flex min-w-0 items-start gap-2.5">
                         <span
-                          className="h-3.5 w-3.5 rounded-full shrink-0"
+                          className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full"
                           style={{ backgroundColor: CRIME_COLORS[idx % CRIME_COLORS.length] }}
                         />
-                        <span className="truncate text-foreground/90 font-semibold">{bn ? item.nameBn : item.name}</span>
+                        <span className="text-sm font-semibold leading-snug text-foreground/95">
+                          {bn ? item.nameBn : item.name}
+                        </span>
                       </div>
-                      <span className="text-base font-extrabold tabular-nums text-foreground shrink-0">{item.percentage}%</span>
+                      <span className="shrink-0 text-base font-extrabold tabular-nums text-foreground">
+                        {item.percentage}%
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -1135,14 +1258,14 @@ export function DivisionalCrisisPanel() {
                     <PolarGrid stroke="rgba(148,163,184,0.15)" />
                     <PolarAngleAxis dataKey={bn ? "subjectBn" : "subject"} tick={layout.tickMuted} />
                     <PolarRadiusAxis angle={30} domain={[0, 100]} tick={layout.tickMuted} tickFormatter={(v) => `${v}%`} />
-                    {filteredDivisions.slice(0, 5).map((div) => (
+                    {filteredDivisions.map((div) => (
                       <Radar
                         key={div.id}
                         name={bn ? div.nameBn : div.nameEn}
                         dataKey={div.id}
                         stroke={DIVISION_COLOR_MAP[div.id] || "#3b82f6"}
                         fill={DIVISION_COLOR_MAP[div.id] || "#3b82f6"}
-                        fillOpacity={0.2}
+                        fillOpacity={0.12}
                         strokeWidth={2}
                       />
                     ))}
@@ -1181,7 +1304,7 @@ export function DivisionalCrisisPanel() {
                     <Tooltip {...chartTooltipProps} />
                     <Legend wrapperStyle={layout.legend} />
                     <Bar dataKey="gasDeficit" fill="#f59e0b" name={bn ? "গ্যাস ঘাটতি (%)" : "Gas Deficit (%)"} radius={[4, 4, 0, 0]} maxBarSize={28} />
-                    <Bar dataKey="fuelDeficit" fill="#ef4444" name={bn ? "তেল/জ্বালানি সংকট (%)" : "Fuel Stock Deficit (%)"} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    <Bar dataKey="fuelDeficit" fill="#f97316" name={bn ? "তেল/জ্বালানি সংকট (%)" : "Fuel Stock Deficit (%)"} radius={[4, 4, 0, 0]} maxBarSize={28} />
                     <Bar dataKey="loadSheddingHours" fill="#a855f7" name={bn ? "দৈনিক লোডশেডিং (ঘণ্টা)" : "Load-shedding (hrs)"} radius={[4, 4, 0, 0]} maxBarSize={28} />
                     <Bar dataKey="waterScarcity" fill="#06b6d4" name={bn ? "পানি সংকট ইনডেক্স" : "Water Scarcity Index"} radius={[4, 4, 0, 0]} maxBarSize={28} />
                   </BarChart>
@@ -1381,7 +1504,7 @@ export function DivisionalCrisisPanel() {
                             {div.resources.electricity.avgLoadSheddingHours} {bn ? "ঘণ্টা" : "hrs"}
                           </span>
                         </div>
-                        <p className="mt-1 text-[10px] text-muted-foreground truncate" title={bn ? div.resources.electricity.ruralStatus_bn : div.resources.electricity.ruralStatus}>
+                        <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
                           {bn ? div.resources.electricity.ruralStatus_bn : div.resources.electricity.ruralStatus}
                         </p>
                       </div>
@@ -1397,7 +1520,7 @@ export function DivisionalCrisisPanel() {
                             {div.resources.water.scarcityIndex}/100
                           </span>
                         </div>
-                        <p className="mt-1 text-[10px] text-muted-foreground truncate" title={bn ? div.resources.water.salinityOrDepletion_bn : div.resources.water.salinityOrDepletion}>
+                        <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
                           {bn ? div.resources.water.salinityOrDepletion_bn : div.resources.water.salinityOrDepletion}
                         </p>
                       </div>
@@ -1405,15 +1528,17 @@ export function DivisionalCrisisPanel() {
 
                     {/* Crime Breakdown Progress Bars */}
                     <div className="mt-3 space-y-2">
-                      <div className="text-sm font-semibold text-muted-foreground flex items-center justify-between gap-2">
+                      <div className="space-y-1 text-sm font-semibold text-muted-foreground">
                         <span>{bn ? "শীর্ষ অপরাধের ধরণ ও শতাংশ:" : "Top Crime Breakdown (%):"}</span>
-                        <span className="text-xs text-muted-foreground font-mono truncate max-w-[200px]" title={(div.crime.topHotspots_bn).join(", ")}>
-                          {bn ? `হটস্পট: ${(div.crime.topHotspots_bn).slice(0, 3).join(", ")}` : `Hotspots: ${div.crime.topHotspots.slice(0, 3).join(", ")}`}
-                        </span>
+                        <p className="text-xs font-mono font-normal leading-snug text-muted-foreground">
+                          {bn
+                            ? `হটস্পট: ${div.crime.topHotspots_bn.join(", ")}`
+                            : `Hotspots: ${div.crime.topHotspots.join(", ")}`}
+                        </p>
                       </div>
 
                       <div className="space-y-2">
-                        {div.crime.breakdown.slice(0, 3).map((item, idx) => (
+                        {div.crime.breakdown.slice(0, 5).map((item, idx) => (
                           <div key={item.type} className="space-y-1">
                             <div className="flex items-center justify-between text-sm gap-2">
                               <span className="text-foreground/90 font-semibold">{bn ? item.type_bn : item.type}</span>
@@ -1555,29 +1680,54 @@ export function DivisionalCrisisPanel() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-muted-foreground font-medium">{bn ? "বিভাগ নির্বাচন:" : "Select Division:"}</label>
-                      <select
+                      <AppSelect
                         value={reportForm.divisionId}
-                        onChange={(e) => setReportForm({ ...reportForm, divisionId: e.target.value })}
-                        className="w-full rounded-lg border border-border/50 bg-background px-2.5 py-1.5 focus:outline-none"
-                      >
-                        {divisions.map((d) => (
-                          <option key={d.id} value={d.id}>{bn ? d.nameBn : d.nameEn}</option>
-                        ))}
-                      </select>
+                        onValueChange={(value) => setReportForm({ ...reportForm, divisionId: value })}
+                        className="w-full"
+                        triggerClassName="w-full"
+                        options={divisions.map((d) => ({
+                          value: d.id,
+                          label: bn ? d.nameBn : d.nameEn,
+                        }))}
+                      />
                     </div>
 
                     <div className="space-y-1">
                       <label className="text-muted-foreground font-medium">{bn ? "জরুরিতা:" : "Urgency:"}</label>
-                      <select
+                      <AppSelect
                         value={reportForm.urgency}
-                        onChange={(e) => setReportForm({ ...reportForm, urgency: e.target.value as "critical" | "warning" | "info" })}
-                        className="w-full rounded-lg border border-border/50 bg-background px-2.5 py-1.5 focus:outline-none"
-                      >
-                        <option value="critical">{bn ? "জরুরি (Critical)" : "Critical"}</option>
-                        <option value="warning">{bn ? "সতর্কতা (Warning)" : "Warning"}</option>
-                        <option value="info">{bn ? "তথ্য (Info)" : "Info"}</option>
-                      </select>
+                        onValueChange={(value) =>
+                          setReportForm({
+                            ...reportForm,
+                            urgency: value as "critical" | "warning" | "info",
+                          })
+                        }
+                        className="w-full"
+                        triggerClassName="w-full"
+                        options={[
+                          { value: "critical", label: bn ? "জরুরি (Critical)" : "Critical" },
+                          { value: "warning", label: bn ? "সতর্কতা (Warning)" : "Warning" },
+                          { value: "info", label: bn ? "তথ্য (Info)" : "Info" },
+                        ]}
+                      />
                     </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-muted-foreground font-medium">{bn ? "ক্যাটাগরি:" : "Category:"}</label>
+                    <AppSelect
+                      value={reportForm.category}
+                      onValueChange={(value) => setReportForm({ ...reportForm, category: value })}
+                      className="w-full"
+                      triggerClassName="w-full"
+                      options={[
+                        { value: "গ্যাস লিকেজ / স্বল্পচাপ", label: bn ? "গ্যাস লিকেজ / স্বল্পচাপ" : "Gas leak / low pressure" },
+                        { value: "তেল / পাম্প সংকট", label: bn ? "তেল / পাম্প সংকট" : "Fuel / pump shortage" },
+                        { value: "বিদ্যুৎ লোডশেডিং", label: bn ? "বিদ্যুৎ লোডশেডিং" : "Power load-shedding" },
+                        { value: "পানি সংকট", label: bn ? "পানি সংকট" : "Water scarcity" },
+                        { value: "অপরাধ / নিরাপত্তা", label: bn ? "অপরাধ / নিরাপত্তা" : "Crime / security" },
+                      ]}
+                    />
                   </div>
 
                   <div className="space-y-1">
@@ -1664,7 +1814,17 @@ export function DivisionalCrisisPanel() {
                 {/* District Cards Grid */}
                 <div className="grid sm:grid-cols-2 gap-3 pt-1">
                   {activeDistrictModalDiv.districts.map((dist) => (
-                    <div key={dist.id} className="p-3.5 rounded-xl bg-background/60 border border-border/50 space-y-2 hover:border-cyan-500/40 transition-all">
+                    <button
+                      type="button"
+                      key={dist.id}
+                      onClick={() => setSelectedDistrict(dist)}
+                      className={cn(
+                        "p-3.5 rounded-xl bg-background/60 border space-y-2 text-left transition-all hover:border-cyan-500/40",
+                        selectedDistrict?.id === dist.id
+                          ? "border-cyan-400/60 ring-1 ring-cyan-400/40"
+                          : "border-border/50",
+                      )}
+                    >
                       <div className="flex items-center justify-between">
                         <h4 className="font-bold text-sm text-foreground">{bn ? dist.nameBn : dist.nameEn}</h4>
                         <span className="text-xs font-mono font-bold text-red-400">
@@ -1687,13 +1847,13 @@ export function DivisionalCrisisPanel() {
                         </div>
                       </div>
 
-                      <div className="pt-1.5 border-t border-border/30 flex items-center justify-between text-[11px]">
-                        <span className="text-muted-foreground">{bn ? "প্রধান হটস্পট:" : "Top Hotspot:"}</span>
-                        <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-300 border-red-500/30">
+                      <div className="pt-1.5 border-t border-border/30 flex items-center justify-between gap-2 text-[11px]">
+                        <span className="shrink-0 text-muted-foreground">{bn ? "প্রধান হটস্পট:" : "Top Hotspot:"}</span>
+                        <Badge variant="outline" className="max-w-[70%] whitespace-normal text-left text-[10px] leading-snug bg-red-500/10 text-red-300 border-red-500/30">
                           {bn ? dist.topHotspot_bn : dist.topHotspot}
                         </Badge>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
 

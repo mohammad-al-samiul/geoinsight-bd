@@ -36,7 +36,7 @@ set -a
 source .env.ollama
 set +a
 
-MODEL="${OLLAMA_MODEL:-llama3.1:8b}"
+MODEL="${OLLAMA_MODEL:-gpt-oss:20b}"
 PORT="${OLLAMA_PORT:-11434}"
 
 echo "==> Starting Ollama container on :$PORT ..."

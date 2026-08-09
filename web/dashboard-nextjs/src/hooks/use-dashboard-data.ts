@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AdminFilterState } from "@/types";
 import { fetchDashboardMetricsSafe, fetchRedFlagMarkers } from "@/lib/dashboard-data";
 import type {
@@ -11,6 +11,8 @@ import type {
 } from "@/types/dashboard";
 import { applyUnitScoreOverlay, getUnitCentroid } from "@/lib/geojson-bd";
 import { useSocket } from "@/hooks/use-socket";
+import { fetchSocketToken } from "@/lib/socket-token";
+import { loadAdminHierarchy } from "@/lib/admin-hierarchy";
 
 export function useDashboardData(filter: AdminFilterState) {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -18,14 +20,12 @@ export function useDashboardData(filter: AdminFilterState) {
   const [loading, setLoading] = useState(true);
   const [pulseKeys, setPulseKeys] = useState<Record<string, number>>({});
   const [socketToken, setSocketToken] = useState<string | null>(null);
+  const hasDataRef = useRef(false);
 
   useEffect(() => {
-    fetch("/api/auth/socket-token", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (json?.success) setSocketToken(json.data.token);
-      })
-      .catch(() => setSocketToken(null));
+    // Warm hierarchy + socket token off the critical paint path.
+    void loadAdminHierarchy();
+    void fetchSocketToken().then(setSocketToken);
   }, []);
 
   const pulse = useCallback((key: string) => {
@@ -34,28 +34,37 @@ export function useDashboardData(filter: AdminFilterState) {
 
   const load = useCallback(
     async (options?: { silent?: boolean }) => {
-      // Silent refreshes (socket-driven) swap data in place without tearing
-      // the dashboard down into the full-screen loader.
-      if (!options?.silent) setLoading(true);
-      try {
-        const [m, mk] = await Promise.all([
-          fetchDashboardMetricsSafe(filter),
-          fetchRedFlagMarkers(filter),
-        ]);
-        setMetrics(m);
-        setMarkers(mk);
-        if (m?.unitScores?.length) {
-          applyUnitScoreOverlay(m.unitScores);
-        }
-      } finally {
-        if (!options?.silent) setLoading(false);
-      }
+      const silent = options?.silent || hasDataRef.current;
+      if (!silent) setLoading(true);
+
+      // Unblock UI as soon as metrics arrive; markers stream in independently.
+      const metricsTask = fetchDashboardMetricsSafe(filter)
+        .then((m) => {
+          setMetrics(m);
+          if (m?.unitScores?.length) {
+            applyUnitScoreOverlay(m.unitScores);
+          }
+          hasDataRef.current = true;
+          setLoading(false);
+        })
+        .catch(() => {
+          if (!hasDataRef.current) setLoading(false);
+        });
+
+      const markersTask = fetchRedFlagMarkers(filter)
+        .then((mk) => setMarkers(mk))
+        .catch(() => {
+          /* keep previous markers */
+        });
+
+      await Promise.allSettled([metricsTask, markersTask]);
+      setLoading(false);
     },
     [filter],
   );
 
   useEffect(() => {
-    load();
+    void load();
   }, [
     filter.divisionId,
     filter.districtId,

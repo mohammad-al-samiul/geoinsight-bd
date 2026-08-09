@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useDigitalTwin } from "@/hooks/use-digital-twin";
 import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Button } from "@/components/ui/button";
+import { AppSelect } from "@/components/ui/app-select";
 import { IntelCard } from "@/components/ui/intel-card";
 import { AnimatedSlider } from "@/components/ui/animated-slider";
 import { ProgressMeter } from "@/components/ui/progress-meter";
@@ -64,17 +65,17 @@ export function DigitalTwinPanel() {
             <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               {t("targetDivision")}
             </label>
-            <select
+            <AppSelect
               value={targetId}
-              onChange={(e) => setTargetId(e.target.value)}
-              className="h-11 w-full rounded-lg border border-border/70 bg-secondary/40 px-3 text-sm outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
-            >
-              {divisions.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {lang === "bn" && d.nameBn ? d.nameBn : d.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setTargetId}
+              size="default"
+              className="w-full"
+              triggerClassName="h-11 w-full bg-secondary/40"
+              options={divisions.map((d) => ({
+                value: d.id,
+                label: lang === "bn" && d.nameBn ? d.nameBn : d.name,
+              }))}
+            />
           </div>
 
           <div className="min-w-0 flex-[1.4]">

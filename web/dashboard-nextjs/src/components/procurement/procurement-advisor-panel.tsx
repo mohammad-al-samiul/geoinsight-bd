@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useProcurementAdvisor } from "@/hooks/use-procurement-advisor";
 import { ModuleShell, DataTable, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Button } from "@/components/ui/button";
+import { AppSelect } from "@/components/ui/app-select";
 import { useAppLang } from "@/hooks/use-app-lang";
 import { useTranslations } from "next-intl";
 import { Package, Search } from "lucide-react";
@@ -49,17 +50,16 @@ export function ProcurementAdvisorPanel() {
       <div className="glass-panel flex flex-wrap items-end gap-4 rounded-xl p-4 shadow-panel">
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-muted-foreground">{t("commodity")}</label>
-          <select
+          <AppSelect
             value={commodity}
-            onChange={(e) => setCommodity(e.target.value)}
-            className="h-10 rounded-md border border-border bg-card px-3 text-sm"
-          >
-            {COMMODITY_VALUES.map((value, i) => (
-              <option key={value} value={value}>
-                {t(COMMODITY_KEYS[i])}
-              </option>
-            ))}
-          </select>
+            onValueChange={setCommodity}
+            size="default"
+            triggerClassName="h-10 min-w-[9rem]"
+            options={COMMODITY_VALUES.map((value, i) => ({
+              value,
+              label: t(COMMODITY_KEYS[i]),
+            }))}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-muted-foreground">{t("quantityMt")}</label>

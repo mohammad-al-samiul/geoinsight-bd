@@ -30,7 +30,7 @@ import {
 import { isBangladeshRelevantArticle } from "../../shared/geo/bangladesh-relevance";
 import { clusterProtestMovements } from "../../shared/geo/protest-movements";
 
-const UNREST_CACHE_KEY = "unrest:pulse:v8";
+const UNREST_CACHE_KEY = "unrest:pulse:v11";
 const UNREST_TTL_SEC = 900;
 /** Fetch window — impact UI can slice 1d / 7d / 30d (floored at current mandate) */
 const LOOKBACK_DAYS = 30;
@@ -108,6 +108,61 @@ const SOCIAL_KW = [
   "online outrage",
 ];
 
+/** Gas / electricity / fuel — so price-hike politics is not dropped as noise */
+const UTILITY_ISSUE_KW = [
+  "বিদ্যুৎ",
+  "বিদ্যুত",
+  "গ্যাস",
+  "জ্বালানি",
+  "লোডশেডিং",
+  "তিতাস",
+  "সিএনজি",
+  "ডিজেল",
+  "অকটেন",
+  "petrol",
+  "octane",
+  "diesel",
+  "electricity",
+  "load shedding",
+  "load-shedding",
+  "cng",
+  "lng",
+  "fuel",
+  "desco",
+  "pdb",
+];
+
+const PRICE_HIKE_KW = [
+  "মূল্যবৃদ্ধি",
+  "মূল্য বৃদ্ধি",
+  "দাম বৃদ্ধি",
+  "দাম বাড়",
+  "দাম বাড়ানো",
+  "বিল বৃদ্ধি",
+  "রেট বৃদ্ধি",
+  "হারে বৃদ্ধি",
+  "ট্যারিফ",
+  "tariff",
+  "price hike",
+  "fare hike",
+  "rate hike",
+  "price rise",
+  "increased price",
+  "raised the price",
+];
+
+const OPPOSITION_KW = [
+  "বিরোধী দল",
+  "বিরোধী নেতা",
+  "বিরোধী নেতারা",
+  "বিএনপি",
+  "bnp",
+  "opposition",
+  "জাতীয় পার্টি",
+  "প্রতিবাদ সভা",
+  "গণসমাবেশ",
+];
+
 function includesAny(text: string, keywords: string[]): boolean {
   const lower = text.toLowerCase();
   return keywords.some((k) => lower.includes(k.toLowerCase()));
@@ -123,13 +178,21 @@ function classifyUnrest(text: string, sentiment: IngestionSentiment | null): Unr
   const hasLaw = includesAny(text, LAW_KW);
   const hasGovt = includesAny(text, GOVT_DISCONTENT_KW);
   const hasSocial = includesAny(text, SOCIAL_KW);
+  const hasUtility = includesAny(text, UTILITY_ISSUE_KW);
+  const hasPriceHike = includesAny(text, PRICE_HIKE_KW);
+  const hasOpposition = includesAny(text, OPPOSITION_KW);
+  const utilityPriceUnrest = hasUtility && hasPriceHike;
+  const oppositionUtilityUnrest = hasOpposition && (hasUtility || hasPriceHike);
 
-  if (hasLaw && (hasProtest || hasGovt)) return "law_reaction";
-  if (hasProtest) return "protest";
+  if (hasLaw && (hasProtest || hasGovt || utilityPriceUnrest)) return "law_reaction";
+  if (hasProtest || utilityPriceUnrest || oppositionUtilityUnrest) return "protest";
   if (hasSocial && (hasGovt || hasProtest || sentiment === IngestionSentiment.Grievance)) {
     return "social_viral";
   }
-  if (hasGovt) return "govt_discontent";
+  if (hasGovt || (hasOpposition && hasGovt)) return "govt_discontent";
+  if (hasUtility && (hasGovt || sentiment === IngestionSentiment.Grievance)) {
+    return "govt_discontent";
+  }
   if (sentiment === IngestionSentiment.Grievance) return "general_grievance";
   return null;
 }

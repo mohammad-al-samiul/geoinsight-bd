@@ -229,6 +229,25 @@ GOOGLE_NEWS_TOPIC_FEEDS: tuple[FeedSource, ...] = (
         "bn",
     ),
     FeedSource(
+        "Google News — BD Gas Electricity Price Protest BN",
+        # গ্যাস/বিদ্যুৎ মূল্যবৃদ্ধি + আন্দোলন/বিক্ষোভ/প্রতিবাদ
+        "https://news.google.com/rss/search?q=%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE%E0%A6%A6%E0%A7%87%E0%A6%B6+%28%E0%A6%97%E0%A7%8D%E0%A6%AF%E0%A6%BE%E0%A6%B8+OR+%E0%A6%AC%E0%A6%BF%E0%A6%A6%E0%A7%8D%E0%A6%AF%E0%A7%81%E0%A7%8E+OR+%E0%A6%9C%E0%A7%8D%E0%A6%AC%E0%A6%BE%E0%A6%B2%E0%A6%BE%E0%A6%A8%E0%A6%BF%29+%28%E0%A6%AE%E0%A7%82%E0%A6%B2%E0%A7%8D%E0%A6%AF%E0%A6%AC%E0%A7%83%E0%A6%A6%E0%A7%8D%E0%A6%A7%E0%A6%BF+OR+%E0%A6%A6%E0%A6%BE%E0%A6%AE+%E0%A6%AC%E0%A7%83%E0%A6%A6%E0%A7%8D%E0%A6%A7%E0%A6%BF+OR+%E0%A6%86%E0%A6%A8%E0%A7%8D%E0%A6%A6%E0%A7%8B%E0%A6%B2%E0%A6%A8+OR+%E0%A6%AC%E0%A6%BF%E0%A6%95%E0%A7%8D%E0%A6%B7%E0%A7%8B%E0%A6%AD+OR+%E0%A6%AA%E0%A7%8D%E0%A6%B0%E0%A6%A4%E0%A6%BF%E0%A6%AC%E0%A6%BE%E0%A6%A6%29&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
+        "Google News — BD Gas Electricity Price Protest EN",
+        "https://news.google.com/rss/search?q=bangladesh+(gas+OR+electricity+OR+fuel)+(price+OR+tariff)+(protest+OR+rally+OR+opposition+OR+BNP)&hl=en&gl=BD&ceid=BD:en",
+        "google_news",
+        "en",
+    ),
+    FeedSource(
+        "Google News — BD Opposition Protest BN",
+        "https://news.google.com/rss/search?q=%E0%A6%AC%E0%A6%BE%E0%A6%82%E0%A6%B2%E0%A6%BE%E0%A6%A6%E0%A7%87%E0%A6%B6+%28%E0%A6%AC%E0%A6%BF%E0%A6%B0%E0%A7%8B%E0%A6%A7%E0%A7%80+%E0%A6%A6%E0%A6%B2+OR+%E0%A6%AC%E0%A6%BF%E0%A6%8F%E0%A6%A8%E0%A6%AA%E0%A6%BF+OR+%E0%A6%AC%E0%A6%BF%E0%A6%B0%E0%A7%8B%E0%A6%A7%E0%A7%80+%E0%A6%A8%E0%A7%87%E0%A6%A4%E0%A6%BE%29+%28%E0%A6%86%E0%A6%A8%E0%A7%8D%E0%A6%A6%E0%A7%8B%E0%A6%B2%E0%A6%A8+OR+%E0%A6%AC%E0%A6%BF%E0%A6%95%E0%A7%8D%E0%A6%B7%E0%A7%8B%E0%A6%AD+OR+%E0%A6%B8%E0%A6%AE%E0%A6%BE%E0%A6%AC%E0%A7%87%E0%A6%B6+OR+%E0%A6%AE%E0%A6%BF%E0%A6%9B%E0%A6%BF%E0%A6%B2%29&hl=bn&gl=BD&ceid=BD:bn",
+        "google_news",
+        "bn",
+    ),
+    FeedSource(
         "Google News — BD Social Viral",
         "https://news.google.com/rss/search?q=bangladesh+%28%28facebook+OR+viral%29+protest+OR+%E0%A6%AD%E0%A6%BE%E0%A6%87%E0%A6%B0%E0%A6%BE%E0%A6%B2%29&hl=bn&gl=BD&ceid=BD:bn",
         "google_news",

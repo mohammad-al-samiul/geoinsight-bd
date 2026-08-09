@@ -41,10 +41,12 @@ GeoInsight BD is a **monorepo** that gives the Government of Bangladesh a single
 - **National project tracking** — budget, completion, red flags by division → union
 - **Representative KPIs** — MPs, Ministers, DCs with verified metrics
 - **AI anomaly detection** — budget overrun, delay, contractor fraud patterns
-- **Citizen sentiment** — Bangla-BERT on 333/999-style grievance streams
+- **Narrative & unrest intel** — counter-disinfo shield, protest pulse, strategic outlook
+- **Citizen sentiment** — Bangla-BERT on news + 333/999-style grievance streams
 - **Procurement intelligence** — global commodity arbitrage (rice, wheat, onion, lentil)
 - **PM Briefing Copilot** — morning executive summary + voice briefing (Bangla / English)
 - **Sovereign Bangla LLM** — on-prem Ollama; verified DB context only
+- **Weather & crisis pulse** — Open-Meteo / GDACS + divisional risk overlay
 - **Blockchain audit trail** — Hyperledger Fabric milestone anchoring
 
 | Service | Stack | Port (host) | Role |
@@ -68,6 +70,9 @@ System design, CI/CD, VPS, এবং Ollama **`docs/`**-এ আলাদা page
 | **[System Design](docs/SYSTEM_DESIGN.md)** | HLD, LLD, ERD, tech stack rationale, ADR |
 | **[CI/CD · VPS · Ops](docs/DEPLOYMENT_AND_OPS.md)** | Deploy pipeline, slim VPS, performance, day-to-day ops |
 | **[Ollama Production](docs/OLLAMA_PRODUCTION.md)** | আলাদা AI server + `OLLAMA_URL` setup |
+| **[API Gateway README](services/api-gateway-node/README.md)** | Gateway modules + local run |
+| **[AI Analytics README](services/ai-analytics-python/README.md)** | FastAPI modules + Ollama |
+| **[Dashboard README](web/dashboard-nextjs/README.md)** | Next.js BFF + pages |
 | **[`.env.example`](.env.example)** | Local Windows / Docker Desktop |
 | **[`.env.production.example`](.env.production.example)** | Hostinger / production VPS |
 
@@ -76,6 +81,7 @@ README  ──►  docs/README.md
                ├─ SYSTEM_DESIGN.md
                ├─ DEPLOYMENT_AND_OPS.md
                └─ OLLAMA_PRODUCTION.md
+         ──►  services/*/README.md · web/dashboard-nextjs/README.md
 ```
 
 ---
@@ -122,40 +128,54 @@ cp .env.example .env          # প্রথমবার
 | National Overview | `/` | Choropleth map, live KPI scorecards, red flag markers |
 | Command Dashboard | `/dashboard` | Same national command viewport |
 | PM Briefing Copilot | `/briefing` | AI morning bullets, narrative, voice TTS |
-| Sovereign Bangla LLM | `/sovereign-ai` | On-prem chat over verified DB context |
-| KPI Digital Twin | `/digital-twin` | Budget reallocation simulation by division |
-| Citizen Sentiment | `/sentiment` | 333/999 grievance heatmap (Bangla-BERT) |
-| Impact Simulator | `/simulator` | Geopolitical shock → Remittance / RMG impact |
-| Procurement Advisor | `/procurement` | Commodity landed cost + lead time |
+| Narrative Shield | `/narrative-shield` | Counter-disinfo: classify, fact-check, RAG debunk, escalate |
+| Strategic Outlook | `/outlook` | Politics / economy themes, direction, scenarios (Ollama) |
+| Unrest Pulse | `/unrest` | Protest / grievance pulse from ingested BD news |
 | Anti-Phishing Shield | `/anti-phishing` | Official site fingerprints vs lookalike URLs (`RED_FLAG`) |
-| Proximity Alert Map | `/proximity` | Shapely geo-fence around PMO / VIP campuses |
-| Face Intel | `/face-intel` | OpenCV VIP match + 6-month Ethical Report Overlay |
+| Procurement Advisor | `/procurement` | Commodity landed cost + lead time |
+| Notifications | `/notifications` | Live red-flag / anomaly notification center |
 
 ### Governance & Operations (Tier 2)
 
 | Page | Path | Description |
 |------|------|-------------|
+| Flood & Cyclone Risk | `/hazards` | Hazard overlay + live weather (Open-Meteo / GDACS) |
 | Representative KPIs | `/kpis` | MP / Minister / DC performance metrics |
 | Project Tracker | `/projects` | Budget, status, red flags, blockchain |
 | Red Flag Alerts | `/alerts` | Predictive scan + live anomaly feed |
 | Document Intelligence | `/documents` | Tender / contract anomaly detection |
 | AI Audit Trail | `/audit-trail` | Red flag → AI → action timeline |
-| Citizen Chatbot | `/citizen-chat` | 333/999 routing demo |
-| Flood & Cyclone Risk | `/hazards` | Project vs hazard zone overlay |
 
 ### Field & Local (Tier 3–4)
 
 | Page | Path | Description |
 |------|------|-------------|
 | Agri Markets | `/agro` | Mandi, haat, retail market registry |
+| Divisional Crisis | `/divisional-crisis` | Division risk pulse (alerts + grievance + weather) |
 | Geo Spatial Map | `/map` | Full command map viewport |
 | Representatives | `/representatives` | Directory + Accountability AI scores |
+
+### Backend / AI modules (API-backed; UI via command search or panels)
+
+| Capability | Paths / APIs | Notes |
+|------------|--------------|-------|
+| Sovereign Bangla LLM | Gateway `/sovereign-llm/*` · AI `/sovereign-llm/chat` | On-prem Ollama; verified DB context |
+| Digital Twin | Gateway `/twin/*` | Budget reallocation simulation |
+| Sentiment heatmap | Gateway `/intelligence/sentiment/*` | Bangla-BERT on 333/999 + news |
+| Impact Simulator | Gateway `/simulator/*` | Geopolitical shock scenarios |
+| Citizen Chatbot | Gateway `/citizen/*` | 333/999 routing |
+| Proximity geo-fence | Gateway `/intelligence/proximity/*` | Shapely polygons (PMO / VIP) |
+| Face Intel | Gateway `/intelligence/face-intel/*` | OpenCV VIP match + ethical card |
+| News ingestion | Gateway `/ingestion/*` · AI `/ingestion/fetch` | RSS + Google News → `external_articles` |
+| Pipeline orchestrator | Gateway `/pipeline/*` | Cron sync: news, weather, unrest, outlook, … |
+| Intel store | Gateway `/intel/*` | Snapshots + pipeline/ingestion run history |
+| Live weather | Gateway `/weather/live` · AI `/weather/fetch` | Feeds hazards + divisional crisis |
 
 ### Global UI
 
 - **Admin Cascade Filter** — Division → District → Upazila → Union
 - **Command Search** — `Ctrl+K` across pages, projects, KPIs, alerts
-- **Notification Center** — live red flag bell
+- **Notification Center** — `/notifications` + live red flag bell
 - **AI Anomaly Feed** — right panel, Socket.io live
 - **Locale Switcher** — বাংলা / English
 
@@ -216,7 +236,7 @@ uvicorn app.main:app --reload --port 8000
 Ollama (optional, for generative AI):
 
 ```bash
-ollama pull llama3.1:8b
+ollama pull gpt-oss:20b
 ollama serve   # default :11434
 ```
 
@@ -329,43 +349,61 @@ Base path: `/api/v1`
 
 ### Gateway modules
 
-| Module | Key endpoints | Roles |
-|--------|---------------|-------|
+| Module | Key endpoints | Roles (typical) |
+|--------|---------------|-----------------|
 | `auth` | `POST /auth/login`, `/register`, `/refresh` | Public / PMO |
 | `dashboard` | `GET /dashboard/national` | PMO, MINISTER |
 | `briefing` | `GET /briefing/morning?lang=bn` | PMO |
+| `narrative-shield` | `/narrative-shield/feed`, `/debunk`, `/escalate`, … | PMO, MINISTER (, DC read) |
+| `outlook` | `GET /outlook/strategic`, `POST /outlook/refresh` | PMO, MINISTER (, DC read) |
+| `unrest` | `GET /unrest/pulse`, `POST /unrest/refresh` | PMO, MINISTER (, DC read) |
+| `divisional-crisis` | `GET /divisional-crisis/pulse` | PMO, MINISTER, DC |
+| `weather` | `GET /weather/live` | PMO, MINISTER, DC |
+| `ingestion` | `/ingestion/sync`, `/articles`, `/stats` | PMO, MINISTER |
+| `pipeline` | `/pipeline/status`, `/pipeline/sync/:job` | PMO, MINISTER |
+| `intel` | `/intel/stats`, `/snapshots/history`, run history | PMO, MINISTER |
 | `sovereign` | `POST /sovereign-llm/chat` | PMO, MINISTER |
 | `twin` | `POST /twin/simulate` | PMO |
-| `intelligence` | `/intelligence/sentiment/heatmap`, `/predictive/scan`, … | PMO, MINISTER |
+| `intelligence` | sentiment, predictive, phishing, proximity, face-intel, … | PMO, MINISTER |
 | `simulator` | `POST /simulator/run` | PMO |
 | `procurement` | `POST /procurement/advise` | PMO |
 | `projects` / `kpis` / `alerts` | CRUD-style scoped routes | Scoped |
 | `search` | `GET /search?q=` | Authenticated |
 | `public-feed` | `/public/feeds/333\|999/stream` | Rate-limited |
 
+Full register list: `services/api-gateway-node/src/modules/register-modules.ts`
+
 ### AI Analytics routes
 
 | Router | Path | Purpose |
 |--------|------|---------|
 | `briefing` | `/briefing/generate` | Morning narrative |
+| `narrative_shield` | `/narrative-shield/classify`, `/debunk`, `/fact-check` | Counter-disinfo NLP |
+| `outlook` | `/outlook/generate` | Strategic outlook LLM |
+| `weather` | `/weather/fetch` | Open-Meteo + disaster feeds |
+| `ingestion` | `/ingestion/fetch`, `/sources` | RSS / Google News fetch |
 | `sovereign_llm` | `/sovereign-llm/chat` | Verified-context chat |
 | `sentiment` | `/sentiment/heatmap`, `/analyze` | Bangla-BERT |
 | `predictive` | `/predictive/score` | Project risk scoring |
 | `arbitrage` | `/arbitrage/*` | Commodity price engine |
 | `procurement` | `/procurement/advise` | Landed cost ranking |
-| `documents` / `hazards` / `twin` / `simulator` | module paths | Intelligence APIs |
+| `phishing` / `proximity` / `face_intel` | DSS modules | Cyber / GIS / CV |
+| `documents` / `hazards` / `twin` / `simulator` / `citizen` | module paths | Intelligence APIs |
 
 ---
 
 ## Dashboard Pages & RBAC
 
-| Tier | Role | Visible pages |
-|------|------|---------------|
-| 1 | PMO | All pages |
-| 2 | MINISTER | KPIs through Hazards (not full PMO-only command set) |
-| 3 | DC | Agro, Map, Representatives |
-| 4 | UNION_CHAIRMAN | Representatives only |
+Sidebar filter: `minTier >= userTier` (PMO=`1` … UNION_CHAIRMAN=`4`); **PMO always sees everything**.
 
+| Tier | Role | Sidebar visibility (approx.) |
+|------|------|------------------------------|
+| 1 | PMO | All pages |
+| 2 | MINISTER | Hazards, KPIs, Projects, Alerts, Documents, Audit Trail (+ shared) |
+| 3 | DC | Agro (+ Divisional Crisis, Representatives) |
+| 4 | UNION_CHAIRMAN | Divisional Crisis, Representatives |
+
+Gateway `requireRoles` is often **wider** than sidebar (e.g. DC can call unrest/outlook APIs even if nav is PMO-only). See [System Design](docs/SYSTEM_DESIGN.md) §২.১৫–২.২০.
 ---
 
 ## Data Seeding
@@ -393,10 +431,11 @@ Headlines from major BD outlets + Google News topics (government, development, a
 |------|--------|
 | **Fetch** | AI `POST /api/v1/ingestion/fetch` |
 | **Store** | Gateway upserts `external_articles` |
-| **Analyze** | Bangla-BERT sentiment |
-| **Auto sync** | Gateway worker (`INGESTION_INTERVAL_MS`) |
+| **Analyze** | Bangla-BERT sentiment + geo-match |
+| **Auto sync** | Gateway `pipeline` / ingestion worker (`INGESTION_INTERVAL_MS`) |
+| **Consumers** | Unrest pulse, Narrative Shield, Outlook, Briefing, Sentiment |
 
-Dashboard → Sentiment → **Fetch news now** for manual sync.
+Manual: `POST /api/v1/ingestion/sync` or `POST /api/v1/pipeline/sync/news` (PMO / MINISTER).
 
 ---
 
@@ -468,8 +507,12 @@ geoinsight-bd/
 ├── deploy/                         # nginx, init, scripts, observability
 ├── services/
 │   ├── api-gateway-node/           # Express API + Prisma + Socket.io
-│   └── ai-analytics-python/        # FastAPI + Bangla-BERT + Ollama client
+│   │   └── README.md
+│   ├── ai-analytics-python/        # FastAPI + Bangla-BERT + Ollama client
+│   │   └── README.md
+│   └── postgres/                   # DB image / extensions helpers
 ├── web/dashboard-nextjs/           # Next.js 15 App Router
+│   └── README.md
 ├── docker-compose.yml              # Infrastructure
 ├── docker-compose.apps.yml         # Gateway, AI, Dashboard
 ├── docker-compose.vps.yml          # Slim Hostinger profile

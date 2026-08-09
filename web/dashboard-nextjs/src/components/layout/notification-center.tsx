@@ -11,7 +11,6 @@ import { useAdminFilter } from "@/hooks/use-admin-filter";
 import type { AnomalyAlert } from "@/types/alerts";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Bell, CheckCheck, ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
-import { ModuleCinematicLoader } from "@/components/ui/module-motion";
 
 const READ_KEY = "geoinsight-notifications-read-at";
 const READ_IDS_KEY = "geoinsight-notifications-read-ids";
@@ -41,13 +40,10 @@ function getReadIds(): string[] {
 
 interface NotificationCenterProps {
   inline?: boolean;
-  /** Dedicated notifications page may promote first-load feedback to the viewport. */
-  fullScreenLoading?: boolean;
 }
 
 export function NotificationCenter({
   inline = false,
-  fullScreenLoading = false,
 }: NotificationCenterProps) {
   const { filter } = useAdminFilter();
   const { alerts, loading, refresh } = useAnomalyFeed(filter);
@@ -229,24 +225,15 @@ export function NotificationCenter({
 
   if (inline) {
     return (
-      <>
-        {fullScreenLoading && loading && (
-          <ModuleCinematicLoader
-            bn
-            fullScreen
-            label="নোটিফিকেশন ও গুরুত্বপূর্ণ ঘটনা সিঙ্ক হচ্ছে…"
-          />
-        )}
-        <div className="space-y-3">
-          {content}
-          <AlertDetailModal
-            alert={selected}
-            open={modalOpen}
-            onOpenChange={setModalOpen}
-            onResolved={refresh}
-          />
-        </div>
-      </>
+      <div className="space-y-3">
+        {content}
+        <AlertDetailModal
+          alert={selected}
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          onResolved={refresh}
+        />
+      </div>
     );
   }
 

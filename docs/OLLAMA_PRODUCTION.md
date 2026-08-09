@@ -8,7 +8,7 @@
 ┌─────────────────────┐         ┌──────────────────────────┐
 │  App VPS (4–8GB)    │         │  AI Server (≥16GB / GPU) │
 │  Dashboard + API    │  HTTP   │  Ollama :11434           │
-│  Postgres + Redis   │ ──────► │  llama3.1:8b             │
+│  Postgres + Redis   │ ──────► │  gpt-oss:20b             │
 │  ai-analytics       │         │  (optional: Bangla-BERT) │
 └─────────────────────┘         └──────────────────────────┘
 ```
@@ -25,7 +25,7 @@ cd /opt/geoinsight-bd
 bash deploy/scripts/ollama-server-setup.sh --allow-from <APP_VPS_PUBLIC_IP>
 ```
 
-This starts `docker-compose.ollama.yml`, pulls `llama3.1:8b`, and (if UFW exists) allows only the app VPS.
+This starts `docker-compose.ollama.yml`, pulls `gpt-oss:20b`, and (if UFW exists) allows only the app VPS.
 
 Check:
 
@@ -50,7 +50,7 @@ This updates `.env`:
 ```env
 LLM_PROVIDER=ollama
 OLLAMA_URL=http://<AI_SERVER_IP>:11434
-OLLAMA_MODEL=llama3.1:8b
+OLLAMA_MODEL=gpt-oss:20b
 SENTIMENT_USE_MOCK=true
 ```
 

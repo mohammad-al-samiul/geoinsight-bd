@@ -110,13 +110,21 @@ export interface ProtestMovement {
   theme_id?: string;
   theme: string;
   theme_bn: string;
+  party_id?: string;
+  party?: string;
+  party_bn?: string;
   place: string;
   place_bn: string;
   district: string | null;
   division: string | null;
-  status: "active" | "recent" | "cooling";
+  status: "active" | "recent" | "cooling" | "historical";
   status_bn: string;
   status_en: string;
+  /** When the protest occurred (inferred) — not news publish time */
+  event_at?: string;
+  event_period_en?: string;
+  event_period_bn?: string;
+  temporal_class?: "live" | "historical" | "commemoration";
   first_seen_at: string;
   last_seen_at: string;
   article_count: number;
@@ -139,6 +147,13 @@ export interface ProtestMovement {
     source_name: string;
     published_at: string;
   }>;
+  lat?: number | null;
+  lng?: number | null;
+  source_confidence?: number;
+  unique_sources?: number;
+  timeline?: Array<{ at: string; title: string; source_name: string; url: string }>;
+  /** Local citizen / field pin (not from API) */
+  source?: "news" | "citizen";
 }
 
 export interface UnrestPulse {

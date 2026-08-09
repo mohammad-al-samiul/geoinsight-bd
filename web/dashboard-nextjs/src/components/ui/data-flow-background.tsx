@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * Premium liquid-glass atmosphere:
- * organic float · magnetic cursor lean · drag trails · multi-spark bursts ·
- * morphing aurora · depth-layered rising bubbles.
+ * aurora ribbons · soft beams · cursor glow · organic float ·
+ * magnetic lean · drag trails · multi-spark bursts · depth bubbles.
  */
 
 type Tone = "emerald" | "sky" | "glass" | "amber";
@@ -42,25 +42,25 @@ interface PlayBubble {
 }
 
 const RISE: RiseBubble[] = [
-  { left: "5%", size: 10, duration: 18, delay: 0, opacity: 0.32, tone: "emerald", depth: "far", sway: 22 },
-  { left: "16%", size: 7, duration: 22, delay: 2.4, opacity: 0.26, tone: "sky", depth: "far", sway: -18 },
-  { left: "30%", size: 12, duration: 20, delay: 5.5, opacity: 0.24, tone: "glass", depth: "far", sway: 26 },
-  { left: "48%", size: 8, duration: 24, delay: 1.2, opacity: 0.28, tone: "emerald", depth: "far", sway: -14 },
-  { left: "63%", size: 11, duration: 19, delay: 4, opacity: 0.25, tone: "sky", depth: "far", sway: 20 },
-  { left: "78%", size: 9, duration: 23, delay: 7, opacity: 0.26, tone: "glass", depth: "far", sway: -22 },
-  { left: "91%", size: 8, duration: 21, delay: 3.2, opacity: 0.24, tone: "amber", depth: "far", sway: 16 },
-  { left: "10%", size: 22, duration: 13, delay: 0.6, opacity: 0.4, tone: "emerald", depth: "mid", sway: 28 },
-  { left: "26%", size: 28, duration: 15, delay: 3.5, opacity: 0.34, tone: "sky", depth: "mid", sway: -24 },
-  { left: "44%", size: 18, duration: 12, delay: 5.8, opacity: 0.42, tone: "glass", depth: "mid", sway: 32 },
-  { left: "58%", size: 24, duration: 14, delay: 2, opacity: 0.36, tone: "amber", depth: "mid", sway: -20 },
-  { left: "74%", size: 20, duration: 11, delay: 6.5, opacity: 0.38, tone: "sky", depth: "mid", sway: 26 },
-  { left: "88%", size: 16, duration: 13.5, delay: 1.8, opacity: 0.36, tone: "emerald", depth: "mid", sway: -28 },
+  { left: "5%", size: 10, duration: 18, delay: 0, opacity: 0.34, tone: "emerald", depth: "far", sway: 22 },
+  { left: "16%", size: 7, duration: 22, delay: 2.4, opacity: 0.28, tone: "sky", depth: "far", sway: -18 },
+  { left: "30%", size: 12, duration: 20, delay: 5.5, opacity: 0.26, tone: "glass", depth: "far", sway: 26 },
+  { left: "48%", size: 8, duration: 24, delay: 1.2, opacity: 0.3, tone: "emerald", depth: "far", sway: -14 },
+  { left: "63%", size: 11, duration: 19, delay: 4, opacity: 0.27, tone: "sky", depth: "far", sway: 20 },
+  { left: "78%", size: 9, duration: 23, delay: 7, opacity: 0.28, tone: "glass", depth: "far", sway: -22 },
+  { left: "91%", size: 8, duration: 21, delay: 3.2, opacity: 0.26, tone: "amber", depth: "far", sway: 16 },
+  { left: "10%", size: 22, duration: 13, delay: 0.6, opacity: 0.42, tone: "emerald", depth: "mid", sway: 28 },
+  { left: "26%", size: 28, duration: 15, delay: 3.5, opacity: 0.36, tone: "sky", depth: "mid", sway: -24 },
+  { left: "44%", size: 18, duration: 12, delay: 5.8, opacity: 0.44, tone: "glass", depth: "mid", sway: 32 },
+  { left: "58%", size: 24, duration: 14, delay: 2, opacity: 0.38, tone: "amber", depth: "mid", sway: -20 },
+  { left: "74%", size: 20, duration: 11, delay: 6.5, opacity: 0.4, tone: "sky", depth: "mid", sway: 26 },
+  { left: "88%", size: 16, duration: 13.5, delay: 1.8, opacity: 0.38, tone: "emerald", depth: "mid", sway: -28 },
 ];
 
 const RICH_RISE: RiseBubble[] = [
-  { left: "38%", size: 15, duration: 16, delay: 2.8, opacity: 0.34, tone: "emerald", depth: "mid", sway: 18 },
-  { left: "68%", size: 13, duration: 17, delay: 0.9, opacity: 0.3, tone: "glass", depth: "far", sway: -16 },
-  { left: "20%", size: 11, duration: 14, delay: 4.6, opacity: 0.36, tone: "amber", depth: "mid", sway: 22 },
+  { left: "38%", size: 15, duration: 16, delay: 2.8, opacity: 0.36, tone: "emerald", depth: "mid", sway: 18 },
+  { left: "68%", size: 13, duration: 17, delay: 0.9, opacity: 0.32, tone: "glass", depth: "far", sway: -16 },
+  { left: "20%", size: 11, duration: 14, delay: 4.6, opacity: 0.38, tone: "amber", depth: "mid", sway: 22 },
 ];
 
 const PLAY: PlayBubble[] = [
@@ -79,27 +79,27 @@ const RICH_PLAY: PlayBubble[] = [
 
 const FILL: Record<Tone, { bg: string; border: string; glow: string; spark: string }> = {
   emerald: {
-    bg: "radial-gradient(circle at 28% 24%, hsl(160 85% 82% / 0.65), hsl(160 65% 50% / 0.22) 36%, hsl(160 50% 28% / 0.08) 62%, transparent 78%)",
-    border: "hsl(160 75% 72% / 0.5)",
-    glow: "0 0 36px hsl(160 65% 50% / 0.38), 0 0 60px hsl(160 60% 40% / 0.12), inset 0 -8px 16px hsl(160 40% 18% / 0.18)",
+    bg: "radial-gradient(circle at 28% 24%, hsl(160 85% 82% / 0.68), hsl(160 65% 50% / 0.24) 36%, hsl(160 50% 28% / 0.08) 62%, transparent 78%)",
+    border: "hsl(160 75% 72% / 0.52)",
+    glow: "0 0 36px hsl(160 65% 50% / 0.4), 0 0 60px hsl(160 60% 40% / 0.14), inset 0 -8px 16px hsl(160 40% 18% / 0.18)",
     spark: "hsl(160 80% 70%)",
   },
   sky: {
-    bg: "radial-gradient(circle at 28% 24%, hsl(199 95% 86% / 0.58), hsl(199 80% 56% / 0.2) 36%, hsl(199 60% 35% / 0.06) 62%, transparent 78%)",
-    border: "hsl(199 90% 74% / 0.45)",
-    glow: "0 0 36px hsl(199 85% 55% / 0.32), 0 0 56px hsl(199 70% 45% / 0.1), inset 0 -8px 16px hsl(199 40% 18% / 0.14)",
+    bg: "radial-gradient(circle at 28% 24%, hsl(199 95% 86% / 0.6), hsl(199 80% 56% / 0.22) 36%, hsl(199 60% 35% / 0.06) 62%, transparent 78%)",
+    border: "hsl(199 90% 74% / 0.48)",
+    glow: "0 0 36px hsl(199 85% 55% / 0.34), 0 0 56px hsl(199 70% 45% / 0.12), inset 0 -8px 16px hsl(199 40% 18% / 0.14)",
     spark: "hsl(199 90% 72%)",
   },
   glass: {
-    bg: "radial-gradient(circle at 28% 24%, hsl(210 40% 98% / 0.42), hsl(210 30% 88% / 0.14) 40%, transparent 74%)",
-    border: "hsl(210 40% 98% / 0.38)",
-    glow: "0 0 30px hsl(210 40% 98% / 0.16), inset 0 -6px 14px hsl(220 40% 8% / 0.14)",
+    bg: "radial-gradient(circle at 28% 24%, hsl(210 40% 98% / 0.45), hsl(210 30% 88% / 0.16) 40%, transparent 74%)",
+    border: "hsl(210 40% 98% / 0.4)",
+    glow: "0 0 30px hsl(210 40% 98% / 0.18), inset 0 -6px 14px hsl(220 40% 8% / 0.14)",
     spark: "hsl(210 40% 92%)",
   },
   amber: {
-    bg: "radial-gradient(circle at 28% 24%, hsl(38 98% 80% / 0.52), hsl(38 85% 54% / 0.18) 38%, transparent 74%)",
-    border: "hsl(38 92% 70% / 0.4)",
-    glow: "0 0 32px hsl(38 90% 55% / 0.28), inset 0 -6px 14px hsl(30 40% 14% / 0.12)",
+    bg: "radial-gradient(circle at 28% 24%, hsl(38 98% 80% / 0.55), hsl(38 85% 54% / 0.2) 38%, transparent 74%)",
+    border: "hsl(38 92% 70% / 0.42)",
+    glow: "0 0 32px hsl(38 90% 55% / 0.3), inset 0 -6px 14px hsl(30 40% 14% / 0.12)",
     spark: "hsl(38 95% 68%)",
   },
 };
@@ -116,6 +116,13 @@ interface TrailDot {
   x: number;
   y: number;
   color: string;
+}
+
+interface AmbientRipple {
+  id: number;
+  x: string;
+  y: string;
+  tone: "emerald" | "sky";
 }
 
 function useMagneticLean(
@@ -261,11 +268,16 @@ export function DataFlowBackground({
   const play = rich ? [...PLAY, ...RICH_PLAY] : PLAY;
   const [bursts, setBursts] = useState<Burst[]>([]);
   const [trails, setTrails] = useState<TrailDot[]>([]);
+  const [ripples, setRipples] = useState<AmbientRipple[]>([]);
 
   const rawX = useMotionValue(0);
   const rawY = useMotionValue(0);
+  const cursorPX = useMotionValue(-400);
+  const cursorPY = useMotionValue(-400);
   const springX = useSpring(rawX, { stiffness: 50, damping: 22, mass: 0.55 });
   const springY = useSpring(rawY, { stiffness: 50, damping: 22, mass: 0.55 });
+  const glowX = useSpring(cursorPX, { stiffness: 70, damping: 24, mass: 0.45 });
+  const glowY = useSpring(cursorPY, { stiffness: 70, damping: 24, mass: 0.45 });
 
   const farX = useTransform(springX, (v) => v * 0.28);
   const farY = useTransform(springY, (v) => v * 0.28);
@@ -273,6 +285,8 @@ export function DataFlowBackground({
   const midY = useTransform(springY, (v) => v * 0.62);
   const orbX = useTransform(springX, (v) => v * 0.48);
   const orbY = useTransform(springY, (v) => v * 0.48);
+  const ribbonX = useTransform(springX, (v) => v * 0.35);
+  const ribbonY = useTransform(springY, (v) => v * 0.35);
 
   useEffect(() => {
     if (reduceMotion) return;
@@ -281,10 +295,33 @@ export function DataFlowBackground({
       const ny = (e.clientY / window.innerHeight - 0.5) * 2;
       rawX.set(nx * -28);
       rawY.set(ny * -18);
+      cursorPX.set(e.clientX);
+      cursorPY.set(e.clientY);
     };
     window.addEventListener("mousemove", onMove, { passive: true });
     return () => window.removeEventListener("mousemove", onMove);
-  }, [rawX, rawY, reduceMotion]);
+  }, [rawX, rawY, cursorPX, cursorPY, reduceMotion]);
+
+  // Soft ambient ripples — breathing water feel
+  useEffect(() => {
+    if (reduceMotion) return;
+    const spawn = () => {
+      const id = Date.now() + Math.random();
+      const next: AmbientRipple = {
+        id,
+        x: `${12 + Math.random() * 76}%`,
+        y: `${18 + Math.random() * 60}%`,
+        tone: Math.random() > 0.45 ? "emerald" : "sky",
+      };
+      setRipples((prev) => [...prev.slice(-3), next]);
+      window.setTimeout(() => {
+        setRipples((prev) => prev.filter((r) => r.id !== id));
+      }, 4200);
+    };
+    spawn();
+    const id = window.setInterval(spawn, rich ? 3200 : 4800);
+    return () => window.clearInterval(id);
+  }, [reduceMotion, rich]);
 
   const spawnBurst = (x: number, y: number, color: string) => {
     const id = Date.now() + Math.random();
@@ -312,9 +349,29 @@ export function DataFlowBackground({
     >
       <span className="bubble-wash pointer-events-none" aria-hidden />
       <span className="bubble-mesh pointer-events-none" aria-hidden />
+      <span className="bubble-caustic pointer-events-none" aria-hidden />
+      <span className="bubble-horizon pointer-events-none" aria-hidden />
+
+      {/* Soft diagonal light beams */}
+      <div className="pointer-events-none absolute inset-0 z-[1]" aria-hidden>
+        <span className="bubble-beam bubble-beam-a" />
+        <span className="bubble-beam bubble-beam-b" />
+        {rich ? <span className="bubble-beam bubble-beam-c" /> : null}
+      </div>
+
+      {/* Aurora ribbons */}
+      <motion.div
+        className="pointer-events-none absolute inset-0 z-[1]"
+        style={reduceMotion ? undefined : { x: ribbonX, y: ribbonY }}
+        aria-hidden
+      >
+        <span className="bubble-ribbon bubble-ribbon-a" />
+        <span className="bubble-ribbon bubble-ribbon-b" />
+        {rich ? <span className="bubble-ribbon bubble-ribbon-c" /> : null}
+      </motion.div>
 
       {/* Morphing aurora orbs */}
-      <motion.div className="pointer-events-none absolute inset-0" style={{ x: orbX, y: orbY }} aria-hidden>
+      <motion.div className="pointer-events-none absolute inset-0 z-[1]" style={{ x: orbX, y: orbY }} aria-hidden>
         <motion.span
           className="bubble-orb bubble-orb-a"
           animate={
@@ -358,9 +415,27 @@ export function DataFlowBackground({
         />
       </motion.div>
 
+      {/* Soft comet streaks */}
+      {!reduceMotion ? (
+        <div className="pointer-events-none absolute inset-0 z-[2]" aria-hidden>
+          {Array.from({ length: rich ? 4 : 2 }).map((_, i) => (
+            <span
+              key={`comet-${i}`}
+              className={cn("bubble-comet", i % 2 === 0 ? "bubble-comet-emerald" : "bubble-comet-sky")}
+              style={{
+                top: `${12 + ((i * 21) % 58)}%`,
+                left: `${-10 + ((i * 17) % 30)}%`,
+                animationDelay: `${i * 3.8 + 1.2}s`,
+                animationDuration: `${9 + (i % 3) * 2.2}s`,
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+
       {/* Twinkling sparks */}
-      <div className="pointer-events-none absolute inset-0" aria-hidden>
-        {Array.from({ length: rich ? 16 : 10 }).map((_, i) => (
+      <div className="pointer-events-none absolute inset-0 z-[2]" aria-hidden>
+        {Array.from({ length: rich ? 18 : 12 }).map((_, i) => (
           <span
             key={`spark-${i}`}
             className="bubble-spark"
@@ -373,6 +448,24 @@ export function DataFlowBackground({
           />
         ))}
       </div>
+
+      {/* Soft floating wisps */}
+      {!reduceMotion ? (
+        <div className="pointer-events-none absolute inset-0 z-[2]" aria-hidden>
+          {Array.from({ length: rich ? 6 : 4 }).map((_, i) => (
+            <span
+              key={`wisp-${i}`}
+              className={cn("bubble-wisp", i % 2 === 0 ? "bubble-wisp-emerald" : "bubble-wisp-sky")}
+              style={{
+                left: `${10 + ((i * 15) % 75)}%`,
+                top: `${20 + ((i * 19) % 55)}%`,
+                animationDelay: `${(i * 1.4) % 8}s`,
+                animationDuration: `${14 + (i % 4) * 3}s`,
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {/* Rising depth layers */}
       {(["far", "mid"] as const).map((depth) => (
@@ -394,7 +487,7 @@ export function DataFlowBackground({
                     left: b.left,
                     width: b.size * (rich ? 1.08 : 1),
                     height: b.size * (rich ? 1.08 : 1),
-                    opacity: b.opacity * (rich ? 1.15 : 0.88),
+                    opacity: b.opacity * (rich ? 1.15 : 0.9),
                     background: tone.bg,
                     borderColor: tone.border,
                     boxShadow: tone.glow,
@@ -412,7 +505,7 @@ export function DataFlowBackground({
       ))}
 
       {/* Micro bubbles */}
-      {Array.from({ length: rich ? 18 : 9 }).map((_, i) => (
+      {Array.from({ length: rich ? 20 : 11 }).map((_, i) => (
         <span
           key={`micro-${i}`}
           className="bubble-micro pointer-events-none"
@@ -427,6 +520,29 @@ export function DataFlowBackground({
           }}
         />
       ))}
+
+      {/* Ambient water ripples */}
+      {ripples.map((r) => (
+        <span
+          key={r.id}
+          className={cn("bubble-ambient-ripple pointer-events-none", `bubble-ambient-ripple-${r.tone}`)}
+          style={{ left: r.x, top: r.y }}
+          aria-hidden
+        >
+          <span />
+          <span />
+          <span />
+        </span>
+      ))}
+
+      {/* Cursor soft glow */}
+      {!reduceMotion ? (
+        <motion.span
+          className="bubble-cursor-glow pointer-events-none"
+          style={{ left: glowX, top: glowY }}
+          aria-hidden
+        />
+      ) : null}
 
       {/* Interactive bubbles */}
       <div className="absolute inset-0 z-[5]">

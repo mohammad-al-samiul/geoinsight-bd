@@ -3,12 +3,12 @@
 #
 # Usage (on app VPS):
 #   bash deploy/scripts/vps-point-ollama.sh http://10.0.0.5:11434
-#   bash deploy/scripts/vps-point-ollama.sh http://10.0.0.5:11434 llama3.1:8b
+#   bash deploy/scripts/vps-point-ollama.sh http://10.0.0.5:11434 gpt-oss:20b
 #
 set -euo pipefail
 
 OLLAMA_URL_ARG="${1:-}"
-MODEL_ARG="${2:-llama3.1:8b}"
+MODEL_ARG="${2:-gpt-oss:20b}"
 
 if [[ -z "$OLLAMA_URL_ARG" ]]; then
   echo "Usage: bash deploy/scripts/vps-point-ollama.sh http://AI_SERVER_IP:11434 [model]"

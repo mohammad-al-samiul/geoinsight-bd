@@ -1,43 +1,45 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AdminFilterState } from "@/types";
 import type { AnomalyAlert } from "@/types/alerts";
 import { fetchAnomalyAlerts, mapSocketPayloadToAlert } from "@/lib/alerts-data";
 import { useSocket } from "@/hooks/use-socket";
 import type { SocketAlertPayload } from "@/types/dashboard";
+import { fetchSocketToken } from "@/lib/socket-token";
 
 export function useAnomalyFeed(filter: AdminFilterState) {
   const [alerts, setAlerts] = useState<AnomalyAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [socketToken, setSocketToken] = useState<string | null>(null);
+  const hasDataRef = useRef(false);
 
   useEffect(() => {
-    fetch("/api/auth/socket-token", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (json?.success) setSocketToken(json.data.token);
-      })
-      .catch(() => setSocketToken(null));
+    void fetchSocketToken().then(setSocketToken);
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchAnomalyAlerts(filter);
-      setAlerts(data);
-    } catch (err) {
-      setAlerts([]);
-      setError(err instanceof Error ? err.message : "Failed to load alerts");
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
+  const load = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const silent = options?.silent || hasDataRef.current;
+      if (!silent) setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchAnomalyAlerts(filter);
+        setAlerts(data);
+        hasDataRef.current = true;
+      } catch (err) {
+        if (!hasDataRef.current) setAlerts([]);
+        setError(err instanceof Error ? err.message : "Failed to load alerts");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [filter],
+  );
 
   useEffect(() => {
-    load();
+    void load();
   }, [
     filter.divisionId,
     filter.districtId,
@@ -64,7 +66,7 @@ export function useAnomalyFeed(filter: AdminFilterState) {
     token: socketToken,
     enabled: Boolean(socketToken),
     onRedFlag: handleRedFlag,
-    onDashboardRefresh: () => load(),
+    onDashboardRefresh: () => load({ silent: true }),
   });
 
   return { alerts, loading, error, refresh: load };
