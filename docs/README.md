@@ -5,6 +5,7 @@
 
 | Document | Audience | কী আছে |
 |----------|----------|--------|
+| **[Interactive SRS (HTML)](./srs-interactive.html)** | Stakeholder / reviewer | **Browser-এ খুলুন** — SRS, 20+ HLD/LLD/ERD/flow diagrams, tech stack, 40+ features, cost/TCO calculator; responsive |
 | **[SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md)** | Architect / reviewer | HLD, LLD, ERD, NFR, security, ADR — incl. Narrative Shield, Unrest, Outlook, Divisional Crisis, Weather, DSS modules |
 | **[DEPLOYMENT_AND_OPS.md](./DEPLOYMENT_AND_OPS.md)** | DevOps / operator | CI/CD (`deploy-vps.yml`), Hostinger VPS, slim compose, performance, day-to-day ops |
 | **[OLLAMA_PRODUCTION.md](./OLLAMA_PRODUCTION.md)** | AI ops | আলাদা AI server, `OLLAMA_URL`, GPU optional, local Windows tip |
@@ -30,12 +31,14 @@
 | Divisional Crisis | `/divisional-crisis` | — | `/divisional-crisis/*` |
 | Weather | embedded in `/hazards` | `/api/v1/weather` | `/weather/*` |
 | Ingestion / Pipeline / Intel | ops APIs | `/api/v1/ingestion` | `/ingestion/*`, `/pipeline/*`, `/intel/*` |
+| Local Entity DSS | `/local/*` | `/api/v1` local_ai | `/local-entity/*` (PMO, MP, MAYOR) |
 
 ### দ্রুত নেভিগেশন
 
 ```
 README (quick start / features)
    │
+   ├─► docs/srs-interactive.html      ← interactive SRS + diagrams (open in browser)
    ├─► docs/SYSTEM_DESIGN.md          ← কেন এমন architecture
    ├─► docs/DEPLOYMENT_AND_OPS.md     ← কীভাবে CI/CD + VPS
    │       └─► docs/OLLAMA_PRODUCTION.md  ← LLM server detail

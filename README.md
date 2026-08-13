@@ -56,7 +56,9 @@ GeoInsight BD is a **monorepo** that gives the Government of Bangladesh a single
 | **AI Analytics** | Python 3.12, FastAPI, Bangla-BERT, Ollama client | internal `8000` | NLP, briefing, predictive scoring |
 | **Infrastructure** | Docker Compose | — | TimescaleDB, PgBouncer, Redis, RabbitMQ, MinIO |
 
-Architecture, CI/CD, and Ollama details live under **[docs/](docs/README.md)** — এই README শুধু quick start ও feature index।
+Architecture, CI/CD, Ollama, এবং **interactive SRS (diagrams + cost)** live under **[docs/](docs/README.md)** — এই README শুধু quick start ও feature index।
+
+**Stakeholder / review walkthrough:** browser-এ খুলুন → **[docs/srs-interactive.html](docs/srs-interactive.html)** (HLD/LLD/ERD/flow diagrams, tech stack, 40+ features, cost calculator; responsive).
 
 ---
 
@@ -66,8 +68,9 @@ System design, CI/CD, VPS, এবং Ollama **`docs/`**-এ আলাদা page
 
 | Document | কী পাবেন |
 |----------|----------|
+| **[Interactive SRS (HTML)](docs/srs-interactive.html)** | **Browser-এ খুলুন** — SRS, HLD/LLD/ERD diagrams, feature encyclopedia, cost/TCO |
 | **[Docs hub](docs/README.md)** | সব docs-এর index + nav map |
-| **[System Design](docs/SYSTEM_DESIGN.md)** | HLD, LLD, ERD, tech stack rationale, ADR |
+| **[System Design](docs/SYSTEM_DESIGN.md)** | HLD, LLD, ERD, tech stack rationale, ADR (Markdown source) |
 | **[CI/CD · VPS · Ops](docs/DEPLOYMENT_AND_OPS.md)** | Deploy pipeline, slim VPS, performance, day-to-day ops |
 | **[Ollama Production](docs/OLLAMA_PRODUCTION.md)** | আলাদা AI server + `OLLAMA_URL` setup |
 | **[API Gateway README](services/api-gateway-node/README.md)** | Gateway modules + local run |
@@ -77,7 +80,8 @@ System design, CI/CD, VPS, এবং Ollama **`docs/`**-এ আলাদা page
 | **[`.env.production.example`](.env.production.example)** | Hostinger / production VPS |
 
 ```
-README  ──►  docs/README.md
+README  ──►  docs/srs-interactive.html   ← interactive SRS + all diagrams
+         ──►  docs/README.md
                ├─ SYSTEM_DESIGN.md
                ├─ DEPLOYMENT_AND_OPS.md
                └─ OLLAMA_PRODUCTION.md
@@ -154,6 +158,29 @@ cp .env.example .env          # প্রথমবার
 | Divisional Crisis | `/divisional-crisis` | Division risk pulse (alerts + grievance + weather) |
 | Geo Spatial Map | `/map` | Full command map viewport |
 | Representatives | `/representatives` | Directory + Accountability AI scores |
+| Face Intel | `/face-intel` | OpenCV VIP match + 6-month ethical card |
+| Local DSS (PMO oversight) | `/local` | MP/Mayor command surface (CTG-8/9/10, CCC, COCC) |
+
+### Local Entity DSS (Tier 5 — MP / Mayor)
+
+Constituency ও City Corporation desk — national choropleth নয়, ward-level action।
+
+| Page | Path | Description |
+|------|------|-------------|
+| Overview / morning brief | `/local` | Entity catalog, brief, CSV/digest |
+| Field snapshot | `/local/field` | Phone-first field summary |
+| Complaints & SLA | `/local/complaints` | Triage, assign, before/after photo, red alert |
+| Heatmap | `/local/heatmap` | Ward risk board |
+| Visits | `/local/visits` | Field visit planner |
+| WPI | `/local/wpi` | Ward Performance Index + AI explain |
+| Scorecard | `/local/scorecard` | Compare wards / entities |
+| Budget | `/local/budget` | Local project spend |
+| OSINT | `/local/osint` | Keyword-scoped news + propaganda flag |
+| Pulse | `/local/pulse` | Influencers, polling, events |
+| Specialty | `/local/specialty` | Entity packs (bridge, hill-cut, canals, dighi…) |
+| Outages | `/local/outage` | Service outage track |
+| Alert delivery | `/local/alerts` | Crisis notify + retry / voice test |
+| Security | `/local/security` | TOTP MFA for the desk |
 
 ### Backend / AI modules (API-backed; UI via command search or panels)
 
@@ -401,7 +428,8 @@ Sidebar filter: `minTier >= userTier` (PMO=`1` … UNION_CHAIRMAN=`4`); **PMO al
 | 1 | PMO | All pages |
 | 2 | MINISTER | Hazards, KPIs, Projects, Alerts, Documents, Audit Trail (+ shared) |
 | 3 | DC | Agro (+ Divisional Crisis, Representatives) |
-| 4 | UNION_CHAIRMAN | Divisional Crisis, Representatives |
+| 4 | UNION_CHAIRMAN | Divisional Crisis, Representatives, Face Intel |
+| 5 | MP / MAYOR | Local DSS tree (`/local/*`) only |
 
 Gateway `requireRoles` is often **wider** than sidebar (e.g. DC can call unrest/outlook APIs even if nav is PMO-only). See [System Design](docs/SYSTEM_DESIGN.md) §২.১৫–২.২০.
 ---
@@ -500,8 +528,9 @@ docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up
 geoinsight-bd/
 ├── docs/
 │   ├── README.md                   # Docs hub (start here)
+│   ├── srs-interactive.html        # Interactive SRS + HLD/LLD/ERD diagrams
 │   ├── SYSTEM_DESIGN.md            # HLD / LLD / ERD / ADR
-│   ├── DEPLOYMENT_AND_OPS.md       # CI/CD, VPS, performance
+│   ├── DEPLOYMENT_AND_OPS.md       # CI/CD + VPS
 │   └── OLLAMA_PRODUCTION.md        # Dedicated Ollama server
 ├── .github/workflows/              # deploy-vps.yml, deploy.yml
 ├── deploy/                         # nginx, init, scripts, observability
@@ -564,7 +593,8 @@ docker compose -f docker-compose.yml -f docker-compose.apps.yml run --rm db-init
 ## Security Notes
 
 - JWT access: **15 minutes**; refresh: HTTP-only, rotated
-- RBAC + admin-unit tenant isolation on protected routes
+- Optional **TOTP MFA** (`/api/v1/auth/mfa/*`, local security panel)
+- RBAC + admin-unit tenant isolation on protected routes (PMO / MINISTER / DC / UNION_CHAIRMAN / MP / MAYOR)
 - Rate limiting: nginx → gateway → AI (333/999 feeds)
 - Production: `SOVEREIGN_MODE`, no external telemetry
 - Never expose `DATABASE_URL` / `JWT_SECRET` to the browser — only `NEXT_PUBLIC_*` is client-safe

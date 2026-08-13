@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>GeoInsight BD — SRS · System Design · Features · Cost</title>
+  <meta name="description" content="GeoInsight BD interactive SRS: system design, HLD, LLD, tech stack, features, and cost." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Outfit:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: false, theme: "neutral" });</script>
+  <style>
+    :root {
+      --paper: #f3eee4;
+      --paper-2: #ebe4d6;
+      --card: #fffaf2;
+      --ink: #1c1914;
+      --muted: #5f574c;
+      --faint: #8a8173;
+      --line: #e2d8c6;
+      --line-2: #d3c7b0;
+      --green: #0b6b4f;
+      --green-2: #148564;
+      --green-dim: rgba(11, 107, 79, 0.1);
+      --gold: #b07a2a;
+      --gold-soft: #c9a15b;
+      --gold-dim: rgba(176, 122, 42, 0.12);
+      --rose: #9b2c2c;
+      --blue: #2c5f8a;
+      --violet: #6b4c8a;
+      --spine: #171410;
+      --spine-2: #221c16;
+      --cream: #f8f1e4;
+      --shadow: 0 20px 50px rgba(28, 25, 20, 0.08);
+      --radius: 22px;
+      --nav-w: 288px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --teal: var(--green);
+      --teal-dim: var(--green-dim);
+      --bg: var(--paper);
+      --surface: var(--card);
+      --surface-2: #f4ead8;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Outfit, "Noto Sans Bengali", system-ui, sans-serif;
+      background:
+        radial-gradient(900px 420px at 88% -8%, rgba(176, 122, 42, 0.12), transparent 50%),
+        radial-gradient(800px 500px at -10% 20%, rgba(11, 107, 79, 0.08), transparent 46%),
+        var(--paper);
+      color: var(--ink);
+      line-height: 1.75;
+      font-size: 16.5px;
+    }
+    body::before {
+      content: "";
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+    }
+    h1, h2, h3, .hero h2, .kicker, .stat b, .brand h1 {
+      font-family: Fraunces, "Noto Serif Bengali", Georgia, serif;
+    }
+    code, .mono, kbd { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.92em; }
+    a { color: var(--green); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:hover { color: #085541; }
+    ::selection { background: #cfe8dc; color: var(--ink); }
+    .skip {
+      position: absolute; left: -999px; top: 8px;
+      background: var(--green); color: #fff; padding: 8px 12px; border-radius: 8px; z-index: 90;
+    }
+    .skip:focus { left: 8px; }
+    #progress {
+      position: fixed; top: 0; left: 0; height: 4px; width: 0;
+      background: linear-gradient(90deg, var(--green), var(--gold-soft));
+      z-index: 70;
+    }
+    .app { display: flex; min-height: 100dvh; }
+    .nav {
+      position: sticky; top: 0; height: 100dvh; width: var(--nav-w); flex-shrink: 0;
+      background:
+        linear-gradient(180deg, rgba(201, 161, 91, 0.08), transparent 28%),
+        var(--spine);
+      color: var(--cream);
+      padding: calc(22px + var(--safe-top)) 16px calc(22px + var(--safe-bottom));
+      overflow: auto; z-index: 40;
+      box-shadow: 8px 0 40px rgba(23, 20, 16, 0.18);
+    }
+    .nav::-webkit-scrollbar { width: 8px; }
+    .nav::-webkit-scrollbar-thumb { background: #3a3229; border-radius: 99px; }
+    .brand { display: flex; gap: 12px; align-items: center; padding: 4px 8px 18px; }
+    .logo {
+      width: 44px; height: 44px; border-radius: 14px;
+      background:
+        radial-gradient(circle at 30% 20%, #e8c878, transparent 40%),
+        linear-gradient(145deg, #1a7a5c, #0b6b4f);
+      display: grid; place-items: center;
+      font-family: Fraunces, serif; font-weight: 700; font-size: 15px; color: #fff8e8;
+      letter-spacing: -0.04em;
+      box-shadow: 0 0 0 1px rgba(232, 200, 120, 0.35), 0 10px 24px rgba(0,0,0,.35);
+    }
+    .brand h1 { margin: 0; font-size: 16px; color: #fff6e8; font-weight: 600; }
+    .brand p { margin: 2px 0 0; font-size: 11px; color: #cbbfa8; letter-spacing: 0.08em; text-transform: uppercase; font-family: Outfit, sans-serif; }
+    .nav-search {
+      width: 100%; background: #2a231c; border: 1px solid #3d342a;
+      color: var(--cream); border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; font: inherit;
+    }
+    .nav-search::placeholder { color: #9a8d78; }
+    .nav-search:focus { outline: 2px solid var(--gold-soft); border-color: transparent; }
+    .main .nav-search {
+      background: var(--card); border: 1px solid var(--line-2); color: var(--ink);
+      box-shadow: 0 1px 0 rgba(28,25,20,.04);
+    }
+    .main .nav-search::placeholder { color: var(--faint); }
+    .main .nav-search:focus { outline-color: var(--green); }
+    .nav a.item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border-radius: 11px; color: #cfc3ae;
+      font-size: 13.5px; text-decoration: none; margin-bottom: 2px;
+      border-left: 2px solid transparent;
+    }
+    .nav a.item:hover { background: rgba(248, 241, 228, 0.06); color: #fff8ea; }
+    .nav a.item.active {
+      background: linear-gradient(90deg, rgba(176,122,42,.18), transparent);
+      color: #fff8ea; border-left-color: var(--gold-soft);
+    }
+    .nav .sec {
+      font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: #9a8b72; padding: 16px 12px 6px; font-family: Outfit, sans-serif;
+    }
+    .main { flex: 1; min-width: 0; padding: 0 28px 96px; }
+    .topbar {
+      position: sticky; top: 0; z-index: 30;
+      display: flex; align-items: center; gap: 10px; justify-content: space-between;
+      padding: calc(14px + var(--safe-top)) 4px 14px;
+      background: linear-gradient(var(--paper) 65%, transparent);
+      backdrop-filter: blur(10px);
+    }
+    .hamburger, .chip, .btn {
+      border: 1px solid var(--line-2); background: var(--card); color: var(--ink);
+      border-radius: 999px; padding: 9px 16px; font: inherit; cursor: pointer;
+      transition: transform .15s ease, box-shadow .15s ease, background .15s;
+    }
+    .chip:hover, .btn.ghost:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(28,25,20,.08); }
+    .hamburger { display: none; width: 44px; height: 44px; padding: 0; border-radius: 14px; }
+    .btn.primary {
+      background: var(--green); color: #f7fff9; border-color: transparent; font-weight: 600;
+      box-shadow: 0 8px 20px rgba(11, 107, 79, 0.22);
+    }
+    .btn.primary:hover { background: var(--green-2); text-decoration: none; color: #fff; }
+    .btn.ghost { background: transparent; }
+    .hero {
+      max-width: 1080px; margin: 6px auto 40px; position: relative; overflow: hidden;
+      background:
+        linear-gradient(135deg, rgba(11,107,79,.08), transparent 42%),
+        linear-gradient(180deg, #fffdf8, #f6ead4);
+      border: 1px solid #e6d9c2; border-radius: 32px; padding: 40px 36px 28px;
+      box-shadow: var(--shadow);
+    }
+    .hero::before {
+      content: "";
+      position: absolute; inset: 18px auto 18px 0; width: 5px;
+      background: linear-gradient(180deg, var(--green), var(--gold));
+      border-radius: 0 6px 6px 0;
+    }
+    .hero::after {
+      content: "";
+      position: absolute; right: -40px; top: -50px; width: 220px; height: 220px;
+      border: 18px solid rgba(11,107,79,.07); border-radius: 50%;
+    }
+    .kicker {
+      color: var(--gold); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase;
+      font-weight: 600; margin: 0;
+    }
+    .hero h2 {
+      margin: 10px 0 14px; font-size: clamp(2rem, 5vw, 3.15rem); line-height: 1.12;
+      letter-spacing: -0.035em; font-weight: 600; max-width: 16ch;
+    }
+    .hero .lead { color: var(--muted); max-width: 62ch; font-size: 1.08rem; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 28px; }
+    .stat {
+      background: rgba(255,250,242,.7); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px;
+    }
+    .stat b { display: block; font-size: 1.85rem; color: var(--green); line-height: 1.1; font-weight: 600; }
+    .stat span { font-size: 12.5px; color: var(--muted); }
+    section.block { max-width: 1080px; margin: 0 auto 56px; scroll-margin-top: 78px; }
+    section.block h2 {
+      font-size: clamp(1.55rem, 2.6vw, 2.05rem); margin: 0 0 18px; letter-spacing: -0.03em;
+      font-weight: 600; line-height: 1.25;
+    }
+    section.block h2::after {
+      content: ""; display: block; width: 52px; height: 3px; margin-top: 12px;
+      background: linear-gradient(90deg, var(--green), var(--gold-soft));
+      border-radius: 99px;
+    }
+    section.block h3 {
+      font-size: 1.18rem; margin: 28px 0 10px; color: var(--ink); font-weight: 600;
+    }
+    .muted { color: var(--muted); }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 20px 20px 16px; box-shadow: 0 1px 0 rgba(28,25,20,.04);
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+    .card h4 { margin: 0 0 8px; font-size: 1.05rem; font-family: Fraunces, "Noto Serif Bengali", serif; }
+    .tag {
+      display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 999px;
+      background: var(--green-dim); color: var(--green); margin-right: 6px; margin-bottom: 4px;
+      font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .tag.gold { background: var(--gold-dim); color: var(--gold); }
+    .tag.rose { background: rgba(155,44,44,.1); color: var(--rose); }
+    .tag.blue { background: rgba(44,95,138,.1); color: var(--blue); }
+    .tag.violet { background: rgba(107,76,138,.12); color: var(--violet); }
+    table.nice {
+      width: 100%; border-collapse: collapse; font-size: 14.5px;
+      background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
+    }
+    table.nice th, table.nice td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    table.nice th {
+      background: #f3e6cf; color: #5a4e3c; font-weight: 600; font-size: 12px;
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    table.nice tr:nth-child(even) td { background: #fbf6ec; }
+    table.nice tr:last-child td { border-bottom: 0; }
+    .table-wrap { overflow-x: auto; border-radius: 18px; box-shadow: var(--shadow); }
+    .arch { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr); }
+    .arch .node {
+      cursor: pointer; text-align: left; width: 100%;
+      background: var(--card); border: 1px solid var(--line-2); border-radius: 18px;
+      padding: 14px; color: inherit; font: inherit;
+      transition: border-color .15s, transform .15s, box-shadow .15s;
+    }
+    .arch .node:hover, .arch .node.on {
+      border-color: var(--green); transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(11,107,79,.12);
+    }
+    .arch .node strong { font-family: Fraunces, serif; }
+    .arch .node small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+    .pill {
+      background: #fff; border: 1px solid var(--line); border-radius: 999px;
+      padding: 7px 13px; font-size: 13px; box-shadow: 0 1px 0 rgba(28,25,20,.04);
+    }
+    .arrow { color: var(--green); font-weight: 700; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 18px; }
+    .chip.on { background: var(--green); color: #f4fff8; border-color: transparent; font-weight: 600; }
+    .feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    details.feat {
+      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 0;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    details.feat[open] { border-color: var(--gold-soft); box-shadow: var(--shadow); }
+    details.feat summary {
+      cursor: pointer; list-style: none; padding: 16px 18px; font-weight: 600;
+    }
+    details.feat summary::after {
+      content: "+"; float: right; color: var(--gold); font-family: Fraunces, serif; font-weight: 500; font-size: 1.2rem;
+    }
+    details.feat[open] summary::after { content: "–"; }
+    details.feat summary::-webkit-details-marker { display: none; }
+    details.feat .body { padding: 0 18px 18px; color: var(--muted); font-size: 15px; }
+    details.feat .steps { margin: 10px 0 0; padding-left: 18px; }
+    details.feat .steps li { margin: 4px 0; }
+    .tech-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .empty { color: var(--faint); padding: 20px; text-align: center; }
+    .callout {
+      border-left: 4px solid var(--gold); background: linear-gradient(90deg, #f8edd4, #fffaf2);
+      padding: 14px 16px; border-radius: 0 16px 16px 0; margin: 14px 0; color: #5c4520;
+    }
+    .callout.teal {
+      border-color: var(--green); background: linear-gradient(90deg, #e5f4ec, #fffaf2); color: #1d4a3a;
+    }
+    .cost-bar { height: 10px; background: #efe4d0; border-radius: 99px; overflow: hidden; margin: 6px 0 14px; }
+    .cost-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--green), var(--gold-soft)); }
+    .range { width: 100%; accent-color: var(--green); }
+    .drawer-bg {
+      display: none; position: fixed; inset: 0; background: rgba(23, 20, 16, .5); z-index: 45;
+    }
+    footer.note {
+      max-width: 1080px; margin: 48px auto 0; color: var(--faint); font-size: 13px; text-align: center;
+    }
+    .diag {
+      background: #fffdf8; border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 16px 16px 8px; margin: 16px 0 24px; box-shadow: var(--shadow);
+    }
+    .diag figcaption {
+      font-size: 14px; font-weight: 600; color: var(--green); margin: 0 4px 10px;
+      font-family: Fraunces, "Noto Serif Bengali", serif;
+    }
+    .diag .hint { font-size: 12.5px; color: var(--muted); font-weight: 400; display: block; margin-top: 3px; font-family: Outfit, "Noto Sans Bengali", sans-serif; }
+    .diag-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
+    .diag .mermaid { display: flex; justify-content: center; min-width: 640px; }
+    .diag .mermaid svg { max-width: 100%; height: auto; }
+    .diag-index { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .diag-index a {
+      display: block; background: var(--card); border: 1px solid var(--line);
+      border-radius: 16px; padding: 14px 14px 12px; color: var(--ink); text-decoration: none; font-size: 14px;
+      transition: transform .15s, box-shadow .15s, border-color .15s;
+    }
+    .diag-index a:hover { border-color: var(--green); transform: translateY(-2px); box-shadow: var(--shadow); text-decoration: none; }
+    .diag-index small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+    label { display: block; margin-top: 10px; font-size: 14px; color: var(--muted); }
+    @media (max-width: 1100px) {
+      .stats, .arch, .tech-grid, .diag-index { grid-template-columns: 1fr 1fr; }
+      .grid-3 { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 860px) {
+      .nav {
+        position: fixed; left: 0; transform: translateX(-105%);
+        transition: transform .22s ease; width: min(88vw, 320px);
+      }
+      .nav.open { transform: none; }
+      .drawer-bg.open { display: block; }
+      .hamburger { display: grid; place-items: center; }
+      .stats, .grid-2, .grid-3, .arch, .feat-grid, .tech-grid, .diag-index { grid-template-columns: 1fr; }
+      .hero { padding: 28px 20px 22px; border-radius: 24px; }
+      .hero h2 { max-width: none; }
+      .main { padding: 0 14px 90px; }
+      .diag .mermaid { min-width: 520px; }
+    }
+    @media print {
+      .nav, .topbar, #progress, .hamburger, .filters, .nav-search, body::before { display: none !important; }
+      .main { padding: 0; }
+      body { background: #fff; color: #111; }
+      .card, .hero, table.nice { break-inside: avoid; box-shadow: none; border-color: #ccc; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <div id="progress"></div>
+  <div class="drawer-bg" id="drawerBg"></div>
+  <div class="app">
+    <aside class="nav" id="nav">
+      <div class="brand">
+        <div class="logo">GI</div>
+        <div>
+          <h1>GeoInsight BD</h1>
+          <p>SRS · HLD · LLD · Cost</p>
+        </div>
+      </div>
+      <input class="nav-search" id="navSearch" type="search" placeholder="সার্চ করুন…  /  Search" />
+      <div class="sec">Overview</div>
+      <a class="item" href="#intro">১. পরিচিতি</a>
+      <a class="item" href="#srs">২. SRS কাঠামো</a>
+      <a class="item" href="#fr">৩. Functional Req.</a>
+      <a class="item" href="#nfr">৪. Non-Functional</a>
+      <div class="sec">Design</div>
+      <a class="item" href="#diagrams">Diagram gallery</a>
+      <a class="item" href="#hld">৫. High Level Design</a>
+      <a class="item" href="#lld">৬. Low Level Design</a>
+      <a class="item" href="#erd">৭. Data / ERD</a>
+      <a class="item" href="#stack">৮. Tech Stack</a>
+      <a class="item" href="#security">৯. Security</a>
+      <div class="sec">Product</div>
+      <a class="item" href="#features">১০. Features</a>
+      <a class="item" href="#behind">১১. Behind the scene</a>
+      <a class="item" href="#cost">১২. Cost & TCO</a>
+      <a class="item" href="#ops">১৩. Deploy & Ops</a>
+      <a class="item" href="#adr">১৪. ADR / Glossary</a>
+    </aside>
+    <div class="main" id="content">
+      <div class="topbar">
+        <button class="hamburger" id="menuBtn" aria-label="Open menu">☰</button>
+        <div class="muted" style="font-size:13px;letter-spacing:.04em">Interactive SRS · August 2026 · GoB</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ghost" onclick="window.print()">Print / PDF</button>
+          <a class="btn primary" href="#cost">Cost</a>
+        </div>
+      </div>
+
+      <header class="hero">
+        <p class="kicker">Software Requirements Specification · Bangladesh</p>
+        <h2>GeoInsight BD — a national command brief you can actually read.</h2>
+        <p class="lead">
+          Division থেকে Union, KPI থেকে red-flag, sovereign AI থেকে MP/Mayor local DSS —
+          এক প্ল্যাটফর্মের পুরো নকশা, requirement, diagram আর cost এই পাতায়।
+          স্ক্রল করুন; বাঁদিকের index দিয়ে chapter বদলান।
+        </p>
+        <div class="stats">
+          <div class="stat"><b>3</b><span>App services — Next, Node, Python</span></div>
+          <div class="stat"><b>6</b><span>Roles — PMO থেকে Mayor</span></div>
+          <div class="stat"><b>40+</b><span>Features ও DSS modules</span></div>
+          <div class="stat"><b>23</b><span>HLD, LLD, ERD, flow diagrams</span></div>
+        </div>
+      </header>
+
+      <section class="block" id="intro">
+        <h2>১. Project context ও goal</h2>
+        <div class="grid-2">
+          <article class="card">
+            <h4>কেন এই সিস্টেম?</h4>
+            <p class="muted">জাতীয় প্রকল্প, প্রতিনিধির KPI, নাগরিক অভিযোগ, খবরের sentiment, দুর্যোগ ও procurement intelligence আলাদা spreadsheet / silo-তে থাকলে PMO দ্রুত সিদ্ধান্ত নিতে পারে না। GeoInsight BD সেগুলোকে <b>evidence-based, role-scoped, real-time</b> command view দেয়।</p>
+          </article>
+          <article class="card">
+            <h4>কে ব্যবহার করবে?</h4>
+            <p class="muted"><b>PMO</b> (national), <b>Minister</b> (division), <b>DC</b> (district), <b>Union Chairman</b>, আর field-level <b>MP / Mayor</b> local DSS। Citizen শুধু rate-limited 333/999 public feed দেখে।</p>
+          </article>
+        </div>
+        <div class="table-wrap" style="margin-top:14px">
+          <table class="nice">
+            <thead><tr><th>আইটেম</th><th>বিবরণ</th></tr></thead>
+            <tbody>
+              <tr><td>Product name</td><td>GeoInsight BD</td></tr>
+              <tr><td>Document type</td><td>SRS + HLD + LLD + Feature design + Cost model (indicative)</td></tr>
+              <tr><td>Architecture</td><td>Monorepo microservices — Dashboard, API Gateway, AI Analytics + shared infra</td></tr>
+              <tr><td>Sovereignty</td><td>On-prem / NDC-ready; Ollama local LLM; MinIO; no cloud AI by default</td></tr>
+              <tr><td>Primary locale</td><td>বাংলা + English (next-intl)</td></tr>
+              <tr><td>Source of truth</td><td>Repo docs + Prisma schema + live modules (this HTML synthesizes them)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="block" id="srs">
+        <h2>২. SRS — যা যা থাকার কথা, এখানে আছে</h2>
+        <p class="muted">IEEE 830 / আধুনিক gov SRS-এর মতো এই ডকুমেন্টে নিচের সব সেকশন কভার করা হয়েছে।</p>
+        <div class="grid-3">
+          <div class="card"><h4>Introduction</h4><p class="muted">Purpose, scope, stakeholders, definitions, references.</p></div>
+          <div class="card"><h4>Overall description</h4><p class="muted">Product perspective, user classes, constraints, assumptions.</p></div>
+          <div class="card"><h4>Functional requirements</h4><p class="muted">Numbered FR — auth, hierarchy, KPI, DSS, local entity.</p></div>
+          <div class="card"><h4>Non-functional</h4><p class="muted">Performance, security, sovereignty, i18n, observability.</p></div>
+          <div class="card"><h4>External interfaces</h4><p class="muted">Open-Meteo, GDACS, RSS/News, Ollama, optional Fabric.</p></div>
+          <div class="card"><h4>Cost</h4><p class="muted">License, infra CAPEX/OPEX, 3-year TCO, calculator.</p></div>
+        </div>
+        <h3>Stakeholders</h3>
+        <div class="table-wrap">
+          <table class="nice">
+            <thead><tr><th>Stakeholder</th><th>Goal</th><th>System-এ কী পায়</th></tr></thead>
+            <tbody>
+              <tr><td>PMO / National desk</td><td>এক নজরে দেশ</td><td>Choropleth, briefing, narrative, outlook, unrest, local oversight</td></tr>
+              <tr><td>Minister / DC</td><td>নিজ এলাকার delivery</td><td>Scoped KPI, projects, alerts, hazards, crisis pulse</td></tr>
+              <tr><td>MP / Mayor</td><td>Ward-level action</td><td>Complaints SLA, WPI, OSINT, specialty, outages, visits</td></tr>
+              <tr><td>Analyst / Intel</td><td>Disinfo + phishing</td><td>Narrative Shield, anti-phishing, face intel, proximity</td></tr>
+              <tr><td>Ops / DevOps</td><td>Uptime + deploy</td><td>Docker, GitHub Actions, Prometheus/Grafana</td></tr>
+              <tr><td>Citizen (limited)</td><td>Helpline visibility</td><td>Public 333/999 stream (no dashboard login)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Constraints & assumptions</h3>
+        <ul class="muted">
+          <li>National / citizen data <b>বাইরে cloud LLM-এ যাবে না</b> (SOVEREIGN_MODE, Ollama on-prem).</li>
+          <li>Windows Hyper-V প্রায়ই 5432/4000/8000/9000 block করে — local ports remap করা আছে।</li>
+          <li>ছোট VPS-এ replica ও heavy BERT default বন্ধ; sentiment mock + remote Ollama।</li>
+          <li>Hyperledger Fabric optional — default <code>FABRIC_ENABLED=false</code>।</li>
+          <li>Cost figures নিচে <b>indicative (Aug 2026)</b> — commercial bid নয়।</li>
+        </ul>
+      </section>
+
+      <section class="block" id="fr">
+        <h2>৩. Functional requirements</h2>
+        <p class="muted">প্রতিটা FR implement করা আছে codebase-এ। ID দিয়ে trace করা যায়।</p>
+        <div class="table-wrap">
+          <table class="nice">
+            <thead><tr><th>ID</th><th>Requirement</th><th>Implementation</th></tr></thead>
+            <tbody>
+              <tr><td>FR-01</td><td>Email/password login, JWT 15m + refresh 7d, rotation, logout denylist</td><td>Gateway auth + Next.js BFF HTTP-only cookies</td></tr>
+              <tr><td>FR-02</td><td>TOTP MFA setup / verify / disable</td><td><code>auth/mfa/*</code> + local security panel</td></tr>
+              <tr><td>FR-03</td><td>RBAC: PMO, MINISTER, DC, UNION_CHAIRMAN, MP, MAYOR</td><td>Prisma UserRole + sidebar minTier + requireRoles</td></tr>
+              <tr><td>FR-04</td><td>Admin hierarchy DIVISION→…→UNION + constituency / city corp</td><td>AdminUnit tree + denormalized ancestor IDs</td></tr>
+              <tr><td>FR-05</td><td>KPI definition/record workflow DRAFT→VERIFIED</td><td>kpi module + optional Fabric hash</td></tr>
+              <tr><td>FR-06</td><td>Project budget/status/contractor + red flags</td><td>project + alert modules, AI predictive score</td></tr>
+              <tr><td>FR-07</td><td>Live dashboard choropleth + Socket.io rooms</td><td>Next Leaflet + gateway socket Redis adapter</td></tr>
+              <tr><td>FR-08</td><td>Agro markets + commodity time-series + arbitrage</td><td>Timescale hypertable + AI scrape worker</td></tr>
+              <tr><td>FR-09</td><td>Bangla sentiment on news / 333/999</td><td>Bangla-BERT (or mock on small VPS)</td></tr>
+              <tr><td>FR-10</td><td>Morning briefing + voice TTS bn/en</td><td>Ollama briefing + dashboard copilot</td></tr>
+              <tr><td>FR-11</td><td>Sovereign LLM chat on verified DB context only</td><td>AI sovereign_llm + gateway proxy</td></tr>
+              <tr><td>FR-12</td><td>Counter-disinfo: classify, fact-check, RAG debunk, escalate</td><td>Narrative Shield + NarrativeSignal</td></tr>
+              <tr><td>FR-13</td><td>Unrest pulse + strategic outlook snapshots</td><td>Gateway unrest + AI outlook generate</td></tr>
+              <tr><td>FR-14</td><td>Weather / GDACS hazards + divisional crisis composite</td><td>Open-Meteo fetch + 48h risk pulse</td></tr>
+              <tr><td>FR-15</td><td>Anti-phishing official chrome fingerprint</td><td>BeautifulSoup + TF-IDF/Levenshtein</td></tr>
+              <tr><td>FR-16</td><td>Proximity geo-fence + Face Intel ethical card</td><td>Shapely / OpenCV + Prisma 6-month window</td></tr>
+              <tr><td>FR-17</td><td>News ingestion RSS + Google News, pipeline cron</td><td>AI fetch → ExternalArticle upsert</td></tr>
+              <tr><td>FR-18</td><td>Local DSS: complaints SLA, WPI, OSINT, specialty, outages, visits</td><td>local-entity module (PMO/MP/Mayor)</td></tr>
+              <tr><td>FR-19</td><td>Audit log + search + notifications</td><td>audit_logs, search, Socket anomaly feed</td></tr>
+              <tr><td>FR-20</td><td>Public 333/999 feeds with rate limit</td><td>public-feed + Redis limiter + nginx</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="block" id="nfr">
+        <h2>৪. Non-functional requirements</h2>
+        <div class="table-wrap">
+          <table class="nice">
+            <thead><tr><th>ID</th><th>Category</th><th>Target</th><th>How</th></tr></thead>
+            <tbody>
+              <tr><td>NFR-01</td><td>Performance</td><td>National dashboard query &lt; 500ms (cached)</td><td>Redis ~90s cache, Timescale, PgBouncer, read replica (opt-in)</td></tr>
+              <tr><td>NFR-02</td><td>Scalability</td><td>Horizontal gateway</td><td>Stateless API + Socket.io Redis adapter + RabbitMQ</td></tr>
+              <tr><td>NFR-03</td><td>Availability</td><td>99.5%+ prod</td><td>Docker healthchecks, durable queues, LLM template fallback</td></tr>
+              <tr><td>NFR-04</td><td>Security</td><td>No JWT in localStorage</td><td>BFF cookies, Helmet, bcrypt 12, MFA, CORS, Zod</td></tr>
+              <tr><td>NFR-05</td><td>Sovereignty</td><td>Tier-4 NDC capable</td><td>Ollama, HF offline, MinIO, SOVEREIGN_MODE</td></tr>
+              <tr><td>NFR-06</td><td>Rate limit</td><td>Public feed DDoS resist</td><td>Redis sliding window + nginx edge</td></tr>
+              <tr><td>NFR-07</td><td>Observability</td><td>Metrics + alerts</td><td>Prometheus, Grafana, Alertmanager</td></tr>
+              <tr><td>NFR-08</td><td>i18n</td><td>bn + en</td><td>next-intl messages</td></tr>
+              <tr><td>NFR-09</td><td>Auditability</td><td>Immutable trail</td><td>audit_logs + optional Fabric</td></tr>
+              <tr><td>NFR-10</td><td>Testability</td><td>CI gates</td><td>Jest, pytest, Next build, Locust</td></tr>
+              <tr><td>NFR-11</td><td>Usability</td><td>Mobile command bar</td><td>Responsive shell, Ctrl+K search, locale switch</td></tr>
+              <tr><td>NFR-12</td><td>Maintainability</td><td>Modular monorepo</td><td>Express modules, FastAPI routers, Prisma</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="block" id="diagrams">
+        <h2>Diagram gallery</h2>
+        <p class="muted">SYSTEM_DESIGN, CI/CD, Ollama, আর feature data-flow — সব diagram এখান থেকে জাম্প করুন। মোবাইলে diagram পাশে স্ক্রল করা যায়।</p>
+        <div class="diag-index">
+          <a href="#diag-hld-context">HLD — System context<small>Users → Platform → Data</small></a>
+          <a href="#diag-hld-container">HLD — Container<small>BFF, Gateway, AI, Ollama</small></a>
+          <a href="#diag-hld-comms">HLD — Communication<small>HTTP · MQ · Socket · BFF</small></a>
+          <a href="#diag-hld-mq">HLD — RabbitMQ topology<small>gov.* / ai.* routing</small></a>
+          <a href="#diag-hld-redis">HLD — Redis use cases<small>5 jobs: cache to sockets</small></a>
+          <a href="#diag-lld-auth">LLD — Auth + MFA<small>Sequence: login → cookies</small></a>
+          <a href="#diag-lld-rbac">LLD — RBAC hierarchy<small>PMO → field roles</small></a>
+          <a href="#diag-lld-db">LLD — Read/write split<small>PgBouncer + replica</small></a>
+          <a href="#diag-lld-live">LLD — Real-time pipeline<small>KPI → MQ → Socket rooms</small></a>
+          <a href="#diag-erd-core">ERD — Core governance<small>AdminUnit, KPI, Project</small></a>
+          <a href="#diag-erd-intel">ERD — Intel &amp; weather<small>Articles, narrative, snapshots</small></a>
+          <a href="#diag-erd-local">ERD — Local DSS<small>Complaints, WPI, OSINT</small></a>
+          <a href="#diag-sec">Security architecture<small>nginx → BFF → RBAC</small></a>
+          <a href="#diag-obs">Observability<small>Prometheus / Grafana</small></a>
+          <a href="#diag-cicd">CI/CD &amp; VPS<small>push main → redeploy</small></a>
+          <a href="#diag-ollama">Ollama split<small>App VPS vs AI server</small></a>
+          <a href="#diag-flow-news">Flow — News → Brief<small>Ingest · unrest · outlook</small></a>
+          <a href="#diag-flow-sla">Flow — Complaint SLA<small>Triage → WPI</small></a>
+          <a href="#diag-flow-phish">Flow — Anti-phishing<small>HTML fingerprint RED_FLAG</small></a>
+          <a href="#diag-flow-face">Flow — Face Intel<small>OpenCV → ethical card</small></a>
+          <a href="#diag-flow-arb">Flow — Arbitrage<small>Scrape → Timescale → map</small></a>
+          <a href="#diag-flow-prox">Flow — Proximity<small>Shapely geo-fence</small></a>
+          <a href="#diag-local">Local DSS map<small>CTG-8/9/10 · CCC · COCC</small></a>
+        </div>
+      </section>
+
+      <section class="block" id="hld">
+        <h2>৫. High Level Design (HLD)</h2>
+        <p class="muted">নিচের নোডে ক্লিক করলে সেই লেয়ারের দায়িত্ব দেখাবে। পুরো context diagram তার নিচে।</p>
+        <div class="arch" id="archNodes"></div>
+        <div class="card" id="archDetail" style="margin-top:12px">
+          <h4>একটা সার্ভিস সিলেক্ট করুন</h4>
+          <p class="muted">Architecture node-এ ট্যাপ করলে এখানে explanation আসবে।</p>
+        </div>
+        <h3>কেন ৩টা আলাদা app service?</h3>
+        <div class="grid-3">
+          <div class="card"><h4>Next.js Dashboard</h4><p class="muted">UI, maps, charts, BFF cookie auth। Browser-এ token যায় না — XSS surface ছোট।</p></div>
+          <div class="card"><h4>Node API Gateway</h4><p class="muted">একটা REST entry, RBAC, Prisma, Socket.io, Fabric, MQ consumer। Gov business logic এখানে।</p></div>
+          <div class="card"><h4>Python AI Analytics</h4><p class="muted">PyTorch, OpenCV, Shapely, Ollama — GPU/CPU ML আলাদা scale হয়, Node-কে block করে না।</p></div>
+        </div>
+        <h3>৪টা communication pattern</h3>
+        <div class="flow"><span class="pill">1. Sync HTTP</span><span class="arrow">→</span><span class="pill">Dashboard BFF</span><span class="arrow">→</span><span class="pill">Gateway</span><span class="arrow">→</span><span class="pill">AI FastAPI</span></div>
+        <div class="flow"><span class="pill">2. Async MQ</span><span class="arrow">→</span><span class="pill">geoinsight_exchange</span><span class="arrow">→</span><span class="pill">gov.* / ai.* queues</span></div>
+        <div class="flow"><span class="pill">3. Realtime</span><span class="arrow">→</span><span class="pill">Rabbit consumer</span><span class="arrow">→</span><span class="pill">Socket.io rooms</span><span class="arrow">→</span><span class="pill">unit / division / national</span></div>
+        <div class="flow"><span class="pill">4. BFF auth</span><span class="arrow">→</span><span class="pill">HTTP-only cookies</span><span class="arrow">→</span><span class="pill">same-origin proxy /api/proxy/*</span></div>
+        <div class="callout teal">Redis = cache, rate-limit, JWT denylist, Socket adapter (গতি)। RabbitMQ = durable jobs ও fan-out (নির্ভরযোগ্যতা)। দুটো এক জিনিস নয়।</div>
+
+        <figure class="diag" id="diag-hld-context">
+          <figcaption>HLD — System context<span class="hint">SYSTEM_DESIGN.md §৪.১ — কে সিস্টেম ব্যবহার করে, প্ল্যাটফর্ম কী, ডেটা কোথায়</span></figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+flowchart TB
+    subgraph Users["Users"]
+        PMO[PMO / National]
+        MIN[Minister / Division]
+        DC[DC / District]
+        UC[Union Chairman]
+        MP[MP / Constituency]
+        MAY[Mayor / City Corp]
+        PUB[Public Citizen]
+    end
+    subgraph Platform["GeoInsight BD Platform"]
+        WEB[Next.js Dashboard]
+        GW[API Gateway]
+        AI[AI Analytics]
+    end
+    subgraph Data["Data Layer"]
+        PG[(TimescaleDB + Replica)]
+        RD[(Redis)]
+        MQ[RabbitMQ]
+        S3[MinIO]
+        FAB[Fabric Ledger]
+        OL[Ollama on-prem]
+    end
+    PMO --> WEB
+    MIN --> WEB
+    DC --> WEB
+    UC --> WEB
+    MP --> WEB
+    MAY --> WEB
+    PUB -->|333/999 feeds| GW
+    WEB -->|BFF proxy| GW
+    WEB -->|WebSocket| GW
+    GW --> PG
+    GW --> RD
+    GW --> MQ
+    GW --> AI
+    GW --> S3
+    GW --> FAB
+    AI --> MQ
+    AI --> RD
+    AI --> OL
+            </div>
+          </div>
+        </figure>
+
+        <figure class="diag" id="diag-hld-container">
+          <figcaption>HLD — Container / runtime<span class="hint">Browser কখনো JWT দেখে না; AI আলাদা process; LLM আরেক মেশিনে থাকতে পারে</span></figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+flowchart LR
+    BR[Browser] -->|same-origin| NEXT[Next.js BFF :3000]
+    NEXT -->|cookie to Bearer| GW[Express Gateway :4000]
+    NEXT -->|Socket.io JWT| GW
+    GW -->|HTTP /api/v1| AI[FastAPI :8000]
+    GW --> PG[(Postgres / Timescale)]
+    GW --> REDIS[(Redis)]
+    GW --> MQ[RabbitMQ]
+    GW --> MINIO[MinIO]
+    GW -.->|optional| FAB[Hyperledger]
+    AI --> REDIS
+    AI --> MQ
+    AI -->|OLLAMA_URL| OLL[Ollama :11434]
+    AI -->|RSS / News| NEWS[BD outlets]
+    AI -->|Open-Meteo / GDACS| WX[Weather feeds]
+            </div>
+          </div>
+        </figure>
+
+        <figure class="diag" id="diag-hld-comms">
+          <figcaption>HLD — ৪টা communication pattern<span class="hint">Sync পথ latency-sensitive UI-এর জন্য; MQ লম্বা AI জবের জন্য</span></figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+flowchart TB
+    subgraph P1["1. Sync HTTP"]
+        D1[Dashboard] --> B1[Next BFF] --> G1[Gateway] --> A1[AI FastAPI]
+    end
+    subgraph P2["2. Async RabbitMQ"]
+        G2[Gateway / AI] --> X[geoinsight_exchange]
+        X --> Q1[gov_core_queue]
+        X --> Q2[ai_analytics_queue]
+    end
+    subgraph P3["3. Real-time Socket.io"]
+        C3[MQ consumer] --> H3[broadcastToHierarchy] --> R3[unit / division / national rooms]
+    end
+    subgraph P4["4. BFF auth"]
+        U4[Browser] -->|HTTP-only cookies| N4[Next.js] -->|Bearer| G4[Gateway]
+    end
+            </div>
+          </div>
+        </figure>
+
+        <figure class="diag" id="diag-hld-mq">
+          <figcaption>HLD — RabbitMQ topology<span class="hint">Exchange: geoinsight_exchange (topic, durable) — definitions.json</span></figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+flowchart LR
+    EX{{geoinsight_exchange}}
+    EX -->|gov.*| GOV[gov_core_queue]
+    EX -->|ai.*| AIQ[ai_analytics_queue]
+    EX -->|agro.*| AIQ
+    GOV --> GWC[Gateway consumer]
+    AIQ --> AIC[AI worker pool]
+    GWC --> SOCK[Socket.io fan-out]
+    AIC --> JOBS[sentiment / arbitrage / phishing / risk]
+            </div>
+          </div>
+        </figure>
+        <figure class="diag" id="diag-hld-redis">
+          <figcaption>HLD — Redis-এর ৫টা কাজ<span class="hint">Cache / limiter / denylist — RabbitMQ নয়</span></figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+flowchart TB
+    REDIS[(Redis 7)]
+    REDIS --> U1[JWT denylist]
+    REDIS --> U2[Rate limit 333/999]
+    REDIS --> U3[Admin hierarchy cache]
+    REDIS --> U4[Socket.io adapter]
+    REDIS --> U5[Arbitrage + dashboard TTL cache]
+            </div>
+          </div>
+        </figure>
+      </section>
+
+      <section class="block" id="lld">
+        <h2>৬. Low Level Design (LLD)</h2>
+        <h3>৬.১ Auth flow</h3>
+        <ol class="muted">
+          <li><code>POST /api/auth/login</code> (Next) → Gateway bcrypt verify। MFA থাকলে <code>mfaToken</code> challenge।</li>
+          <li>Success-এ <code>gi_access_token</code> + <code>gi_refresh_token</code> HTTP-only cookies।</li>
+          <li>API: <code>/api/proxy/kpis/...</code> cookie → <code>Authorization: Bearer</code> → <code>authenticate()</code> + <code>rbac.authorize()</code>।</li>
+          <li>401 হলে silent <code>/api/auth/refresh</code>, একবার retry; 403 → <code>/forbidden</code>।</li>
+          <li>Logout: refresh revoke + Redis jti denylist।</li>
+        </ol>
+        <figure class="diag" id="diag-lld-auth">
+          <figcaption>LLD — Login, MFA, BFF proxy<span class="hint">Token কখনো localStorage-এ যায় না</span></figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+sequenceDiagram
+    actor U as Browser
+    participant N as Next BFF
+    participant G as API Gateway
+    participant DB as Postgres
+    participant R as Redis
+    U->>N: POST /api/auth/login
+    N->>G: POST /api/v1/auth/login
+    G->>DB: bcrypt verify user
+    alt MFA enabled
+        G-->>N: mfaToken challenge
+        N-->>U: MFA step
+        U->>N: POST /api/auth/mfa/verify
+        N->>G: TOTP check
+        G->>DB: load mfaSecret
+    end
+    G->>DB: store hashed refresh
+    G-->>N: access + refresh JWT
+    N-->>U: Set-Cookie HTTP-only
+    U->>N: GET /api/proxy/dashboard/national
+    N->>G: Authorization Bearer from cookie
+    G->>G: authenticate + RBAC scope
+    G-->>N: JSON
+    N-->>U: JSON
+    U->>N: POST /api/auth/logout
+    N->>G: revoke
+    G->>R: denylist access jti
+            </div>
+          </div>
+        </figure>
+        <h3>৬.২ RBAC scope</h3>
+        <p class="muted">PMO-এর <code>admin_unit_id = NULL</code> = সব unit। অন্যরা নিজ unit-এর descendant দেখে। Hierarchy chain Redis-এ cache হয় যাতে প্রতি request-এ tree walk না হয়। MP/Mayor আলাদা Local DSS surface পায় (<code>CONSTITUENCY</code> / <code>CITY_CORPORATION</code>)।</p>
+        <figure class="diag" id="diag-lld-rbac">
+          <figcaption>LLD — Roles ও admin-unit scope</figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+flowchart TB
+    PMO[PMO — all units]
+    PMO --> MIN[MINISTER — DIVISION]
+    PMO --> MP[MP — CONSTITUENCY]
+    PMO --> MAY[MAYOR — CITY_CORPORATION]
+    MIN --> DC[DC — DISTRICT]
+    DC --> UC[UNION_CHAIRMAN — UNION]
+    MP --> LOCAL[Local DSS /local]
+    MAY --> LOCAL
+            </div>
+          </div>
+        </figure>
+        <h3>৬.৩ Gateway modules</h3>
+        <p class="muted">Register: <code>services/api-gateway-node/src/modules/register-modules.ts</code> — auth, admin-unit, kpi, project, alert, dashboard, briefing, intelligence, ingestion, pipeline, weather, unrest, narrative-shield, outlook, divisional-crisis, <b>local-entity</b>, simulator, procurement, sovereign, twin, audit, citizen, search, public-feed, blockchain.</p>
+        <h3>৬.৪ AI routers</h3>
+        <p class="muted">FastAPI <code>/api/v1</code>: sentiment, briefing, outlook, weather, ingestion, sovereign-llm, predictive, arbitrage, procurement, phishing, proximity, face-intel, narrative-shield, documents, hazards, twin, simulator, citizen, local_ai.</p>
+        <h3>৬.৫ Read/write split</h3>
+        <p class="muted"><code>DATABASE_URL</code> → PgBouncer write → primary। <code>DATABASE_READ_URL</code> → read pool / replica। Migrations শুধু <code>DIRECT_DATABASE_URL</code>।</p>
+        <figure class="diag" id="diag-lld-db">
+          <figcaption>LLD — Database paths</figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+flowchart LR
+    GW[API Gateway]
+    GW -->|INSERT UPDATE DELETE| W[PgBouncer write]
+    GW -->|heavy SELECT| R[PgBouncer read]
+    W --> PRI[(Primary TimescaleDB)]
+    R --> REP[(Replica — profile with-replica)]
+    PRI -.->|streaming| REP
+    MIG[Prisma migrate] -->|DIRECT_DATABASE_URL| PRI
+            </div>
+          </div>
+        </figure>
+        <h3>৬.৬ Real-time pipeline</h3>
+        <p class="muted">KPI/alert DB write → publish <code>gov.kpi.update</code> → gov_core_queue → <code>broadcastToHierarchy(adminUnitId)</code> → rooms <code>unit:{id}</code>, <code>division:{id}</code>, <code>national</code> → dashboard hooks refetch.</p>
+        <figure class="diag" id="diag-lld-live">
+          <figcaption>LLD — Live KPI / alert fan-out</figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+sequenceDiagram
+    participant GW as Gateway
+    participant DB as TimescaleDB
+    participant MQ as RabbitMQ
+    participant SK as Socket.io + Redis adapter
+    participant UI as Dashboard
+    GW->>DB: KPI / alert write
+    GW->>MQ: gov.kpi.update / alert_created
+    MQ->>GW: gov_core_queue consume
+    GW->>SK: broadcastToHierarchy
+    SK->>UI: room unit / division / national
+    UI->>UI: hooks refetch panels
+            </div>
+          </div>
+        </figure>
+      </section>
+
+      <section class="block" id="erd">
+        <h2>৭. Data model (ERD summary)</h2>
+        <p class="muted">Source of truth: <code>services/api-gateway-node/prisma/schema.prisma</code></p>
+        <div class="grid-2">
+          <div class="card">
+            <h4>Core governance</h4>
+            <p class="muted">AdminUnit (self-tree) → User, Representative, Project, AgroMarket, KpiRecord। RedFlagAlert project/user-এর সাথে। AuditLog সব critical action।</p>
+          </div>
+          <div class="card">
+            <h4>Intel & time-series</h4>
+            <p class="muted">ExternalArticle, NarrativeSignal, WeatherObservation, DisasterAlert, IntelAnalysisSnapshot, PipelineJobRun। CommodityPriceLog = Timescale hypertable <code>(id, created_at)</code>।</p>
+          </div>
+          <div class="card">
+            <h4>Local DSS</h4>
+            <p class="muted">CitizenComplaint + timeline events, WardPerformanceScore (WPI), LocalOsintHit, LocalInfluencer, LocalSpecialtySignal, LocalServiceOutage, LocalVisitPlan, LocalPulseEvent, AlertDeliveryLog.</p>
+          </div>
+          <div class="card">
+            <h4>Security tables</h4>
+            <p class="muted">RefreshToken (hashed, rotatable), RolePermission matrix, User.mfaSecret, Redis denylist for access jti.</p>
+          </div>
+        </div>
+        <figure class="diag" id="diag-erd-core">
+          <figcaption>ERD — Core governance<span class="hint">Prisma schema — AdminUnit self-tree + KPI/project/alerts</span></figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+erDiagram
+    AdminUnit ||--o{ AdminUnit : parent
+    AdminUnit ||--o{ User : scopes
+    AdminUnit ||--o{ Representative : represents
+    AdminUnit ||--o{ Project : hosts
+    AdminUnit ||--o{ AgroMarket : located
+    User ||--o{ AuditLog : performs
+    User ||--o{ RefreshToken : has
+    User ||--o{ RedFlagAlert : resolves
+    Representative ||--o{ KpiRecord : measured
+    KpiDefinition ||--o{ KpiRecord : defines
+    Project ||--o{ RedFlagAlert : triggers
+    Project ||--o{ BlockchainMilestoneQueue : queued
+            </div>
+          </div>
+        </figure>
+        <figure class="diag" id="diag-erd-intel">
+          <figcaption>ERD — Intel, weather, pipeline</figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+erDiagram
+    ExternalArticle ||--o{ NarrativeSignal : may-seed
+    User ||--o{ NarrativeAuditLog : acts
+    NarrativeSignal ||--o{ NarrativeAuditLog : audited
+    AdminUnit ||--o{ CommodityPriceLog : context
+    ExternalArticle {
+        string url
+        string district_code
+        float sentiment_score
+    }
+    NarrativeSignal {
+        string threat_level
+        string fingerprint
+    }
+    WeatherObservation {
+        string location_key
+        int flood_risk
+    }
+    DisasterAlert {
+        string source
+        jsonb geo
+    }
+    IntelAnalysisSnapshot {
+        string kind
+        jsonb payload
+    }
+    PipelineJobRun {
+        string job
+        string status
+    }
+            </div>
+          </div>
+        </figure>
+        <figure class="diag" id="diag-erd-local">
+          <figcaption>ERD — Local MP/Mayor DSS</figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+erDiagram
+    AdminUnit ||--o{ CitizenComplaint : entity
+    CitizenComplaint ||--o{ ComplaintStatusEvent : timeline
+    AdminUnit ||--o{ WardPerformanceScore : WPI
+    AdminUnit ||--o{ LocalOsintHit : feed
+    AdminUnit ||--o{ LocalSpecialtySignal : niche
+    AdminUnit ||--o{ LocalServiceOutage : outage
+    AdminUnit ||--o{ LocalVisitPlan : visit
+    AdminUnit ||--o{ LocalPulseEvent : pulse
+    AdminUnit ||--o{ AlertDeliveryLog : notify
+            </div>
+          </div>
+        </figure>
+      </section>
+
+      <section class="block" id="stack">
+        <h2>৮. Tech stack — কোনটা কেন, কী করে, কেন best</h2>
+        <p class="muted">Filter চাপুন। প্রতিটা কার্ডে: কাজ, এই প্রজেক্টে ব্যবহার, বিকল্প কেন নয়।</p>
+        <div class="filters" id="techFilters"></div>
+        <div class="tech-grid" id="techGrid"></div>
+      </section>
+
+      <section class="block" id="security">
+        <h2>৯. Security architecture</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h4>Edge → App → Data</h4>
+            <p class="muted">nginx TLS/CSP/rate-limit → Next BFF → JWT 15m + refresh → RBAC + admin-unit scope → audit log। Passwords bcrypt 12। MinIO private bucket। Ollama শুধু app VPS থেকে :11434।</p>
+          </div>
+          <div class="card">
+            <h4>Threats যেগুলো আটকানো হয়েছে</h4>
+            <p class="muted">XSS token theft (HTTP-only), CSRF same-origin BFF, privilege climb (descendant check), public feed flood (Redis limiter), lookalike gov sites (phishing DSS), session steal after logout (denylist).</p>
+          </div>
+        </div>
+        <figure class="diag" id="diag-sec">
+          <figcaption>Security architecture<span class="hint">SYSTEM_DESIGN.md §৮</span></figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+flowchart LR
+    subgraph Edge["Edge"]
+        NGINX[nginx TLS + CSP + Rate Limit]
+    end
+    subgraph App["Application"]
+        BFF[Next.js BFF]
+        JWT[JWT 15min + Refresh 7d]
+        RBAC[Role + Admin Unit]
+        AUDIT[Audit Log]
+    end
+    subgraph DataSec["Data"]
+        REDIS_DENY[JWT Denylist]
+        BCRYPT[bcrypt]
+        MINIO_PRIV[Private MinIO]
+        SOV[Ollama on-prem]
+    end
+    NGINX --> BFF --> JWT --> RBAC --> AUDIT
+    JWT --> REDIS_DENY
+    BFF --> BCRYPT
+    RBAC --> MINIO_PRIV
+    RBAC --> SOV
+            </div>
+          </div>
+        </figure>
+      </section>
+
+      <section class="block" id="features">
+        <h2>১০. Features — কোনটা কী কাজ করে</h2>
+        <p class="muted">Filter + সার্চ। কার্ড খুললে user-facing কাজ এবং API path দেখবেন। Behind-the-scene ডিটেইল পরের সেকশনেও আছে।</p>
+        <input class="nav-search" id="featSearch" placeholder="Feature খুঁজুন (wpi, phishing, briefing…)" style="max-width:420px" />
+        <div class="filters" id="featFilters"></div>
+        <div class="feat-grid" id="featGrid"></div>
+      </section>
+
+      <section class="block" id="behind">
+        <h2>১১. Behind the scene — technology কীভাবে কাজ করে</h2>
+        <p class="muted">কয়েকটা end-to-end chain — PMO desk থেকে DB/AI পর্যন্ত।</p>
+        <div class="card">
+          <h4>A. খবর → Unrest → Outlook → Morning Brief</h4>
+          <ol class="muted">
+            <li>Pipeline/ingestion worker AI <code>/ingestion/fetch</code> চালায় (RSS + Google News)।</li>
+            <li>Geo-match + Bangla-BERT sentiment → Gateway upsert <code>ExternalArticle</code>।</li>
+            <li>Unrest module keyword/cluster করে district score → snapshot <code>UNREST</code> (Redis cache)।</li>
+            <li>Outlook AI (Ollama structured JSON) themes + unrest নিয়ে snapshot <code>OUTLOOK</code>।</li>
+            <li>Briefing copilot KPI/alerts + intel snapshots থেকে bn/en bullets + TTS।</li>
+          </ol>
+          <figure class="diag" id="diag-flow-news">
+            <figcaption>News → Unrest → Outlook → Briefing</figcaption>
+            <div class="diag-scroll">
+              <div class="mermaid">
+flowchart LR
+    RSS[RSS / Google News] --> AI[AI ingestion fetch]
+    AI --> GEO[geo-match]
+    GEO --> BERT[Bangla-BERT]
+    BERT --> ART[(ExternalArticle)]
+    ART --> UN[Unrest pulse]
+    UN --> SN1[snapshot UNREST]
+    ART --> OUT[Outlook generate]
+    SN1 --> OUT
+    OUT --> SN2[snapshot OUTLOOK]
+    SN2 --> BR[Morning briefing + TTS]
+              </div>
+            </div>
+          </figure>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h4>B. Local complaint SLA</h4>
+          <ol class="muted">
+            <li>MP/Mayor UI থেকে complaint create (ward, GPS, before-photo, red-alert)।</li>
+            <li>Optional <code>/complaints/triage</code> → local_ai fast model category/severity suggest করে।</li>
+            <li>Assign / start / notes timeline Prisma-এ। SLA hours পার হলে OVERDUE।</li>
+            <li>Resolve-এ after-photo বাধ্যতামূলক — evidence trail। Alert delivery SMS/voice test করা যায়।</li>
+            <li>WPI recompute ward scores (complaints + outages + specialty signals) → heatmap/scorecard।</li>
+          </ol>
+          <figure class="diag" id="diag-flow-sla">
+            <figcaption>Complaint lifecycle → WPI</figcaption>
+            <div class="diag-scroll">
+              <div class="mermaid">
+flowchart LR
+    CR[Create] --> TR[AI triage]
+    TR --> AS[Assign]
+    AS --> ST[In progress]
+    ST --> RS[Resolve + after photo]
+    RS --> WPI[WPI recompute]
+    WPI --> HM[Heatmap / scorecard]
+              </div>
+            </div>
+          </figure>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h4>C. Anti-phishing RED_FLAG</h4>
+          <ol class="muted">
+            <li>Analyst URL paste → Gateway <code>/intelligence/phishing/scan</code> → AI HTML fetch।</li>
+            <li>DOM skeleton + meta + visual tokens → SHA-256 signature।</li>
+            <li>Official .gov.bd gallery-র সাথে TF-IDF cosine + Levenshtein।</li>
+            <li>Score ≥ threshold <b>এবং</b> domain allow-list-এ না → <code>RED_FLAG</code>।</li>
+          </ol>
+          <figure class="diag" id="diag-flow-phish">
+            <figcaption>Anti-phishing fingerprint</figcaption>
+            <div class="diag-scroll">
+              <div class="mermaid">
+flowchart TB
+    URL[Suspicious URL] --> HTML[Fetch HTML]
+    HTML --> SIG[DOM + meta signature SHA-256]
+    SIG --> CMP[TF-IDF cosine + Levenshtein]
+    CMP --> GAL[Official .gov.bd gallery]
+    GAL --> DEC{similarity high AND domain not allow-listed?}
+    DEC -->|yes| RED[RED_FLAG]
+    DEC -->|no| OK[Clean / review]
+              </div>
+            </div>
+          </figure>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h4>D. Face Intel ethical card</h4>
+          <ol class="muted">
+            <li>Webcam/upload → OpenCV Haar + embedding gallery match (dlib নয়, Docker-friendly)।</li>
+            <li>Gateway Prisma ৬ মাস: red flags, budget overrun, grievance KPI, news proxies।</li>
+            <li>UI ethical_score 0–100 + allegations — CV Python-এ, aggregation Node-এ (RBAC থাকে)।</li>
+          </ol>
+          <figure class="diag" id="diag-flow-face">
+            <figcaption>Face Intel split: CV in Python, dossier in Node</figcaption>
+            <div class="diag-scroll">
+              <div class="mermaid">
+flowchart LR
+    CAM[Webcam / upload] --> CV[OpenCV match]
+    CV --> ID[vip_id / representative]
+    ID --> PR[Prisma 6-month window]
+    PR --> CARD[ethical_score + allegations]
+              </div>
+            </div>
+          </figure>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h4>E. Arbitrage heatmap</h4>
+          <figure class="diag" id="diag-flow-arb">
+            <figcaption>Commodity scrape → cache → map</figcaption>
+            <div class="diag-scroll">
+              <div class="mermaid">
+flowchart LR
+    W[AI worker 300s] --> SC[Global price scrape]
+    SC --> RD[(Redis TTL 3600s)]
+    SC --> TS[(Timescale hypertable)]
+    UI[Dashboard] --> BFF[Next BFF]
+    BFF --> GW[Gateway]
+    GW --> HEAT[AI arbitrage heatmap]
+    HEAT --> RD
+    HEAT --> UI2[Leaflet choropleth]
+              </div>
+            </div>
+          </figure>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h4>F. Proximity geo-fence</h4>
+          <figure class="diag" id="diag-flow-prox">
+            <figcaption>VIP track vs sensitive polygons</figcaption>
+            <div class="diag-scroll">
+              <div class="mermaid">
+flowchart LR
+    LIVE[GET proximity/live] --> PT[lat lng tracks]
+    PT --> SH[Shapely polygon / buffer]
+    SH --> IN[INSIDE]
+    SH --> AP[APPROACHING]
+    SH --> OUT[OUTSIDE]
+    IN --> MAP[Leaflet CARTO dark]
+              </div>
+            </div>
+          </figure>
+        </div>
+        <figure class="diag" id="diag-local">
+          <figcaption>Local DSS — ৫টা entity ও module surface</figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+flowchart TB
+    subgraph ENT["Entities"]
+        C8[CTG-8 MP]
+        C9[CTG-9 MP]
+        C10[CTG-10 MP]
+        CCC[Chattogram City]
+        COCC[Cumilla City]
+    end
+    subgraph MOD["Shared local modules"]
+        COM[Complaints SLA]
+        WPI[WPI / heatmap]
+        OS[OSINT]
+        SP[Specialty packs]
+        OU[Outages]
+        VI[Visits]
+    end
+    C8 --> MOD
+    C9 --> MOD
+    C10 --> MOD
+    CCC --> MOD
+    COCC --> MOD
+            </div>
+          </div>
+        </figure>
+      </section>
+
+      <section class="block" id="cost">
+        <h2>১২. Cost model (indicative)</h2>
+        <div class="callout">এগুলো <b>বাংলাদেশ ২০২৬ বাজারের আনুমানিক</b> হিসাব — vendor quotation নয়। সফটওয়্যার লাইসেন্স প্রায় শূন্য কারণ stack ওপেন সোর্স ও self-hosted। খরচ আসে মানুষ, সার্ভার, GPU, backup, আর NDC hosting থেকে।</div>
+        <h3>License</h3>
+        <div class="table-wrap">
+          <table class="nice">
+            <thead><tr><th>Item</th><th>License</th><th>Est. annual</th></tr></thead>
+            <tbody>
+              <tr><td>Next.js, Express, FastAPI, Prisma, PostgreSQL, Redis, RabbitMQ, MinIO, nginx, Prometheus, Grafana, Ollama, PyTorch, OpenCV, Leaflet, Hyperledger (opt.)</td><td>OSS / Apache / MIT / GPL-compatible as used</td><td>৳0</td></tr>
+              <tr><td>Cloud OpenAI / Maps / paid weather</td><td>Avoided by design</td><td>৳0 (sovereignty)</td></tr>
+              <tr><td>Optional Serper/CSE for fact-check</td><td>Usage API</td><td>৳0–50,000</td></tr>
+              <tr><td>Domain + DNS + email</td><td>Commercial</td><td>৳5,000–20,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>তিনটা deployment profile</h3>
+        <div class="filters" id="costProfiles"></div>
+        <div class="card" id="costCard"></div>
+        <h3>Custom calculator</h3>
+        <div class="grid-2">
+          <div class="card">
+            <label>App VPS (৳/month) <b id="vpsL">8000</b></label>
+            <input class="range" type="range" id="vps" min="4000" max="40000" step="1000" value="8000" />
+            <label>AI server (৳/month) <b id="aiL">28000</b></label>
+            <input class="range" type="range" id="ai" min="0" max="120000" step="2000" value="28000" />
+            <label>Ops staff (people) <b id="staffL">2</b></label>
+            <input class="range" type="range" id="staff" min="1" max="8" step="1" value="2" />
+            <label>Avg loaded cost / person (৳/month) <b id="salL">120000</b></label>
+            <input class="range" type="range" id="sal" min="50000" max="300000" step="10000" value="120000" />
+          </div>
+          <div class="card" id="calcOut"></div>
+        </div>
+        <p class="muted" style="margin-top:10px">Build-from-scratch development (যদি greenfield হয়): ৬–৯ মাস, ৫–৭ ইঞ্জিনিয়ার — আনুমানিক <b>৳৮০ লক্ষ – ১.৫ কোটি</b> one-time। এই repo already built; remaining cost = harden, train, NDC onboarding, data integration.</p>
+      </section>
+
+      <section class="block" id="ops">
+        <h2>১৩. Deployment, CI/CD, ports</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h4>Everyday path</h4>
+            <p class="muted"><code>git push origin main</code> → GitHub Action <code>deploy-vps.yml</code> → SSH VPS → <code>vps-redeploy.sh</code> → slim compose. Hostinger-friendly; GHCR optional।</p>
+          </div>
+          <div class="card">
+            <h4>Compose layers</h4>
+            <p class="muted"><code>docker-compose.yml</code> infra · <code>apps.yml</code> gateway/AI/dashboard · <code>vps.yml</code> memory caps · <code>ollama.yml</code> dedicated LLM · <code>observability.yml</code> metrics.</p>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-top:12px">
+          <table class="nice">
+            <thead><tr><th>Service</th><th>Local host port</th><th>Internal</th></tr></thead>
+            <tbody>
+              <tr><td>Dashboard</td><td>3000 / 3600 (script)</td><td>3000</td></tr>
+              <tr><td>API Gateway</td><td>4800</td><td>4000</td></tr>
+              <tr><td>AI Analytics</td><td>—</td><td>8000</td></tr>
+              <tr><td>Postgres / PgBouncer</td><td>55432 / 6432</td><td>5432 / 6432</td></tr>
+              <tr><td>Redis / RabbitMQ</td><td>6379 / 5672, 15672</td><td>same</td></tr>
+              <tr><td>MinIO</td><td>19000 / 19001</td><td>9000 / 9001</td></tr>
+              <tr><td>Ollama</td><td>11434 (AI server)</td><td>11434</td></tr>
+              <tr><td>Prometheus / Grafana</td><td>9090 / 3002</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <figure class="diag" id="diag-cicd">
+          <figcaption>CI/CD — push main → VPS redeploy<span class="hint">DEPLOYMENT_AND_OPS.md — deploy-vps.yml</span></figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+flowchart LR
+    DEV[Developer git push] --> GH[GitHub Actions]
+    GH -->|SSH secrets| VPS["App VPS /opt/geoinsight-bd"]
+    VPS --> PULL[git reset origin/main]
+    PULL --> UP[vps-redeploy.sh]
+    UP --> DC[docker compose slim]
+    DC --> APP[Dashboard + Gateway + AI + DB]
+    APP -->|OLLAMA_URL| AIS[Dedicated Ollama server]
+            </div>
+          </div>
+        </figure>
+        <figure class="diag" id="diag-ollama">
+          <figcaption>Ollama production split<span class="hint">App VPS-এ LLM চালালে swap — আলাদা AI server</span></figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+flowchart LR
+    subgraph APPVPS["App VPS 4-8GB"]
+        DASH[Dashboard]
+        GW2[API Gateway]
+        AIA[ai-analytics]
+        PG2[(Postgres)]
+        RD2[(Redis)]
+    end
+    subgraph AISRV["AI Server 16GB+"]
+        OL2[Ollama :11434]
+        Q2[gpt-oss:20b quality]
+        F2[llama3.1:8b fast]
+    end
+    AIA -->|HTTP| OL2
+    OL2 --> Q2
+    OL2 --> F2
+            </div>
+          </div>
+        </figure>
+        <figure class="diag" id="diag-obs">
+          <figcaption>Observability<span class="hint">docker-compose.observability.yml</span></figcaption>
+          <div class="diag-scroll">
+            <div class="mermaid">
+flowchart TB
+    GW3[api-gateway /metrics] --> PROM[Prometheus]
+    AI3[ai-analytics /metrics] --> PROM
+    PGX[postgres-exporter] --> PROM
+    RDX[redis-exporter] --> PROM
+    CAD[cAdvisor / node-exporter] --> PROM
+    PROM --> GRAF[Grafana]
+    PROM --> AM[Alertmanager]
+            </div>
+          </div>
+        </figure>
+      </section>
+
+      <section class="block" id="adr">
+        <h2>১৪. Architecture decisions & glossary</h2>
+        <div class="table-wrap">
+          <table class="nice">
+            <thead><tr><th>Decision</th><th>Rejected</th><th>Why this project</th></tr></thead>
+            <tbody>
+              <tr><td>Monorepo microservices</td><td>One giant monolith / many repos</td><td>AI আলাদা scale; এক PR-এ UI+API; VPS-এ এক clone</td></tr>
+              <tr><td>BFF + HTTP-only cookies</td><td>localStorage JWT</td><td>Gov XSS threat model</td></tr>
+              <tr><td>TimescaleDB</td><td>Plain Postgres / Influx</td><td>Commodity series + SQL one stack</td></tr>
+              <tr><td>Redis + RabbitMQ</td><td>Only Redis</td><td>Cache ≠ durable jobs</td></tr>
+              <tr><td>Ollama on-prem</td><td>OpenAI API</td><td>Data sovereignty</td></tr>
+              <tr><td>Compose not K8s</td><td>Kubernetes</td><td>Lean VPS ops</td></tr>
+              <tr><td>OpenCV not dlib</td><td>face_recognition</td><td>CPU wheels in Docker</td></tr>
+              <tr><td>Open-Meteo</td><td>Paid weather SaaS</td><td>No vendor lock</td></tr>
+              <tr><td>Pipeline in Gateway</td><td>Airflow/Temporal</td><td>VPS-scale cron + same RBAC</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Glossary</h3>
+        <p class="muted"><b>BFF</b> Backend-for-Frontend · <b>DSS</b> Decision Support System · <b>WPI</b> Ward Performance Index · <b>OSINT</b> Open-source intelligence · <b>NDC</b> National Data Center · <b>SLA</b> Service level for complaints · <b>RAG</b> Retrieval-augmented generation · <b>TOTP</b> Time-based MFA.</p>
+      </section>
+
+      <footer class="note">
+        GeoInsight BD · Interactive SRS generated from repo architecture (Aug 2026).<br />
+        Open this file in any browser. Related: SYSTEM_DESIGN.md · DEPLOYMENT_AND_OPS.md · OLLAMA_PRODUCTION.md
+      </footer>
+    </div>
+  </div>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const nav = $("nav"), bg = $("drawerBg");
+    $("menuBtn").onclick = () => { nav.classList.add("open"); bg.classList.add("open"); };
+    bg.onclick = () => { nav.classList.remove("open"); bg.classList.remove("open"); };
+    nav.querySelectorAll("a.item").forEach((a) => a.addEventListener("click", () => {
+      nav.classList.remove("open"); bg.classList.remove("open");
+    }));
+    window.addEventListener("scroll", () => {
+      const h = document.documentElement;
+      $("progress").style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + "%";
+      const ids = [...document.querySelectorAll("section.block")];
+      let cur = ids[0];
+      ids.forEach((s) => { if (s.getBoundingClientRect().top < 120) cur = s; });
+      nav.querySelectorAll("a.item").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#" + cur.id));
+    });
+    $("navSearch").addEventListener("input", (e) => {
+      const q = e.target.value.toLowerCase();
+      nav.querySelectorAll("a.item").forEach((a) => {
+        a.style.display = a.textContent.toLowerCase().includes(q) ? "" : "none";
+      });
+    });
+
+    const arch = [
+      { id: "users", title: "Users", sub: "PMO · Minister · DC · MP/Mayor", body: "Role অনুযায়ী আলাদা sidebar। PMO সব দেখে; MP/Mayor Local DSS (tier 5)। Token browser JS-এ থাকে না।" },
+      { id: "web", title: "Next.js 15", sub: "Dashboard :3000 + BFF", body: "App Router, Tailwind, Leaflet, Recharts, next-intl, Socket client। Auth cookies সেট করে /api/proxy/* দিয়ে Gateway hit করে।" },
+      { id: "gw", title: "API Gateway", sub: "Express + Prisma :4000", body: "JWT/RBAC, REST modules, Rabbit consumer, Fabric client, Socket.io Redis adapter, pipeline cron। Single orchestration point।" },
+      { id: "ai", title: "AI Analytics", sub: "FastAPI :8000", body: "Bangla-BERT, Ollama, OpenCV, Shapely, phishing fingerprints, news fetch। Heavy work Python ecosystem-এ — Node block হয় না।" },
+      { id: "pg", title: "TimescaleDB", sub: "Postgres 16 + replica", body: "ACID gov data + commodity hypertables। PgBouncer connection storm আটকায়। Analytics read path আলাদা।" },
+      { id: "rd", title: "Redis 7", sub: "Cache · limiter · pub/sub", body: "JWT denylist, 333/999 rate limit, admin hierarchy cache, Socket adapter, arbitrage TTL, dashboard national cache ~90s।" },
+      { id: "mq", title: "RabbitMQ", sub: "geoinsight_exchange", body: "gov.* → gateway fan-out; ai.* / agro.* → AI workers। Durable, retry, load-level long NLP jobs।" },
+      { id: "s3", title: "MinIO + Ollama + Fabric", sub: "Sovereign extras", body: "MinIO docs bucket; Ollama gpt-oss:20b / llama3.1:8b on AI server; optional Hyperledger milestone hashes।" },
+    ];
+    const archBox = $("archNodes");
+    const archDetail = $("archDetail");
+    arch.forEach((n) => {
+      const b = document.createElement("button");
+      b.className = "node";
+      b.innerHTML = "<strong>" + n.title + "</strong><small>" + n.sub + "</small>";
+      b.onclick = () => {
+        document.querySelectorAll(".arch .node").forEach((x) => x.classList.remove("on"));
+        b.classList.add("on");
+        archDetail.innerHTML = "<h4>" + n.title + "</h4><p class='muted'>" + n.body + "</p>";
+      };
+      archBox.appendChild(b);
+    });
+
+    const techs = [
+      { g: "frontend", name: "Next.js 15 + React 19", why: "SSR/App Router + API routes = BFF এক ফ্রেমওয়ার্কে।", use: "সব dashboard page, middleware guard, /api/auth ও /api/proxy।", best: "Gov UI-তে SEO কম লাগলেও same-origin cookie auth-এর জন্য Next best fit — SPA+separate auth server-এর চেয়ে সহজ ও নিরাপদ।" },
+      { g: "frontend", name: "Tailwind + Radix", why: "Utility CSS + accessible primitives।", use: "Command bar, dialogs, tabs, consistent density।", best: "Custom gov design system দ্রুত; heavy Material lock-in নেই।" },
+      { g: "frontend", name: "Leaflet + Recharts", why: "OSS maps/charts, Google Maps billing নেই।", use: "National choropleth, local ward map, KPI/budget charts।", best: "Bangladesh GeoJSON self-host; sovereignty + cost।" },
+      { g: "frontend", name: "next-intl + Socket.io client", why: "bn/en UI; live alerts।", use: "Locale switcher; anomaly feed rooms।", best: "Helpline/news বাংলা — i18n first-class হতে হবে।" },
+      { g: "backend", name: "Express + TypeScript", why: "Mature REST, team speed, modular routers।", use: "Gateway সব business orchestration।", best: "Nest-এর চেয়ে কম ceremony; gov CRUD+proxy মিশ্রণে Express যথেষ্ট।" },
+      { g: "backend", name: "Prisma 6", why: "Typed schema + migrations।", use: "Write/read clients, local DSS models, KPI/projects।", best: "SQL visibility + type safety; raw SQL Timescale-এর পাশেও চলে।" },
+      { g: "backend", name: "FastAPI", why: "Async Python, OpenAPI, ML libs।", use: "সব AI/NLP/CV/GIS endpoint।", best: "PyTorch/transformers Python-এ; Node-এ port করা ব্যয়বহুল।" },
+      { g: "backend", name: "Zod", why: "Runtime validation।", use: "Gateway request schemas (complaints, MFA, local entity)।", best: "Invalid intel payload DB-তে ঢুকতে পারে না।" },
+      { g: "data", name: "PostgreSQL 16 + Timescale", why: "ACID + hypertables।", use: "Governance entities + commodity prices।", best: "এক DB-তে relational+series — Influx আলাদা ops বাড়ে।" },
+      { g: "data", name: "PgBouncer + replica", why: "Pool + read scale।", use: "Node short connections; dashboard SELECTs।", best: "Connection exhaustion আটকায়; ছোট VPS-এ replica opt-in।" },
+      { g: "data", name: "Redis 7", why: "In-memory TTL + pub/sub।", use: "৫টা use-case: denylist, rate limit, hierarchy, socket, AI cache।", best: "এই latency-sensitive path-এ SQL যথেষ্ট নয়।" },
+      { g: "data", name: "RabbitMQ", why: "Durable topic routing।", use: "kpi_update, sentiment_batch, phishing_scan, dashboard_refresh।", best: "Redis list হারায়; gov jobs হারানো চলবে না।" },
+      { g: "data", name: "MinIO", why: "S3-compatible on-prem।", use: "national-intelligence-docs, complaint photos।", best: "AWS S3 data residency ভাঙে।" },
+      { g: "ai", name: "Bangla-BERT", why: "Pretrained Bangla sentiment।", use: "333/999 + news heatmap; classification কখনো Ollama-য় যায় না।", best: "English BERT বাংলা grievance বোঝে না।" },
+      { g: "ai", name: "Ollama (gpt-oss:20b + llama3.1:8b)", why: "Local generative AI।", use: "Brief, outlook, debunk, sovereign chat, WPI explain, fast triage।", best: "Citizen data OpenAI-তে যায় না; dual-model quality vs speed।" },
+      { g: "ai", name: "OpenCV + Shapely", why: "CPU face match + polygon geo-fence।", use: "Face intel gallery; PMO/VIP proximity INSIDE/APPROACHING।", best: "dlib Docker pain; haversine circles campus shape ভুল করে।" },
+      { g: "ai", name: "BeautifulSoup + sklearn", why: "HTML fingerprint + TF-IDF।", use: "Anti-phishing vs official .gov.bd chrome।", best: "Domain blocklist alone lookalike site ধরে না।" },
+      { g: "infra", name: "Docker Compose", why: "Dev/prod parity without K8s।", use: "Infra+apps+vps+ollama+observability overlays।", best: "Hostinger 4–8GB-এ K8s overkill।" },
+      { g: "infra", name: "nginx + GitHub Actions", why: "TLS edge + SSH deploy।", use: "deploy-vps.yml everyday; deploy.yml GHCR optional।", best: "Simple secrets, idempotent redeploy।" },
+      { g: "infra", name: "Prometheus / Grafana / Locust", why: "Metrics + load test।", use: "/metrics scrape, alert rules, public-feed capacity।", best: "Gov SLA প্রমাণ করতে SaaS APM বাধ্যতামূলক নয়।" },
+      { g: "security", name: "JWT + TOTP MFA + Helmet", why: "Short-lived session + 2FA + headers।", use: "Login challenge, local security panel, XSS/clickjacking headers।", best: "National desk-এ password-only অপর্যাপ্ত।" },
+      { g: "security", name: "Hyperledger Fabric (opt.)", why: "Permissioned ledger।", use: "KPI/project milestone hash queue + retry/DLQ।", best: "Public chain-এ sensitive gov data যায় না।" },
+    ];
+    const techGroups = ["all", "frontend", "backend", "data", "ai", "infra", "security"];
+    let techOn = "all";
+    function renderTech() {
+      const box = $("techFilters");
+      box.innerHTML = "";
+      techGroups.forEach((g) => {
+        const c = document.createElement("button");
+        c.className = "chip" + (techOn === g ? " on" : "");
+        c.textContent = g;
+        c.onclick = () => { techOn = g; renderTech(); };
+        box.appendChild(c);
+      });
+      const grid = $("techGrid");
+      grid.innerHTML = "";
+      techs.filter((t) => techOn === "all" || t.g === techOn).forEach((t) => {
+        const d = document.createElement("article");
+        d.className = "card";
+        d.innerHTML = "<span class='tag'>" + t.g + "</span><h4>" + t.name + "</h4><p class='muted'><b>কাজ:</b> " + t.why + "</p><p class='muted'><b>এখানে:</b> " + t.use + "</p><p class='muted'><b>কেন best:</b> " + t.best + "</p>";
+        grid.appendChild(d);
+      });
+    }
+    renderTech();
+
+    const feats = [
+      { g: "national", name: "National Overview / Command", path: "/  ·  /dashboard", roles: "PMO+", work: "Choropleth, live KPI scorecards, red-flag markers, cascade filter।", behind: "GET /dashboard/national (Redis ~90s) + GeoJSON districts + Socket refresh। Heatmap article cap যাতে VPS thrash না করে।" },
+      { g: "national", name: "PM Briefing Copilot", path: "/briefing", roles: "PMO", work: "সকালের bullets, narrative, Bangla/English voice briefing।", behind: "Gateway briefing → AI /briefing/generate (Ollama quality model) + KPI/alert/intel snapshots। Ollama down হলে template fallback।" },
+      { g: "national", name: "Narrative Shield", path: "/narrative-shield", roles: "PMO, MINISTER, DC read", work: "Hostile narrative classify, fact-check, RAG debunk, escalate/dismiss, CSV export।", behind: "News → AI classify + fingerprint dedup + trust lists → NarrativeSignal। Debunk = Ollama RAG বা rule template। Audit = NarrativeAuditLog।" },
+      { g: "national", name: "Strategic Outlook", path: "/outlook", roles: "PMO, MINISTER", work: "Politics/economy themes, direction, scenarios।", behind: "POST /outlook/refresh → AI structured JSON from news themes + unrest summary → snapshot OUTLOOK।" },
+      { g: "national", name: "Unrest Pulse", path: "/unrest", roles: "PMO, MINISTER", work: "District protest/grievance scores + movement clusters।", behind: "Gateway-only keyword BN/EN, sports-noise filter, BD gate, clusterProtestMovements, Redis cache, snapshot UNREST।" },
+      { g: "national", name: "Anti-Phishing Shield", path: "/anti-phishing", roles: "PMO", work: "সন্দেহজনক URL vs official .gov.bd chrome। RED_FLAG।", behind: "Fetch HTML → signature SHA-256 → TF-IDF cosine + Levenshtein vs gallery; domain not allow-listed + high similarity = RED_FLAG।" },
+      { g: "national", name: "Procurement Advisor", path: "/procurement", roles: "PMO", work: "Rice/wheat/onion/lentil landed cost + lead time rank।", behind: "AI arbitrage scrape every ~5 min → Redis 3600s + Timescale → /procurement/advise ranking।" },
+      { g: "national", name: "Notifications + Anomaly feed", path: "/notifications", roles: "Logged-in", work: "Live red-flag bell, right-rail feed।", behind: "Socket.io hierarchy rooms; Rabbit alert_created → broadcast। Compact panel desktop-এ default open (national roles)।" },
+      { g: "national", name: "Hazards & Weather", path: "/hazards", roles: "MINISTER+", work: "Flood/cyclone/heat overlay + live weather।", behind: "AI Open-Meteo + GDACS/ReliefWeb → WeatherObservation/DisasterAlert; monsoon-aware risk 1–5। UI hazards page-এ embed।" },
+      { g: "national", name: "Representative KPIs", path: "/kpis", roles: "MINISTER+", work: "MP/Minister/DC metrics, verify workflow।", behind: "KpiDefinition/Record statuses; optional blockchain_hash; RBAC scope by admin unit।" },
+      { g: "national", name: "Project Tracker", path: "/projects", roles: "MINISTER+", work: "Budget, completion, contractor, red flags, chain tx।", behind: "Project model + predictive AI score; Fabric queue if enabled।" },
+      { g: "national", name: "Red Flag Alerts", path: "/alerts", roles: "MINISTER+", work: "Overrun, delay, fraud patterns, resolve workflow।", behind: "AI predictive + rules → RedFlagAlert; resolve user + audit trail।" },
+      { g: "national", name: "Document Intelligence", path: "/documents", roles: "MINISTER+", work: "Tender/contract anomaly hints।", behind: "MinIO store + AI documents module (Ollama quality)।", },
+      { g: "national", name: "AI Audit Trail", path: "/audit-trail", roles: "MINISTER+", work: "Red flag → AI → action timeline।", behind: "audit_logs JSON old/new + user/IP; intel snapshots history via /intel/*।" },
+      { g: "national", name: "Agri Markets", path: "/agro", roles: "DC+", work: "Mandi/haat/retail registry + prices।", behind: "AgroMarket geo + CommodityPriceLog hypertable + map." },
+      { g: "national", name: "Divisional Crisis Pulse", path: "/divisional-crisis", roles: "All national tiers", work: "Division composite risk (not official crime feed)।", behind: "48h window: weather stress + alert severity + grievance articles।" },
+      { g: "national", name: "Geo Spatial Map", path: "/map", roles: "PMO+", work: "Full command map viewport।", behind: "Same GeoJSON + live markers as overview, larger canvas।" },
+      { g: "national", name: "Representatives directory", path: "/representatives", roles: "UNION+", work: "Directory + accountability scores।", behind: "Representative CRUD + AI accountability formula vs peers।" },
+      { g: "ai", name: "Face Intel", path: "/face-intel", roles: "UNION+", work: "Camera/upload → VIP ethical report card।", behind: "OpenCV match then Node 6-month Prisma aggregation (score, flags, allegations)।" },
+      { g: "ai", name: "Sovereign Bangla LLM", path: "API /sovereign-llm", roles: "PMO, MINISTER", work: "Chat only verified DB context।", behind: "Gateway proxy → Ollama; never free-web hallucinated gov facts; template if down।" },
+      { g: "ai", name: "Digital Twin / Simulator", path: "API /twin /simulator", roles: "PMO", work: "Budget reallocation & geopolitical shock scenarios।", behind: "Python simulation engines; results JSON to UI panels।" },
+      { g: "ai", name: "Sentiment heatmap", path: "intelligence/sentiment", roles: "PMO, MINISTER", work: "Bangla mood map from helpline+news।", behind: "Bangla-BERT batch via Rabbit ai.sentiment; mock flag on tiny VPS।" },
+      { g: "ai", name: "Proximity geo-fence", path: "intelligence/proximity", roles: "PMO+", work: "VIP tracks vs PMO/Bangabhaban polygons।", behind: "Shapely point-in-polygon + buffer; ray-casting fallback; Leaflet CARTO dark।" },
+      { g: "ai", name: "Citizen chatbot / 333-999", path: "citizen + public-feed", roles: "PMO / public", work: "Routing assist; public streams।", behind: "Fast llama triage; public routes IP guard + Redis rate limit।" },
+      { g: "platform", name: "News ingestion + Pipeline + Intel store", path: "/ingestion /pipeline /intel", roles: "PMO, MINISTER", work: "Sync jobs, run history, snapshots।", behind: "Interval workers; POST /pipeline/sync/:job; Prisma PipelineJobRun / IngestionSyncRun।" },
+      { g: "platform", name: "Command Search (Ctrl+K)", path: "shell", roles: "All", work: "Pages, projects, KPIs, alerts jump।", behind: "GET /search?q= scoped by role।" },
+      { g: "platform", name: "Auth, RBAC, MFA", path: "/login · /local/security", roles: "All", work: "Login, refresh, TOTP, register (PMO)।", behind: "BFF cookies; totp.ts; middleware.ts; role-route-guard।" },
+      { g: "platform", name: "Blockchain milestones", path: "blockchain module", roles: "Ops", work: "Optional immutable project hashes।", behind: "Fabric network client + retry queue + DLQ; off by default।" },
+      { g: "local", name: "Local Entity overview", path: "/local", roles: "PMO, MP, MAYOR", work: "CTG-8/9/10, CCC, COCC catalog, morning brief, CSV/digest।", behind: "local-entity.catalog.ts + scoped entityId; PMO can multi-brief।" },
+      { g: "local", name: "Field summary", path: "/local/field", roles: "MP, MAYOR", work: "Phone-first field snapshot।", behind: "field-summary.service aggregates complaints/outages/pulse for fast model narration।" },
+      { g: "local", name: "Complaints & SLA", path: "/local/complaints", roles: "MP, MAYOR", work: "Create, triage, assign, notes, before/after photo, red alert।", behind: "CitizenComplaint + status events; AI triage; SLA hours 6–72; OVERDUE query।" },
+      { g: "local", name: "Local heatmap", path: "/local/heatmap", roles: "MP, MAYOR", work: "Ward risk board।", behind: "heatmap.service blends WPI, complaints, outages onto ward GeoJSON।" },
+      { g: "local", name: "Visit planner", path: "/local/visits", roles: "MP, MAYOR", work: "Plan/done/cancel field visits।", behind: "LocalVisitPlan; optional AI recommend from pain wards।" },
+      { g: "local", name: "Ward Performance Index", path: "/local/wpi", roles: "MP, MAYOR", work: "Monthly ward scores + AI explain।", behind: "WardPerformanceScore recompute; /wpi/wards/:id/explain → Ollama quality model।" },
+      { g: "local", name: "Scorecard", path: "/local/scorecard", roles: "MP, MAYOR", work: "Compare wards or entities।", behind: "scorecard.service compare=wards|entities।" },
+      { g: "local", name: "Local budget", path: "/local/budget", roles: "MP, MAYOR", work: "Entity-scoped projects spend vs allocation।", behind: "Filters Project by local admin unit / status।" },
+      { g: "local", name: "Local OSINT", path: "/local/osint", roles: "MP, MAYOR", work: "Keyword-scoped news + propaganda flag।", behind: "osintKeywords per entity; LocalOsintHit; BanglaBERT/local_ai sentiment।" },
+      { g: "local", name: "Local pulse & events", path: "/local/pulse", roles: "MP, MAYOR", work: "Influencers, polling, timed events।", behind: "pulse.service + LocalPulseEvent/Influencer/PollingCenter।" },
+      { g: "local", name: "Specialty packs", path: "/local/specialty", roles: "MP, MAYOR", work: "Entity-specific DSS (bridge, hill-cut, canals, dighi…)।", behind: "Config catalog + LocalSpecialtySignal + scan-anomalies notify।" },
+      { g: "local", name: "Service outages", path: "/local/outage", roles: "MP, MAYOR", work: "Power/water/etc outage track + resolve।", behind: "LocalServiceOutage kinds/status; feeds WPI/heatmap।" },
+      { g: "local", name: "Alert delivery", path: "/local/alerts", roles: "MP, MAYOR", work: "Crisis notify + retry + voice test।", behind: "AlertDeliveryLog; notifyCrisis forceVoice; channel adapters।" },
+      { g: "local", name: "Local security (MFA)", path: "/local/security", roles: "MP, MAYOR", work: "Enable/disable TOTP for the desk।", behind: "Same gateway MFA as national; UI panel for field roles।" },
+    ];
+    const featGroups = ["all", "national", "local", "ai", "platform"];
+    let featOn = "all";
+    function renderFeats() {
+      const q = ($("featSearch").value || "").toLowerCase();
+      const box = $("featFilters");
+      box.innerHTML = "";
+      featGroups.forEach((g) => {
+        const c = document.createElement("button");
+        c.className = "chip" + (featOn === g ? " on" : "");
+        c.textContent = g === "all" ? "সব" : g;
+        c.onclick = () => { featOn = g; renderFeats(); };
+        box.appendChild(c);
+      });
+      const grid = $("featGrid");
+      grid.innerHTML = "";
+      const rows = feats.filter((f) => (featOn === "all" || f.g === featOn) && (f.name + f.work + f.path).toLowerCase().includes(q));
+      if (!rows.length) { grid.innerHTML = "<div class='empty'>কোনো feature মেলেনি</div>"; return; }
+      rows.forEach((f) => {
+        const d = document.createElement("details");
+        d.className = "feat";
+        d.innerHTML = "<summary><span class='tag " + (f.g==="local"?"gold":f.g==="ai"?"violet":f.g==="platform"?"blue":"") + "'>" + f.g + "</span> " + f.name + "</summary><div class='body'><p><b>Path:</b> <span class='mono'>" + f.path + "</span> · <b>Roles:</b> " + f.roles + "</p><p><b>কী করে:</b> " + f.work + "</p><p><b>Behind the scene:</b> " + f.behind + "</p></div>";
+        grid.appendChild(d);
+      });
+    }
+    $("featSearch").addEventListener("input", renderFeats);
+    renderFeats();
+
+    const profiles = {
+      pilot: {
+        title: "Pilot — slim VPS (current Hostinger-style)",
+        capex: "৳0–2 লক্ষ (domain, backup disk, optional small GPU later)",
+        opex: "App VPS ৳6–12k + AI box ৳20–40k + 1–2 ops ৳80–150k → ~৳1.2–2.2 লক্ষ/মাস",
+        y1: "~৳15–30 লক্ষ OPEX (no big build fee if software already exists)",
+        y3: "~৳45–85 লক্ষ TCO",
+        note: "Replica off, sentiment mock, remote Ollama, pipeline not on boot. Best for demo / single-city DSS.",
+      },
+      prod: {
+        title: "Production — dual machine + staffed ops",
+        capex: "৳8–20 লক্ষ (32GB+ AI server, optional T4/L4 GPU, NAS backup)",
+        opex: "Infra ৳50–90k + 3 staff ৳3–5 লক্ষ → ~৳3.5–6 লক্ষ/মাস",
+        y1: "CAPEX + OPEX ≈ ৳50 লক্ষ – 1 কোটি",
+        y3: "~৳1.5–2.5 কোটি TCO (no cloud LLM invoices)",
+        note: "Real Bangla-BERT, both Ollama models resident, observability stack, MFA enforced, Fabric optional.",
+      },
+      ndc: {
+        title: "National / NDC Tier-4",
+        capex: "৳40 লক্ষ – 1.2 কোটি (HA Postgres, GPU nodes, HSM/backup, training)",
+        opex: "DC power/space + 5–8 staff + on-call ≈ ৳8–15 লক্ষ/মাস",
+        y1: "~৳1.5–3 কোটি",
+        y3: "~৳4–8 কোটি TCO",
+        note: "Air-gapped HF models, replica always on, nginx edge in NDC, Hyperledger consortium, 24/7 NOC. Still ৳0 software license vs equivalent SaaS AI.",
+      },
+    };
+    let prof = "pilot";
+    function renderProf() {
+      const box = $("costProfiles");
+      box.innerHTML = "";
+      Object.keys(profiles).forEach((k) => {
+        const b = document.createElement("button");
+        b.className = "chip" + (prof === k ? " on" : "");
+        b.textContent = k;
+        b.onclick = () => { prof = k; renderProf(); };
+        box.appendChild(b);
+      });
+      const p = profiles[prof];
+      $("costCard").innerHTML = "<h4>" + p.title + "</h4><p class='muted'><b>CAPEX:</b> " + p.capex + "</p><p class='muted'><b>Monthly OPEX:</b> " + p.opex + "</p><p class='muted'><b>Year-1:</b> " + p.y1 + "</p><p class='muted'><b>3-year TCO:</b> " + p.y3 + "</p><p class='muted'>" + p.note + "</p>";
+    }
+    renderProf();
+
+    function money(n) { return "৳" + Math.round(n).toLocaleString("en-BD"); }
+    function calc() {
+      const vps = +$("vps").value, ai = +$("ai").value, staff = +$("staff").value, sal = +$("sal").value;
+      $("vpsL").textContent = vps; $("aiL").textContent = ai; $("staffL").textContent = staff; $("salL").textContent = sal;
+      const month = vps + ai + staff * sal + 8000;
+      const y1 = month * 12 + 150000;
+      const y3 = y1 + month * 24 * 1.08;
+      const pct = Math.min(100, month / 800000 * 100);
+      $("calcOut").innerHTML = "<h4>Your custom OPEX</h4><p>Infra + people (incl. ~৳8k backup/dns): <b>" + money(month) + "/month</b></p><div class='cost-bar'><i style='width:" + pct + "%'></i></div><p class='muted'>Year-1 ≈ " + money(y1) + " ( + small contingency)</p><p class='muted'>3-year ≈ " + money(y3) + " with 8% drift on years 2–3</p><p class='muted'>Software licenses still ≈ ৳0. GPU purchase would be extra CAPEX, not in this slider.</p>";
+    }
+    ["vps","ai","staff","sal"].forEach((id) => $(id).addEventListener("input", calc));
+    calc();
+
+    function bootMermaid() {
+      if (!window.mermaid) return;
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: "neutral",
+        securityLevel: "loose",
+        flowchart: { htmlLabels: true, curve: "basis", useMaxWidth: true },
+        sequence: { useMaxWidth: true },
+        er: { useMaxWidth: true },
+        themeVariables: {
+          darkMode: false,
+          background: "#fffdf8",
+          primaryColor: "#d8efe4",
+          primaryTextColor: "#1c1914",
+          primaryBorderColor: "#0b6b4f",
+          lineColor: "#8a8173",
+          secondaryColor: "#f3e6cf",
+          tertiaryColor: "#fffaf2",
+          nodeTextColor: "#1c1914",
+          mainBkg: "#fffaf2",
+          clusterBkg: "#f6ead4",
+          clusterBorder: "#0b6b4f",
+          titleColor: "#0b6b4f",
+          edgeLabelBackground: "#fffdf8",
+          actorBkg: "#0b6b4f",
+          actorBorder: "#0b6b4f",
+          actorTextColor: "#fff8ea",
+          signalColor: "#5f574c",
+          labelBoxBkgColor: "#f3e6cf",
+        },
+      });
+      try {
+        mermaid.run({ querySelector: ".mermaid" });
+      } catch (err) {
+        mermaid.init(undefined, document.querySelectorAll(".mermaid"));
+      }
+    }
+    if (window.mermaid) bootMermaid();
+  </script>
+</body>
+</html>

@@ -5,7 +5,7 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 
 এই ডকুমেন্টে আছে: **HLD**, **LLD**, functional/non-functional requirements, **ERD**, tech stack rationale — সব একসাথে।
 
-**Related:** [Docs hub](./README.md) · [README (quick start)](../README.md) · [CI/CD & VPS](./DEPLOYMENT_AND_OPS.md) · [Ollama production](./OLLAMA_PRODUCTION.md)
+**Related:** [Docs hub](./README.md) · [Interactive SRS (HTML)](./srs-interactive.html) · [README (quick start)](../README.md) · [CI/CD & VPS](./DEPLOYMENT_AND_OPS.md) · [Ollama production](./OLLAMA_PRODUCTION.md)
 
 ---
 
@@ -1033,6 +1033,7 @@ Windows Hyper-V frequently blocks `5432`, `4000`, `8000`, `9000` — তাই l
 
 | Document | Location |
 |----------|----------|
+| **Interactive SRS + diagrams** | [`docs/srs-interactive.html`](./srs-interactive.html) |
 | Docs index | [`docs/README.md`](./README.md) |
 | Setup & quick start | [`README.md`](../README.md) |
 | API Gateway | [`services/api-gateway-node/README.md`](../services/api-gateway-node/README.md) |
