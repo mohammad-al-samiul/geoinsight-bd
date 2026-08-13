@@ -76,7 +76,8 @@ INSERT INTO local_visit_plans (
   'ca000001-0001-4001-8001-000000000001',
   'c9000001-0001-4001-8001-000000000001',
   NULL, NOW(), NOW()
-);
+)
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO local_pulse_events (
   id, kind, title, title_bn, detail, starts_at, ends_at, location_label, done,
@@ -120,4 +121,5 @@ INSERT INTO local_pulse_events (
   'cc000001-0001-4001-8001-000000000004',
   'c8000001-0001-4001-8001-000000000009',
   NULL, NOW(), NOW()
-);
+)
+ON CONFLICT (id) DO NOTHING;

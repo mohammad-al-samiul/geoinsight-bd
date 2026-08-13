@@ -39,11 +39,17 @@ VPS must be a **git clone** of the repo (not only uploaded files).
 
 ---
 
-## db-init exit 3 (fixed)
+## db-init exit 3
 
-Cause: seeds ran before Prisma migrations → tables missing.
-
+### Cause A (schema) — fixed
+Seeds ran before Prisma migrations → tables missing.
 Fix: `db-migrate` runs `prisma migrate deploy`, then `db-init` seeds.
+
+### Cause B (re-deploy seed duplicates) — fixed
+Redeploy re-runs `db-init` on an existing volume. Non-idempotent inserts in
+`18-local-p2-ops.sql` (`local_visit_plans` / `local_pulse_events`) failed with
+`duplicate key …_pkey`, so `api-gateway` never started (`depends_on: db-init`).
+Fix: all local seed inserts use `ON CONFLICT … DO NOTHING/UPDATE`.
 
 ### Immediate fix on VPS (before CI is wired)
 

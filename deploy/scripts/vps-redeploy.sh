@@ -82,6 +82,16 @@ run_deploy() {
   echo "==> Building images (this can take 10–20 min)..."
   "${COMPOSE[@]}" build api-gateway ai-analytics dashboard-nextjs pgbouncer
 
+  echo "==> Starting Postgres + migrate + seed (idempotent)..."
+  "${COMPOSE[@]}" up -d --remove-orphans postgres redis rabbitmq minio pgbouncer
+  "${COMPOSE[@]}" up --no-build db-migrate
+  "${COMPOSE[@]}" up --no-build --force-recreate db-init
+  if ! docker inspect -f '{{.State.ExitCode}}' geoinsight-db-init 2>/dev/null | grep -qx 0; then
+    echo "ERROR: db-init failed — last logs:"
+    "${COMPOSE[@]}" logs db-migrate db-init --tail 80 || true
+    exit 1
+  fi
+
   echo "==> Starting infra + API first (keep dashboard serving until API is ready)..."
   "${COMPOSE[@]}" up -d --remove-orphans postgres redis rabbitmq minio pgbouncer ai-analytics api-gateway
   echo "==> Waiting for API health before recycling dashboard..."
