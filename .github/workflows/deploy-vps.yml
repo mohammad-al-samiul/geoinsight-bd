@@ -55,6 +55,7 @@ jobs:
             git reset --hard origin/main
 
             chmod +x deploy/scripts/vps-redeploy.sh deploy/scripts/docker-db-init.sh || true
-            bash deploy/scripts/vps-redeploy.sh
+            # Always run foreground in CI (never background + exit-early)
+            GEOINSIGHT_REDEPLOY_WORKER=1 bash deploy/scripts/vps-redeploy.sh --foreground
 
             echo "Deploy OK — $(date -Is)"

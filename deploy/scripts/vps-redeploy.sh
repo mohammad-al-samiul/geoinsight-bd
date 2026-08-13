@@ -67,6 +67,12 @@ run_deploy() {
     exit 1
   fi
 
+  # Load .env for POSTGRES_* checks (ignore noisy unset extras)
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+
   echo "==> Deploy path: $DEPLOY_PATH"
   echo "==> Started at: $(date -Is)"
   echo "==> Pulling latest git (if remote configured)..."
@@ -84,12 +90,68 @@ run_deploy() {
 
   echo "==> Starting Postgres + migrate + seed (idempotent)..."
   "${COMPOSE[@]}" up -d --remove-orphans postgres redis rabbitmq minio pgbouncer
-  "${COMPOSE[@]}" up --no-build db-migrate
-  "${COMPOSE[@]}" up --no-build --force-recreate db-init
-  if ! docker inspect -f '{{.State.ExitCode}}' geoinsight-db-init 2>/dev/null | grep -qx 0; then
-    echo "ERROR: db-init failed — last logs:"
-    "${COMPOSE[@]}" logs db-migrate db-init --tail 80 || true
+  echo "==> Waiting for Postgres..."
+  for i in $(seq 1 60); do
+    if docker exec geoinsight-postgres pg_isready -U "${POSTGRES_USER:-geoinsight_admin}" >/dev/null 2>&1; then
+      break
+    fi
+    if [[ "$i" -eq 60 ]]; then
+      echo "ERROR: Postgres not ready"
+      exit 1
+    fi
+    sleep 2
+  done
+
+  # Prefer `run --rm` so exit codes are reliable across Compose versions.
+  # Drop stale one-shot containers (fixed container_name conflicts with `run`).
+  docker rm -f geoinsight-db-migrate geoinsight-db-init 2>/dev/null || true
+
+  if ! "${COMPOSE[@]}" run --rm --no-deps db-migrate; then
+    echo "ERROR: db-migrate failed"
+    "${COMPOSE[@]}" logs --no-color 2>/dev/null | tail -n 40 || true
     exit 1
+  fi
+
+  set +e
+  "${COMPOSE[@]}" run --rm --no-deps db-init
+  INIT_RC=$?
+  set -e
+  if [[ "$INIT_RC" -ne 0 ]]; then
+    echo "WARN: db-init exited ${INIT_RC} — checking if DB already has schema/data..."
+    # local socket inside postgres container usually needs no password
+    if docker exec geoinsight-postgres \
+      psql -U "${POSTGRES_USER:-geoinsight_admin}" -d "${POSTGRES_DB:-geoinsight_db}" \
+      -tAc "SELECT 1 FROM information_schema.tables WHERE table_name='admin_units'" 2>/dev/null | grep -q 1; then
+      echo "WARN: continuing deploy (admin_units present; seed likely already applied)"
+    else
+      echo "ERROR: db-init failed and schema looks empty"
+      exit 1
+    fi
+  fi
+
+  # Keep VPS .env intervals aligned with recommended defaults (15m heavy / 5m pulse)
+  if [[ -f .env ]]; then
+    patch_env_kv() {
+      local key="$1" val="$2"
+      if grep -qE "^${key}=" .env; then
+        sed -i "s|^${key}=.*|${key}=${val}|" .env
+      else
+        echo "${key}=${val}" >> .env
+      fi
+    }
+    patch_env_kv INGESTION_INTERVAL_MS 900000
+    patch_env_kv PIPELINE_NEWS_INTERVAL_MS 900000
+    patch_env_kv PIPELINE_COMMODITY_INTERVAL_MS 900000
+    patch_env_kv PIPELINE_KPI_INTERVAL_MS 900000
+    patch_env_kv PIPELINE_ALERT_INTERVAL_MS 900000
+    patch_env_kv PIPELINE_AGRO_INTERVAL_MS 900000
+    patch_env_kv PIPELINE_HAZARD_INTERVAL_MS 900000
+    patch_env_kv PIPELINE_WEATHER_INTERVAL_MS 900000
+    patch_env_kv PIPELINE_UNREST_INTERVAL_MS 900000
+    patch_env_kv PIPELINE_NARRATIVE_INTERVAL_MS 900000
+    patch_env_kv PIPELINE_OUTLOOK_INTERVAL_MS 900000
+    patch_env_kv PIPELINE_BRIEFING_INTERVAL_MS 900000
+    patch_env_kv PIPELINE_PULSE_INTERVAL_MS 300000
   fi
 
   echo "==> Starting infra + API first (keep dashboard serving until API is ready)..."
