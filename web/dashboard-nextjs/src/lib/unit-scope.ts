@@ -32,3 +32,28 @@ export function unitSearchParams(
   if (id) params.set("unitId", id);
   return params;
 }
+
+/** Division/district/upazila/union query string used by national intel endpoints. */
+export function adminScopeQuery(
+  filter: AdminFilterState,
+  base: Record<string, string> = {},
+): string {
+  const params = new URLSearchParams(base);
+  if (filter.divisionId) params.set("divisionId", filter.divisionId);
+  if (filter.districtId) params.set("districtId", filter.districtId);
+  if (filter.upazilaId) params.set("upazilaId", filter.upazilaId);
+  if (filter.unionId) params.set("unionId", filter.unionId);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export function appendAdminScope(
+  params: URLSearchParams,
+  filter: AdminFilterState,
+): URLSearchParams {
+  if (filter.divisionId) params.set("divisionId", filter.divisionId);
+  if (filter.districtId) params.set("districtId", filter.districtId);
+  if (filter.upazilaId) params.set("upazilaId", filter.upazilaId);
+  if (filter.unionId) params.set("unionId", filter.unionId);
+  return params;
+}

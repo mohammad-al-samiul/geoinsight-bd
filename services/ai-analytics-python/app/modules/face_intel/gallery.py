@@ -17,12 +17,12 @@ class VipProfile(TypedDict):
 
 VIP_GALLERY: list[VipProfile] = [
     {
-        "vip_id": "vip-nik",
-        "representative_id": "d4000001-0001-4001-8001-000000000010",
-        "nid": "1000000000010",
-        "name": "Nazrul Islam Khan (Road Transport)",
-        "designation": "Minister",
-        "designation_bn": "মন্ত্রী",
+        "vip_id": "vip-kz",
+        "representative_id": "d4000001-0001-4001-8001-000000000025",
+        "nid": "1000000000025",
+        "name": "Begum Khaleda Zia (Prime Minister)",
+        "designation": "Prime Minister",
+        "designation_bn": "প্রধানমন্ত্রী",
         "party": "BNP",
     },
     {
@@ -35,12 +35,21 @@ VIP_GALLERY: list[VipProfile] = [
         "party": "BNP",
     },
     {
+        "vip_id": "vip-nik",
+        "representative_id": "d4000001-0001-4001-8001-000000000010",
+        "nid": "1000000000010",
+        "name": "Nazrul Islam Khan (Road Transport)",
+        "designation": "Minister",
+        "designation_bn": "মন্ত্রী",
+        "party": "BNP",
+    },
+    {
         "vip_id": "vip-rf",
         "representative_id": "d4000001-0001-4001-8001-000000000011",
         "nid": "1000000000011",
         "name": "Rumeen Farhana (Law & Justice)",
-        "designation": "Member of Parliament",
-        "designation_bn": "সংসদ সদস্য",
+        "designation": "Minister",
+        "designation_bn": "মন্ত্রী",
         "party": "BNP",
     },
     {

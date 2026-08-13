@@ -27,6 +27,11 @@ export interface FeedQuery {
   category?: NarrativeCategory;
   organization?: string;
   search?: string;
+  /** Geo scope — name strings (legacy) or admin unit UUIDs */
+  division?: string;
+  district?: string;
+  divisionId?: string;
+  districtId?: string;
   limit?: number;
   offset?: number;
 }
@@ -175,6 +180,33 @@ export class NarrativeShieldService {
     if (query.organization) {
       where.organization = { equals: query.organization, mode: "insensitive" };
     }
+
+    let divisionName = query.division?.trim() || null;
+    let districtName = query.district?.trim() || null;
+    if (query.divisionId || query.districtId) {
+      const units = await prismaRead.adminUnit.findMany({
+        where: {
+          id: {
+            in: [query.divisionId, query.districtId].filter(Boolean) as string[],
+          },
+        },
+        select: { id: true, name: true, type: true },
+      });
+      const byId = new Map(units.map((u) => [u.id, u]));
+      if (query.divisionId && byId.get(query.divisionId)) {
+        divisionName = byId.get(query.divisionId)!.name;
+      }
+      if (query.districtId && byId.get(query.districtId)) {
+        districtName = byId.get(query.districtId)!.name;
+      }
+    }
+    if (divisionName) {
+      where.division = { contains: divisionName, mode: "insensitive" };
+    }
+    if (districtName) {
+      where.district = { contains: districtName, mode: "insensitive" };
+    }
+
     if (query.search) {
       where.OR = [
         { title: { contains: query.search, mode: "insensitive" } },

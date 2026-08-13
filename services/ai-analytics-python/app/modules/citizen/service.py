@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.core.config import Settings
+from app.ml.ai_policy import LlmTask
 from app.ml.ollama_client import OllamaClient
 from app.modules.citizen.schemas import CitizenChatRequest, CitizenChatResponse
 
@@ -53,7 +54,11 @@ class CitizenChatbotService:
                 if req.lang == "bn"
                 else f"You are Bangladesh govt 333/999 chatbot. Category: {category}, ministry: {ministry_en}. Be brief."
             )
-            llm_reply = await self._ollama.complete(system, req.message)
+            llm_reply = await self._ollama.complete(
+                system,
+                req.message,
+                task=LlmTask.CITIZEN_CHAT,
+            )
             if llm_reply:
                 if req.lang == "bn":
                     reply_bn = llm_reply

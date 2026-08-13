@@ -3,6 +3,7 @@ import { env } from "../../core/config/env";
 import { prismaRead } from "../../core/database/prisma.client";
 import { redisCacheService } from "../../infrastructure/cache/redis-cache.service";
 import { liveDataService } from "../live-data/live-data.service";
+import { metricSeriesService } from "../metrics/metric-series.service";
 
 const DASHBOARD_TTL_SEC = 90;
 
@@ -251,10 +252,24 @@ export class DashboardService {
         };
       });
 
-      const completionTrend = MONTH_LABELS.map((month, i) => ({
-        month,
-        rate: Math.round((72 + i * 1.4 + (completionRate - 85) * 0.3) * 10) / 10,
-      }));
+      let completionTrend = await metricSeriesService.buildCompletionTrendFromKpis();
+      if (!completionTrend.length) {
+        completionTrend = MONTH_LABELS.map((month, i) => ({
+          month,
+          rate: Math.round((72 + i * 1.4 + (completionRate - 85) * 0.3) * 10) / 10,
+        }));
+      }
+      // Persist national trend permanently (upsert by month period).
+      void metricSeriesService.upsertMany(
+        "dashboard",
+        completionTrend.map((point, i) => ({
+          seriesKey: "completion",
+          periodKey: `m-${String(i).padStart(2, "0")}-${point.month}`,
+          label: point.month,
+          value: point.rate,
+          recordedAt: new Date(Date.UTC(2025, i, 15)),
+        })),
+      );
 
       const arbitrageMatrix = commodityRows.map((row) => {
         const landed = Number(row.landed_cost_usd);

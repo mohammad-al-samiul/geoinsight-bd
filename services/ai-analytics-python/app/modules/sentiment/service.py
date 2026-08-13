@@ -14,6 +14,8 @@ from app.modules.sentiment.schemas import (
 
 
 class SentimentService:
+    """BanglaBERT (or mock) classification — never routes through Ollama."""
+
     def __init__(self, settings: Settings, executor: ProcessPoolExecutor) -> None:
         self._settings = settings
         self._executor = executor

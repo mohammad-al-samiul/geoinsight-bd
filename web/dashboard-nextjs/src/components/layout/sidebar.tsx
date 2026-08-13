@@ -1,32 +1,49 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { UserProfile } from "@/components/layout/user-profile";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { isLocalEntityRole } from "@/types";
+import { withLocalEntityHref } from "@/hooks/use-local-entity-id";
 import {
   AlertTriangle,
   BarChart3,
   BellRing,
+  Boxes,
+  Building2,
+  CalendarDays,
   ChevronLeft,
   CloudRain,
   FileText,
   Flame,
+  Gauge,
   Globe2,
   Landmark,
   Link2,
   LineChart,
+  MessageSquare,
+  Newspaper,
   Package,
+  Radio,
   Scale,
   ShieldAlert,
+  ShieldCheck,
   ShieldOff,
+  Siren,
+  Smartphone,
   Sprout,
   Sun,
   Users,
+  Wallet,
+  Zap,
+  ScanFace,
 } from "lucide-react";
 
 interface NavItem {
@@ -34,9 +51,11 @@ interface NavItem {
   key: string;
   icon: React.ComponentType<{ className?: string }>;
   minTier: number;
+  /** If set, only these roles see the item (in addition to PMO). */
+  roles?: string[];
 }
 
-const NAV: NavItem[] = [
+const NATIONAL_NAV: NavItem[] = [
   { href: "/", key: "nationalOverview", icon: Globe2, minTier: 1 },
   { href: "/briefing", key: "briefing", icon: Sun, minTier: 1 },
   { href: "/narrative-shield", key: "narrativeShield", icon: ShieldOff, minTier: 1 },
@@ -54,6 +73,26 @@ const NAV: NavItem[] = [
   { href: "/audit-trail", key: "auditTrail", icon: Link2, minTier: 2 },
   { href: "/notifications", key: "notifications", icon: BellRing, minTier: 1 },
   { href: "/representatives", key: "representatives", icon: Users, minTier: 4 },
+  { href: "/face-intel", key: "faceIntel", icon: ScanFace, minTier: 4 },
+  // PMO oversight entry into Local DSS (not the full local nav tree)
+  { href: "/local", key: "localEntity", icon: Building2, minTier: 1, roles: ["PMO"] },
+];
+
+const LOCAL_NAV: NavItem[] = [
+  { href: "/local", key: "localEntity", icon: Building2, minTier: 5 },
+  { href: "/local/field", key: "localField", icon: Smartphone, minTier: 5 },
+  { href: "/local/complaints", key: "localComplaints", icon: Siren, minTier: 5 },
+  { href: "/local/heatmap", key: "localHeatmap", icon: Flame, minTier: 5 },
+  { href: "/local/visits", key: "localVisits", icon: CalendarDays, minTier: 5 },
+  { href: "/local/wpi", key: "localWpi", icon: Gauge, minTier: 5 },
+  { href: "/local/scorecard", key: "localScorecard", icon: Scale, minTier: 5 },
+  { href: "/local/budget", key: "localBudget", icon: Wallet, minTier: 5 },
+  { href: "/local/osint", key: "localOsint", icon: Newspaper, minTier: 5 },
+  { href: "/local/pulse", key: "localPulse", icon: Radio, minTier: 5 },
+  { href: "/local/specialty", key: "localSpecialty", icon: Boxes, minTier: 5 },
+  { href: "/local/outage", key: "localOutage", icon: Zap, minTier: 5 },
+  { href: "/local/alerts", key: "localAlerts", icon: MessageSquare, minTier: 5 },
+  { href: "/local/security", key: "localSecurity", icon: ShieldCheck, minTier: 5 },
 ];
 
 const TIER: Record<string, number> = {
@@ -61,6 +100,8 @@ const TIER: Record<string, number> = {
   MINISTER: 2,
   DC: 3,
   UNION_CHAIRMAN: 4,
+  MP: 5,
+  MAYOR: 5,
 };
 
 interface SidebarProps {
@@ -70,12 +111,32 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useAuth();
   const t = useTranslations("nav");
   const ts = useTranslations("shell");
   const userTier = TIER[user.role] ?? 4;
+  const localRole = isLocalEntityRole(user.role);
+  const scopedEntityId =
+    (localRole ? user.adminUnitId : null) ?? searchParams.get("entityId");
 
-  const visibleNav = NAV.filter((item) => item.minTier >= userTier || user.role === "PMO");
+  useEffect(() => {
+    if (!localRole) return;
+    if (pathname === "/" || pathname === "/dashboard") {
+      router.replace(withLocalEntityHref("/local", scopedEntityId));
+    }
+  }, [localRole, pathname, router, scopedEntityId]);
+
+  const sourceNav = localRole ? LOCAL_NAV : NATIONAL_NAV;
+  const visibleNav = sourceNav.filter((item) => {
+    if (localRole) return true;
+    if (item.roles) {
+      return item.roles.includes(user.role) || user.role === "PMO";
+    }
+    if (user.role === "PMO") return true;
+    return item.minTier >= userTier;
+  });
 
   return (
     <aside
@@ -91,7 +152,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               GeoInsight BD
             </span>
             <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-              {ts("brandSubtitle")}
+              {localRole ? ts("localSubtitle") : ts("brandSubtitle")}
             </span>
           </div>
         )}
@@ -111,17 +172,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <Separator className="bg-sidebar-border/80" />
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2.5">
-        {visibleNav.map((item) => {
+        {visibleNav.map((item, index) => {
+          const href = withLocalEntityHref(item.href, scopedEntityId);
           const active =
             item.href === "/"
               ? pathname === "/"
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+              : item.href === "/local"
+                ? pathname === "/local"
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
           const label = t(item.key);
           const Icon = item.icon;
-          return (
+          const link = (
             <Link
-              key={item.href}
-              href={item.href}
+              href={href}
               title={collapsed ? label : undefined}
               className={cn(
                 "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
@@ -143,12 +206,26 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               {!collapsed && <span className="truncate">{label}</span>}
             </Link>
           );
+
+          if (!localRole) return <div key={item.href}>{link}</div>;
+
+          return (
+            <motion.div
+              key={item.href}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.04, duration: 0.35 }}
+              whileHover={{ x: 2 }}
+            >
+              {link}
+            </motion.div>
+          );
         })}
       </nav>
 
       {!collapsed && (
         <div className="border-t border-sidebar-border/80 p-3.5 text-[10px] leading-relaxed tracking-wide text-muted-foreground">
-          {ts("classifiedFooter")}
+          {localRole ? ts("localFooter") : ts("classifiedFooter")}
         </div>
       )}
     </aside>

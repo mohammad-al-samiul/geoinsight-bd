@@ -80,6 +80,11 @@ const faceIntelReportQuerySchema = z.object({
   lang: z.enum(["bn", "en"]).optional(),
 });
 
+const crowdEstimateSchema = z.object({
+  image_base64: z.string().min(32).max(8_000_000),
+  note: z.string().max(200).optional(),
+});
+
 const hazardQuerySchema = z.object({
   divisionId: z.string().uuid().optional(),
   districtId: z.string().uuid().optional(),
@@ -282,6 +287,23 @@ export class IntelligenceModule extends BaseModule {
           sendSuccess(res, { error: "representative_not_found" }, 404);
           return;
         }
+        sendSuccess(res, data);
+      }),
+    );
+
+    router.post(
+      "/intelligence/face-intel/crowd-estimate",
+      authenticate(),
+      container.rbac.requireRoles(
+        UserRole.PMO,
+        UserRole.MINISTER,
+        UserRole.DC,
+        UserRole.MP,
+        UserRole.MAYOR,
+      ),
+      validate(crowdEstimateSchema, "body"),
+      asyncHandler(async (req, res) => {
+        const data = await intelligenceService.estimateCrowd(req.body);
         sendSuccess(res, data);
       }),
     );

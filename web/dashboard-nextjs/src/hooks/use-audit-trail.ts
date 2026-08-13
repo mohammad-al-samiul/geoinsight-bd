@@ -40,7 +40,7 @@ export function useAuditTrail() {
   useEffect(() => {
     void load();
   }, [load]);
-  useRealtimeRefresh(load);
+  useRealtimeRefresh(load, true, true);
 
   return { timeline, loading, error, reload: load };
 }

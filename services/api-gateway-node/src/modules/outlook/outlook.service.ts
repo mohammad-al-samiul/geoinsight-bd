@@ -165,24 +165,37 @@ export class OutlookService {
       if (!res.ok) throw new Error(`outlook AI ${res.status}`);
       aiResult = (await res.json()) as Record<string, unknown>;
     } catch (err) {
-      aiResult = {
-        lang,
-        generated_at: new Date().toISOString(),
-        challenges: [],
-        direction: [],
-        scenarios: [],
-        narrative:
-          lang === "bn"
-            ? "আউটলুক AI সাময়িকভাবে অনুপলব্ধ — নিচে সোর্স তালিকা দেখুন।"
-            : "Outlook AI temporarily unavailable — see source list below.",
-        disclaimer:
-          lang === "bn"
-            ? "খোলা সোর্স ভিত্তিক — থিসিস/পূর্বাভাস নয়।"
-            : "Open-source grounded — not a thesis or forecast.",
-        source_count: trimmed.length,
-        llm_used: false,
-        error: err instanceof Error ? err.message : String(err),
-      };
+      const snapshot = await prismaRead.intelAnalysisSnapshot.findFirst({
+        where: { kind: "OUTLOOK", lang },
+        orderBy: { generatedAt: "desc" },
+      });
+      if (snapshot?.payload && typeof snapshot.payload === "object") {
+        aiResult = {
+          ...(snapshot.payload as Record<string, unknown>),
+          llm_used: false,
+          source_count: trimmed.length || snapshot.sourceCount,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      } else {
+        aiResult = {
+          lang,
+          generated_at: new Date().toISOString(),
+          challenges: [],
+          direction: [],
+          scenarios: [],
+          narrative:
+            lang === "bn"
+              ? "আউটলুক AI সাময়িকভাবে অনুপলব্ধ — নিচে সোর্স তালিকা দেখুন।"
+              : "Outlook AI temporarily unavailable — see source list below.",
+          disclaimer:
+            lang === "bn"
+              ? "খোলা সোর্স ভিত্তিক — থিসিস/পূর্বাভাস নয়।"
+              : "Open-source grounded — not a thesis or forecast.",
+          source_count: trimmed.length,
+          llm_used: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
     }
 
     return {

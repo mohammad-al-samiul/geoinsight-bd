@@ -78,7 +78,7 @@ export function useProjectsList() {
     void load();
   }, [load]);
 
-  useRealtimeRefresh(load, ready);
+  useRealtimeRefresh(load, ready, true);
 
   return { rows, loading: loading || !ready, error, reload: load };
 }
@@ -152,7 +152,7 @@ export function useRepresentativesList() {
     void load();
   }, [load]);
 
-  useRealtimeRefresh(load, ready);
+  useRealtimeRefresh(load, ready, true);
 
   return { rows, loading: loading || !ready, error, reload: load };
 }
@@ -190,7 +190,7 @@ export function useAgroMarketsList() {
     void load();
   }, [load]);
 
-  useRealtimeRefresh(load, ready);
+  useRealtimeRefresh(load, ready, true);
 
   return { rows, loading: loading || !ready, error, reload: load };
 }
@@ -248,7 +248,7 @@ export function useKpiData() {
     void load();
   }, [load]);
 
-  useRealtimeRefresh(load, ready);
+  useRealtimeRefresh(load, ready, true);
 
   return { definitions, records, loading: loading || !ready, error, reload: load };
 }

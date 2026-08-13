@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProcurementAdvisor } from "@/hooks/use-procurement-advisor";
 import { ModuleShell, DataTable, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Button } from "@/components/ui/button";
 import { AppSelect } from "@/components/ui/app-select";
 import { useAppLang } from "@/hooks/use-app-lang";
 import { useTranslations } from "next-intl";
-import { Package, Search } from "lucide-react";
+import { Loader2, Package, Search } from "lucide-react";
 
 const COMMODITY_KEYS = ["rice", "onion", "wheat", "lentil"] as const;
 const COMMODITY_VALUES = ["rice", "onion", "wheat", "lentil"] as const;
@@ -18,8 +18,17 @@ export function ProcurementAdvisorPanel() {
   const [commodity, setCommodity] = useState("rice");
   const [quantity, setQuantity] = useState(10000);
   const { advice, loading, error, advise } = useProcurementAdvisor();
+  const bootstrapped = useRef(false);
 
   const handleAdvise = () => void advise(commodity, quantity, lang);
+
+  // First visit: load default rice advice immediately (no empty error state)
+  useEffect(() => {
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
+    void advise(commodity, quantity, lang);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <ModuleShell
@@ -73,7 +82,7 @@ export function ProcurementAdvisorPanel() {
           />
         </div>
         <Button onClick={handleAdvise} disabled={loading} className="gap-2">
-          <Search className="h-4 w-4" />
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           {t("getAdvice")}
         </Button>
       </div>
@@ -83,7 +92,9 @@ export function ProcurementAdvisorPanel() {
           <div className="glass-panel rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
             <Package className="mb-2 h-4 w-4 text-emerald-400" />
             <p className="text-sm leading-relaxed">
-              {lang === "bn" ? advice.recommendation_bn : advice.recommendation}
+              {lang === "bn"
+                ? advice.narrative_bn || advice.recommendation_bn
+                : advice.narrative || advice.recommendation}
             </p>
           </div>
 

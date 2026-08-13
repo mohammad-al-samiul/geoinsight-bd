@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 export interface WeatherObservation {
   division: string;
@@ -142,6 +143,8 @@ export function useWeatherLive() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useRealtimeRefresh(load, true, true);
 
   return { data, loading, error, reload: load };
 }

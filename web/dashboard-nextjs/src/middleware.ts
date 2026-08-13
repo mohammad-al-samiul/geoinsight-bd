@@ -6,25 +6,7 @@ const PUBLIC_PREFIXES = [
   "/forbidden",
   "/api/auth/login",
   "/api/auth/refresh",
-];
-
-const PROTECTED_PREFIXES = [
-  "/",
-  "/dashboard",
-  "/briefing",
-  "/narrative-shield",
-  "/unrest",
-  "/anti-phishing",
-  "/procurement",
-  "/alerts",
-  "/kpis",
-  "/projects",
-  "/documents",
-  "/audit-trail",
-  "/hazards",
-  "/agro",
-  "/map",
-  "/representatives",
+  "/api/auth/mfa",
 ];
 
 function isPublic(pathname: string): boolean {
@@ -33,11 +15,16 @@ function isPublic(pathname: string): boolean {
   );
 }
 
-function isProtected(pathname: string): boolean {
+function requiresAuth(pathname: string): boolean {
+  if (isPublic(pathname)) return false;
+  // Auth helper routes that don't need a session cookie
+  if (pathname.startsWith("/api/auth/") && !pathname.startsWith("/api/proxy")) {
+    return false;
+  }
+  // All app pages + gateway proxy require a session
   if (pathname.startsWith("/api/proxy")) return true;
-  return PROTECTED_PREFIXES.some(
-    (p) => pathname === p || (p !== "/" && pathname.startsWith(`${p}/`)),
-  );
+  if (pathname.startsWith("/api/")) return false;
+  return true;
 }
 
 export async function middleware(request: NextRequest) {
@@ -51,11 +38,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (isPublic(pathname)) {
-    return NextResponse.next();
-  }
-
-  if (!isProtected(pathname)) {
+  if (!requiresAuth(pathname)) {
     return NextResponse.next();
   }
 

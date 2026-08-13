@@ -54,7 +54,10 @@ class Settings(BaseSettings):
     sovereign_mode: bool = Field(default=False, alias="SOVEREIGN_MODE")
     llm_provider: str = Field(default="ollama", alias="LLM_PROVIDER")
     ollama_url: str | None = Field(default="http://host.docker.internal:11434", alias="OLLAMA_URL")
+    # Quality tier — briefs, explainers, sovereign chat (default production model)
     ollama_model: str = Field(default="gpt-oss:20b", alias="OLLAMA_MODEL")
+    # Fast tier — triage, citizen chat, visit rank (keep small for latency)
+    ollama_model_fast: str = Field(default="llama3.1:8b", alias="OLLAMA_MODEL_FAST")
     public_feed_333_rate_max: int = Field(default=30, alias="PUBLIC_FEED_333_RATE_MAX")
     public_feed_999_rate_max: int = Field(default=15, alias="PUBLIC_FEED_999_RATE_MAX")
 

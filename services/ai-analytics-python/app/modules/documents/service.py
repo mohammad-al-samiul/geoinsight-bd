@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from app.core.config import Settings
+from app.ml.ai_policy import LlmTask
 from app.ml.ollama_client import OllamaClient
 from app.modules.documents.schemas import (
     ComplianceCheck,
@@ -352,6 +353,7 @@ class DocumentIntelligenceEngine:
               f"Recommendations:\n" + "\n".join(f"- {r}" for r in base.recommendations[:6])
           ),
           temperature=0.2,
+          task=LlmTask.DOCUMENT_POLISH,
       )
       if polished:
           base.engine = "ollama_enhanced"

@@ -46,9 +46,11 @@ export function useProcurementAdvisor() {
           },
         );
         setAdvice(json.data);
+        return json.data;
       } catch (err) {
         setAdvice(null);
         setError(err instanceof Error ? err.message : "Procurement advice failed");
+        return null;
       } finally {
         setLoading(false);
       }

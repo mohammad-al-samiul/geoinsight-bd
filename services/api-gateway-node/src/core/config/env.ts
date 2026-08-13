@@ -53,6 +53,10 @@ const envSchema = z.object({
   PIPELINE_NARRATIVE_INTERVAL_MS: z.coerce.number().int().positive().default(600_000),
   PIPELINE_OUTLOOK_INTERVAL_MS: z.coerce.number().int().positive().default(1_800_000),
   PIPELINE_BRIEFING_INTERVAL_MS: z.coerce.number().int().positive().default(1_800_000),
+  /** Always-on national + local DB pulse (independent of browser tabs). */
+  PIPELINE_PULSE_INTERVAL_MS: z.coerce.number().int().positive().default(120_000),
+  PIPELINE_PULSE_RUN_ON_START: z.string().default("true").transform((v) => v === "true"),
+  PIPELINE_PULSE_STARTUP_DELAY_MS: z.coerce.number().int().positive().default(30_000),
 
   /** Intel snapshot DB retention (days) + max rows kept per kind/lang/scope */
   INTEL_SNAPSHOT_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
@@ -80,6 +84,17 @@ const envSchema = z.object({
     .transform((v) => v !== "false"),
   FABRIC_MAX_RETRIES: z.coerce.number().int().positive().default(5),
   FABRIC_RETRY_INTERVAL_MS: z.coerce.number().int().positive().default(30_000),
+
+  /** P4 — WhatsApp / voice alert delivery (dry_run = log only, no external call) */
+  ALERT_DELIVERY_MODE: z.enum(["dry_run", "meta", "twilio"]).default("dry_run"),
+  WHATSAPP_API_URL: z.string().optional(),
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_WHATSAPP_FROM: z.string().optional(),
+  TWILIO_VOICE_FROM: z.string().optional(),
+  ALERT_VOICE_ENABLED: z.string().default("true").transform((v) => v === "true"),
 });
 
 export type Env = z.infer<typeof envSchema>;

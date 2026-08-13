@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime
 
 from app.core.config import Settings
+from app.ml.ai_policy import LlmTask
 from app.ml.ollama_client import OllamaClient
 from app.modules.briefing.schemas import (
     BriefingBullet,
@@ -13,7 +14,7 @@ from app.modules.briefing.schemas import (
 
 
 class BriefingService:
-    """Morning briefing — structured data + local Ollama (gpt-oss:20b) narrative."""
+    """Morning briefing — structured data + quality-tier Ollama narrative."""
 
     def __init__(self, settings: Settings) -> None:
         self._ollama = OllamaClient(settings)
@@ -43,7 +44,11 @@ class BriefingService:
                 if data.lang == "bn"
                 else "You are a PMO briefing writer. Write a concise briefing from the JSON data with 5 bullets."
             )
-            llm_narrative = await self._ollama.complete(system, context)
+            llm_narrative = await self._ollama.complete(
+                system,
+                context,
+                task=LlmTask.NATIONAL_BRIEFING,
+            )
             if llm_narrative:
                 narrative = llm_narrative
                 llm_used = True
@@ -53,7 +58,11 @@ class BriefingService:
                         "শুধু প্লেইন বাংলা বাক্য লেখো। মার্কডাউন, বুলেট, ইংরেজি শব্দ বা সংক্ষিপ্ত রূপ ব্যবহার করো না। "
                         "শতাংশকে 'শতাংশ' বলো। সর্বোচ্চ ৮ বাক্য।"
                     )
-                    spoken = await self._ollama.complete(voice_prompt, llm_narrative[:1500])
+                    spoken = await self._ollama.complete(
+                        voice_prompt,
+                        llm_narrative[:1500],
+                        task=LlmTask.NATIONAL_BRIEFING,
+                    )
                     voice_text = (spoken or self._voice_text(data, bullets))[:1200]
                 else:
                     voice_text = llm_narrative[:1200]

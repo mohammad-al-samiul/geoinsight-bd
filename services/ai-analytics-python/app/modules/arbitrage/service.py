@@ -116,8 +116,6 @@ class CommodityScraper:
         country: _CountrySeed,
         commodity: str,
     ) -> CommodityQuote:
-        await asyncio.sleep(random.uniform(0.001, 0.012))
-
         base = _COMMODITY_BASE_PRICES.get(commodity.lower(), 400.0)
         seed = int(hashlib.md5(f"{country.code}:{commodity}".encode()).hexdigest(), 16)
         rng = random.Random(seed)

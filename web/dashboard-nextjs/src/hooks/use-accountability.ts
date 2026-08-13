@@ -57,7 +57,7 @@ export function useAccountabilityScores(lang: "bn" | "en" = "bn") {
   useEffect(() => {
     void load();
   }, [load]);
-  useRealtimeRefresh(load);
+  useRealtimeRefresh(load, true, true);
 
   return { scores, loading, error, reload: load };
 }

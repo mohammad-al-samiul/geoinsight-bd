@@ -387,6 +387,19 @@
   min-height: 240px;
 }
 
+.local-entity-badge {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-tooltip.local-ward-tip {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(148, 163, 184, 0.35) !important;
+  color: #e2e8f0 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+}
+
 .marker-pulse {
   animation: markerPulse 2s ease-in-out infinite;
 }

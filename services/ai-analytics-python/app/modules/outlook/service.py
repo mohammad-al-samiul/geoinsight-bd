@@ -6,6 +6,7 @@ from collections import Counter
 from datetime import UTC, datetime
 
 from app.core.config import Settings
+from app.ml.ai_policy import LlmTask
 from app.ml.ollama_client import OllamaClient
 from app.modules.outlook.schemas import (
     ChallengeItem,
@@ -439,4 +440,5 @@ class OutlookService:
             system,
             json.dumps(slim, ensure_ascii=False)[:8000],
             temperature=0.2,
+            task=LlmTask.OUTLOOK,
         )

@@ -22,6 +22,7 @@ from app.modules.phishing.router import router as phishing_router
 from app.modules.proximity.router import router as proximity_router
 from app.modules.face_intel.router import router as face_intel_router
 from app.modules.narrative_shield.router import router as narrative_shield_router
+from app.modules.local_ai.router import router as local_ai_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
@@ -46,3 +47,4 @@ api_router.include_router(phishing_router)
 api_router.include_router(proximity_router)
 api_router.include_router(face_intel_router)
 api_router.include_router(narrative_shield_router)
+api_router.include_router(local_ai_router)

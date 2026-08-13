@@ -9,10 +9,21 @@ import { ApiError } from "../../core/errors/api.error";
 import { JwtPayload } from "../../core/types/express";
 import { IAuditService } from "../../shared/audit/audit.service";
 import { IAdminScopeService } from "../../shared/scope/admin-scope.interface";
+import {
+  buildOtpAuthUrl,
+  generateTotpSecret,
+  verifyTotp,
+} from "../../shared/security/totp";
 import { RegisterDto } from "./auth.validator";
 import { jwtSessionService } from "../../infrastructure/session/jwt-session.service";
 
 const BCRYPT_ROUNDS = 12;
+const MFA_TOKEN_EXPIRES = "5m";
+
+interface MfaChallengePayload {
+  sub: string;
+  purpose: "mfa";
+}
 
 function hashRefreshToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -113,17 +124,23 @@ export class AuthService {
     });
   }
 
-  async login(email: string, password: string) {
-    const user = await prismaRead.user.findUnique({ where: { email } });
-    if (!user?.isActive) throw ApiError.unauthorized("Invalid credentials");
+  private issueMfaChallenge(userId: string): string {
+    const payload: MfaChallengePayload = { sub: userId, purpose: "mfa" };
+    return jwt.sign(payload, env.JWT_SECRET, {
+      expiresIn: MFA_TOKEN_EXPIRES,
+      jwtid: crypto.randomUUID(),
+    });
+  }
 
-    if (!(await bcrypt.compare(password, user.passwordHash))) {
-      throw ApiError.unauthorized("Invalid credentials");
-    }
-
+  private async issueSession(user: {
+    id: string;
+    email: string;
+    phone: string | null;
+    role: UserRole;
+    adminUnitId: string | null;
+  }) {
     const accessToken = issueAccessToken(userPayload(user));
     const refreshToken = await this.createRefreshToken(user.id);
-
     return {
       accessToken,
       refreshToken,
@@ -132,10 +149,119 @@ export class AuthService {
         id: user.id,
         email: user.email,
         phone: user.phone,
-        role: user.role as UserRole,
+        role: user.role,
         adminUnitId: user.adminUnitId,
       },
     };
+  }
+
+  async login(email: string, password: string) {
+    const user = await prismaRead.user.findUnique({ where: { email } });
+    if (!user?.isActive) throw ApiError.unauthorized("Invalid credentials");
+
+    if (!(await bcrypt.compare(password, user.passwordHash))) {
+      throw ApiError.unauthorized("Invalid credentials");
+    }
+
+    if (user.mfaSecret) {
+      return {
+        requiresMfa: true as const,
+        mfaToken: this.issueMfaChallenge(user.id),
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role as UserRole,
+        },
+      };
+    }
+
+    const session = await this.issueSession(user);
+    return {
+      requiresMfa: false as const,
+      ...session,
+      user: { ...session.user, mfaEnabled: false },
+    };
+  }
+
+  async verifyMfa(mfaToken: string, code: string) {
+    let challenge: MfaChallengePayload;
+    try {
+      challenge = jwt.verify(mfaToken, env.JWT_SECRET) as MfaChallengePayload;
+    } catch {
+      throw ApiError.unauthorized("Invalid or expired MFA challenge");
+    }
+    if (challenge.purpose !== "mfa" || !challenge.sub) {
+      throw ApiError.unauthorized("Invalid MFA challenge");
+    }
+
+    const user = await prismaRead.user.findUnique({ where: { id: challenge.sub } });
+    if (!user?.isActive || !user.mfaSecret) {
+      throw ApiError.unauthorized("MFA not available for this account");
+    }
+    if (!verifyTotp(user.mfaSecret, code)) {
+      throw ApiError.unauthorized("Invalid authenticator code");
+    }
+
+    const session = await this.issueSession(user);
+    return {
+      requiresMfa: false as const,
+      ...session,
+      user: { ...session.user, mfaEnabled: true },
+    };
+  }
+
+  async setupMfa(userId: string) {
+    const user = await prismaRead.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, mfaSecret: true },
+    });
+    if (!user) throw ApiError.notFound("User not found");
+    if (user.mfaSecret) {
+      throw ApiError.conflict("MFA already enabled — disable first to rotate");
+    }
+
+    const secret = generateTotpSecret();
+    return {
+      secret,
+      otpauthUrl: buildOtpAuthUrl({ secret, email: user.email }),
+      issuer: "GeoInsight BD",
+    };
+  }
+
+  async enableMfa(userId: string, secret: string, code: string) {
+    const user = await prismaRead.user.findUnique({
+      where: { id: userId },
+      select: { id: true, mfaSecret: true },
+    });
+    if (!user) throw ApiError.notFound("User not found");
+    if (user.mfaSecret) throw ApiError.conflict("MFA already enabled");
+    if (!verifyTotp(secret, code)) {
+      throw ApiError.badRequest("Invalid authenticator code — check clock sync");
+    }
+
+    await prismaWrite.user.update({
+      where: { id: userId },
+      data: { mfaSecret: secret },
+    });
+    return { mfaEnabled: true };
+  }
+
+  async disableMfa(userId: string, code: string) {
+    const user = await prismaRead.user.findUnique({
+      where: { id: userId },
+      select: { id: true, mfaSecret: true },
+    });
+    if (!user) throw ApiError.notFound("User not found");
+    if (!user.mfaSecret) throw ApiError.badRequest("MFA is not enabled");
+    if (!verifyTotp(user.mfaSecret, code)) {
+      throw ApiError.unauthorized("Invalid authenticator code");
+    }
+
+    await prismaWrite.user.update({
+      where: { id: userId },
+      data: { mfaSecret: null },
+    });
+    return { mfaEnabled: false };
   }
 
   async refresh(refreshToken: string) {
@@ -212,10 +338,12 @@ export class AuthService {
         phone: true,
         role: true,
         adminUnitId: true,
+        mfaSecret: true,
         adminUnit: { select: { id: true, name: true, type: true } },
       },
     });
     if (!user) throw ApiError.notFound("User not found");
-    return user;
+    const { mfaSecret, ...rest } = user;
+    return { ...rest, mfaEnabled: Boolean(mfaSecret) };
   }
 }

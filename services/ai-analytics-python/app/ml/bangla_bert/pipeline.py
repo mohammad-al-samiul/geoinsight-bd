@@ -153,3 +153,64 @@ def analyze_batch(
         sentiment_to_dict(analyze_text(text, district, upazila, model_id, cache_dir, use_mock))
         for text, district, upazila in items
     ]
+
+
+_PROPAGANDA_KW = re.compile(
+    r"জাল|গুজব|মিথ্যা|ভুয়া|অপপ্রচার|ফেক|fake\s*news|rumour|rumor|disinfo|"
+    r"propaganda|deepfake|fabricat|hoax|misleading|false\s*claim|"
+    r"ভ্রান্ত|বিভ্রান্ত|বানোয়াট|অপতথ্য",
+    re.IGNORECASE,
+)
+
+
+def classify_propaganda(
+    text: str,
+    *,
+    title: str | None = None,
+    model_id: str,
+    cache_dir: str,
+    use_mock: bool,
+) -> dict[str, object]:
+    """Propaganda / disinfo classify — BanglaBERT-assisted, never Ollama.
+
+    Uses keyword hits for hard flags + sentiment model score as confidence prior.
+    """
+    blob = f"{title or ''} {text}".strip()
+    kw_hit = bool(_PROPAGANDA_KW.search(blob))
+
+    # Reuse sentiment pipeline as a distress/negativity prior (not generative).
+    sent = analyze_text(
+        blob[:500] or text[:500],
+        district="",
+        upazila="",
+        model_id=model_id,
+        cache_dir=cache_dir,
+        use_mock=use_mock,
+    )
+    grievance_boost = 0.12 if sent.category == "Grievance" else 0.0
+    base = float(sent.confidence)
+
+    if kw_hit:
+        confidence = min(0.98, max(0.78, base + 0.2 + grievance_boost))
+        return {
+            "is_propaganda": True,
+            "confidence": round(confidence, 3),
+            "note": "Propaganda/disinfo lexical + BanglaBERT prior",
+            "backend": "bangla_bert" if not use_mock else "mock_rules",
+        }
+
+    # Soft flag only when strongly grievance-like with high confidence
+    if sent.category == "Grievance" and base >= 0.9 and len(blob) > 80:
+        return {
+            "is_propaganda": False,
+            "confidence": round(min(0.55, base * 0.5), 3),
+            "note": "High grievance signal — review manually; no propaganda lexeme",
+            "backend": "bangla_bert" if not use_mock else "mock_rules",
+        }
+
+    return {
+        "is_propaganda": False,
+        "confidence": round(max(0.15, 1.0 - base * 0.4), 3),
+        "note": "No propaganda indicators",
+        "backend": "bangla_bert" if not use_mock else "mock_rules",
+    }

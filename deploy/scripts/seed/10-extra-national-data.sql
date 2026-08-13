@@ -29,12 +29,13 @@ VALUES
 ON CONFLICT (id) DO UPDATE SET ai_explanation = EXCLUDED.ai_explanation, severity = EXCLUDED.severity;
 
 -- Extra duty-holders under current BNP mandate only (no Awami League)
+-- Primary roster lives in 03-representatives-real.sql; keep these upserts aligned.
 INSERT INTO representatives (id, name, nid, role, party, tenure_start, tenure_end, admin_unit_id, created_at, updated_at)
 VALUES
-  ('d4000001-0001-4001-8001-000000000021', 'Salahuddin Ahmed (Home Minister)', '1000000000021', 'MINISTER', 'BNP', '2026-02-15', NULL, 'b2000001-0001-4001-8001-000000000154', NOW(), NOW()),
-  ('d4000001-0001-4001-8001-000000000022', 'Barrister Mahbub Uddin Khokon (Whip)', '1000000000022', 'MP', 'BNP', '2026-02-15', NULL, 'b2000001-0001-4001-8001-000000000159', NOW(), NOW()),
+  ('d4000001-0001-4001-8001-000000000021', 'Salahuddin Ahmed (Home Affairs)', '1000000000021', 'MINISTER', 'BNP', '2026-02-15', NULL, 'b2000001-0001-4001-8001-000000000154', NOW(), NOW()),
+  ('d4000001-0001-4001-8001-000000000022', 'Barrister Mahbub Uddin Khokon (Chief Whip)', '1000000000022', 'MP', 'BNP', '2026-02-15', NULL, 'b2000001-0001-4001-8001-000000000159', NOW(), NOW()),
   ('d4000001-0001-4001-8001-000000000023', 'Md. Habibur Rahman (DC, Cox''s Bazar)', '1000000000023', 'DC', 'BCS (Admin)', '2023-08-01', NULL, 'b2000001-0001-4001-8001-000000000145', NOW(), NOW()),
-  ('d4000001-0001-4001-8001-000000000024', 'Dr. Khondaker Mosharraf Hossain (Health)', '1000000000024', 'MP', 'BNP', '2026-02-15', NULL, 'b2000001-0001-4001-8001-000000000001', NOW(), NOW())
+  ('d4000001-0001-4001-8001-000000000024', 'Dr. Khondaker Mosharraf Hossain (Health)', '1000000000024', 'MINISTER', 'BNP', '2026-02-15', NULL, 'b2000001-0001-4001-8001-000000000001', NOW(), NOW())
 ON CONFLICT (nid) DO UPDATE SET
   name = EXCLUDED.name,
   role = EXCLUDED.role,

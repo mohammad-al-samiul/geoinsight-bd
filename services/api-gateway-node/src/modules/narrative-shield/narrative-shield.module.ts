@@ -15,6 +15,10 @@ const feedQuerySchema = z.object({
   category: z.nativeEnum(NarrativeCategory).optional(),
   organization: z.string().max(255).optional(),
   search: z.string().max(200).optional(),
+  division: z.string().max(64).optional(),
+  district: z.string().max(64).optional(),
+  divisionId: z.string().uuid().optional(),
+  districtId: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).optional(),
 });

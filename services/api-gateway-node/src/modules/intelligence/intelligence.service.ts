@@ -11,6 +11,7 @@ import {
   resolveScopeContext,
 } from "../../shared/scope/scope-context";
 import { fetchAi } from "../../shared/http/fetch-ai";
+import { getCurrentMandate } from "../../shared/gov/current-mandate";
 import { allStaticHazardZones } from "./flood-hotspots.data";
 import {
   fetchNewsLocalitiesForWindow,
@@ -263,12 +264,28 @@ export class IntelligenceService {
   }
 
   async scoreAccountability(unitId?: string, lang: "bn" | "en" = "bn") {
+    const mandate = getCurrentMandate({
+      CURRENT_GOVERNMENT_SINCE: env.CURRENT_GOVERNMENT_SINCE,
+      CURRENT_GOVERNMENT_PARTY: env.CURRENT_GOVERNMENT_PARTY,
+    });
+
     // Current-mandate duty-holders only — never Awami League / ended tenure.
     const reps = await prismaRead.representative.findMany({
       where: {
         ...(unitId ? { adminUnitId: unitId } : {}),
         OR: [{ tenureEnd: null }, { tenureEnd: { gt: new Date() } }],
-        NOT: { party: { contains: "Awami", mode: "insensitive" } },
+        AND: [
+          { NOT: { party: { contains: "Awami", mode: "insensitive" } } },
+          { NOT: { name: { contains: "Hasina", mode: "insensitive" } } },
+          {
+            OR: [
+              { party: { equals: mandate.rulingParty, mode: "insensitive" } },
+              { party: { contains: "BCS", mode: "insensitive" } },
+              { party: { contains: "Local", mode: "insensitive" } },
+              { role: { in: ["DC", "UNION_CHAIRMAN", "UPAZILA_CHAIRMAN", "MAYOR"] } },
+            ],
+          },
+        ],
       },
       include: {
         adminUnit: { select: { name: true, nameBn: true } },
@@ -646,6 +663,45 @@ export class IntelligenceService {
           ? `${rep.name}: ethical score ${ethical}/100 over 6 months — ${openAlerts.length} open red flags, ${overruns.length} budget overruns, ${liveSignals.length} public signals.`
           : `${rep.name}: গত ৬ মাসের ethical স্কোর ${ethical}/১০০ — ${openAlerts.length}টি উন্মুক্ত রেড ফ্ল্যাগ, ${overruns.length}টি বাজেট overrun, ${liveSignals.length}টি পাবলিক সিগন্যাল।`,
       explanation_bn: `${rep.name}: গত ৬ মাসের ethical স্কোর ${ethical}/১০০ — ${openAlerts.length}টি উন্মুক্ত রেড ফ্ল্যাগ।`,
+    };
+  }
+
+  async estimateCrowd(body: { image_base64: string; note?: string }) {
+    const res = await fetchAi(`/api/v1/local-ai/crowd-estimate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image_base64: body.image_base64,
+        note: body.note,
+      }),
+    });
+    if (!res.ok) {
+      return {
+        faceCount: 0,
+        densityBand: "LOW" as const,
+        noteEn: "Crowd estimate unavailable.",
+        noteBn: "ভিড় অনুমান পাওয়া যায়নি।",
+        faceBoxes: [] as number[][],
+        engine: "haar",
+      };
+    }
+    const data = (await res.json()) as {
+      face_count?: number;
+      density_band?: string;
+      note_en?: string;
+      note_bn?: string;
+      face_boxes?: number[][];
+      engine?: string;
+    };
+    const band = data.density_band;
+    return {
+      faceCount: Number(data.face_count ?? 0),
+      densityBand:
+        band === "HIGH" || band === "MEDIUM" || band === "LOW" ? band : "LOW",
+      noteEn: String(data.note_en ?? ""),
+      noteBn: String(data.note_bn ?? ""),
+      faceBoxes: Array.isArray(data.face_boxes) ? data.face_boxes : [],
+      engine: String(data.engine ?? "haar"),
     };
   }
 

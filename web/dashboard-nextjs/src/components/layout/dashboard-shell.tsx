@@ -10,26 +10,38 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { loadAdminHierarchy } from "@/lib/admin-hierarchy";
 import { fetchSocketToken } from "@/lib/socket-token";
+import { useAuth, useAuthContext } from "@/hooks/use-auth";
+import { isLocalEntityRole } from "@/types";
 
 export function DashboardShell({ children }: { children: ReactNode }) {
+  const user = useAuth();
+  const { isLoading: authLoading } = useAuthContext();
+  const authReady = !authLoading && user.id !== "loading";
+  const localRole = authReady && isLocalEntityRole(user.role);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
 
   // Warm shared caches as soon as chrome mounts — before modules ask for them.
+  // Wait for real role so MP/Mayor never boot national endpoints as fake-PMO.
   useEffect(() => {
+    if (!authReady || localRole) return;
     void loadAdminHierarchy();
     void fetchSocketToken();
-  }, []);
+  }, [authReady, localRole]);
 
-  // Desktop feed open by default; stay closed on smaller screens until toggled.
+  // Desktop feed open by default for national roles; local DSS stays focused.
   useEffect(() => {
+    if (!authReady || localRole) {
+      setFeedOpen(false);
+      return;
+    }
     const mq = window.matchMedia("(min-width: 1280px)");
     const sync = () => setFeedOpen(mq.matches);
     sync();
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
-  }, []);
+  }, [authReady, localRole]);
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-background">

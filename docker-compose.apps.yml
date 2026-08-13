@@ -21,6 +21,9 @@ services:
       DIRECT_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoinsight_db}?schema=public
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoinsight_db}?schema=public
       TZ: ${TZ:-Asia/Dhaka}
+    # Always use host prisma/ so new migrations apply without requiring -Build
+    volumes:
+      - ./services/api-gateway-node/prisma:/app/prisma:ro
     entrypoint: ["sh", "-c"]
     command:
       - DATABASE_URL="$$DIRECT_DATABASE_URL" npx prisma migrate deploy
@@ -88,6 +91,9 @@ services:
       PIPELINE_AGRO_INTERVAL_MS: ${PIPELINE_AGRO_INTERVAL_MS:-1800000}
       PIPELINE_HAZARD_INTERVAL_MS: ${PIPELINE_HAZARD_INTERVAL_MS:-1800000}
       PIPELINE_NARRATIVE_INTERVAL_MS: ${PIPELINE_NARRATIVE_INTERVAL_MS:-600000}
+      PIPELINE_PULSE_INTERVAL_MS: ${PIPELINE_PULSE_INTERVAL_MS:-120000}
+      PIPELINE_PULSE_RUN_ON_START: ${PIPELINE_PULSE_RUN_ON_START:-true}
+      PIPELINE_PULSE_STARTUP_DELAY_MS: ${PIPELINE_PULSE_STARTUP_DELAY_MS:-30000}
       LIVE_DATA_ONLY: ${LIVE_DATA_ONLY:-true}
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-500}
@@ -134,6 +140,7 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-gpt-oss:20b}
+      OLLAMA_MODEL_FAST: ${OLLAMA_MODEL_FAST:-llama3.1:8b}
       SOVEREIGN_MODE: ${SOVEREIGN_MODE:-true}
       AI_MODEL_CACHE_DIR: /tmp/ml_models/cache
       CORS_ORIGINS: ${CORS_ORIGIN:-http://localhost:3600},http://api-gateway:4000

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 
 from app.core.config import Settings
+from app.ml.ai_policy import LlmTask
 from app.ml.ollama_client import OllamaClient
 from app.modules.arbitrage.service import CommodityScraper, optimize_arbitrage
 from app.modules.procurement.schemas import (
@@ -10,6 +13,8 @@ from app.modules.procurement.schemas import (
     ProcurementAdviceResponse,
     ProcurementOption,
 )
+
+logger = logging.getLogger(__name__)
 
 _PORT_CONGESTION = {
     "IN": "Moderate — Chittagong berth wait 2–4 days",
@@ -47,6 +52,9 @@ class ProcurementAdvisor:
             quotes = req.market_quotes
         else:
             quotes = await self._scraper.scrape_commodity(req.commodity.lower())
+        if not quotes:
+            raise ValueError(f"No market quotes available for {req.commodity}")
+
         arb = optimize_arbitrage(quotes, req.quantity_mt)
 
         def to_option(row: object) -> ProcurementOption:
@@ -65,6 +73,8 @@ class ProcurementAdvisor:
             )
 
         ranked = [to_option(r) for r in arb.all_ranked[:6]]
+        if not ranked:
+            raise ValueError(f"No ranked procurement options for {req.commodity}")
         best = ranked[0]
         alts = ranked[1:4]
 
@@ -98,7 +108,14 @@ class ProcurementAdvisor:
         narrative_en = f"{rec_en} Alternatives: {alt_text_en}."
         narrative_bn = f"{rec_bn} বিকল্প: {alt_text_bn}।"
 
-        if self._ollama and self._ollama.enabled:
+        # Default: skip Ollama — unreachable LLM was hanging ~40s and timing out
+        # the gateway (30s), so "Get advice" failed with load error.
+        use_llm = os.getenv("PROCUREMENT_USE_LLM", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        if use_llm and self._ollama and self._ollama.enabled:
             context = json.dumps(
                 {
                     "commodity": req.commodity,
@@ -114,7 +131,18 @@ class ProcurementAdvisor:
                 if req.lang == "bn"
                 else "You are a government procurement advisor. Write a concise recommendation from the JSON."
             )
-            llm_narrative = await self._ollama.complete(system, context)
+            try:
+                llm_narrative = await self._ollama.chat(
+                    [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": context},
+                    ],
+                    timeout=8.0,
+                    task=LlmTask.PROCUREMENT_NARRATIVE,
+                )
+            except Exception as exc:
+                logger.warning("Procurement LLM skipped: %s", exc)
+                llm_narrative = None
             if llm_narrative:
                 if req.lang == "bn":
                     narrative_bn = llm_narrative

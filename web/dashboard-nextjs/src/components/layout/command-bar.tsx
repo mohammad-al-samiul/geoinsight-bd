@@ -4,13 +4,14 @@ import { AdminCascadeFilter } from "@/components/filters/admin-cascade-filter";
 import { CommandSearch } from "@/components/layout/command-search";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { NotificationCenter } from "@/components/layout/notification-center";
-import { useAuth, useAuthActions } from "@/hooks/use-auth";
+import { useAuth, useAuthActions, useAuthContext } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
 import { AlertTriangle, LogOut, Menu, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
+import { isLocalEntityRole } from "@/types";
 
 interface CommandBarProps {
   onMenuClick: () => void;
@@ -26,15 +27,20 @@ export function CommandBar({
   feedOpen,
 }: CommandBarProps) {
   const user = useAuth();
+  const { isLoading: authLoading } = useAuthContext();
   const { logout } = useAuthActions();
   const t = useTranslations("shell");
   const tr = useTranslations("roles");
   const pathname = usePathname();
+  const authReady = !authLoading && user.id !== "loading";
+  const localRole = authReady && isLocalEntityRole(user.role);
+  const showNationalChrome = authReady && !localRole;
 
   // Production polish:
   // Show "proshashonik elaka" cascade only where it is actually needed (Hazards / risk context).
   // Everywhere else, drill-down can still work via map clicks (filter stays in URL).
-  const showAdminCascadeFilter = pathname?.startsWith("/hazards") ?? false;
+  const showAdminCascadeFilter =
+    showNationalChrome && (pathname?.startsWith("/hazards") ?? false);
 
   return (
     <header className="sticky top-0 z-[100] overflow-visible border-b border-command-border/80 bg-command/90 shadow-panel backdrop-blur-xl">
@@ -58,10 +64,12 @@ export function CommandBar({
           </div>
           <div>
             <p className="font-display text-sm font-semibold leading-none tracking-tight">
-              {t("commandCenter")}
+              {localRole ? t("localSubtitle") : t("commandCenter")}
             </p>
             <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-              {t("commandSubtitle")}
+              {localRole
+                ? user.adminUnitName ?? t("localSubtitle")
+                : t("commandSubtitle")}
             </p>
           </div>
         </div>
@@ -80,7 +88,7 @@ export function CommandBar({
           >
             {tr(user.role)}
           </Badge>
-          {onToggleFeed && (
+          {showNationalChrome && onToggleFeed && (
             <Button
               variant={feedOpen ? "secondary" : "ghost"}
               size="icon"
@@ -92,7 +100,7 @@ export function CommandBar({
               <AlertTriangle className="h-4 w-4" />
             </Button>
           )}
-          <NotificationCenter />
+          {showNationalChrome && <NotificationCenter />}
           <Button
             variant="ghost"
             size="icon"

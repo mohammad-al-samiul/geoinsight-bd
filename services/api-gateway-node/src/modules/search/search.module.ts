@@ -25,11 +25,17 @@ export class SearchModule extends BaseModule {
         UserRole.MINISTER,
         UserRole.DC,
         UserRole.UNION_CHAIRMAN,
+        UserRole.MP,
+        UserRole.MAYOR,
       ),
       validate(querySchema, "query"),
       asyncHandler(async (req, res) => {
         const q = req.query as unknown as z.infer<typeof querySchema>;
-        const data = await searchService.search(q.q, q.limit ?? 20);
+        const data = await searchService.search(
+          q.q,
+          q.limit ?? 20,
+          req.user!.role,
+        );
         sendSuccess(res, { results: data, query: q.q });
       }),
     );

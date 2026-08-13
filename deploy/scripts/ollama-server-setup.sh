@@ -37,6 +37,7 @@ source .env.ollama
 set +a
 
 MODEL="${OLLAMA_MODEL:-gpt-oss:20b}"
+MODEL_FAST="${OLLAMA_MODEL_FAST:-llama3.1:8b}"
 PORT="${OLLAMA_PORT:-11434}"
 
 echo "==> Starting Ollama container on :$PORT ..."
@@ -55,8 +56,11 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-echo "==> Pulling model: $MODEL (may take several minutes)..."
+echo "==> Pulling quality model: $MODEL (may take several minutes)..."
 docker exec geoinsight-ollama ollama pull "$MODEL"
+
+echo "==> Pulling fast model: $MODEL_FAST ..."
+docker exec geoinsight-ollama ollama pull "$MODEL_FAST"
 
 echo "==> Installed models:"
 docker exec geoinsight-ollama ollama list
@@ -77,13 +81,14 @@ IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 IP="${IP:-<AI_SERVER_IP>}"
 
 echo ""
-echo "==> Ollama server ready."
+echo "==> Ollama server ready (dual-tier)."
 echo "    Local check:  curl -s http://127.0.0.1:${PORT}/api/tags"
 echo ""
 echo "On the APP VPS (/opt/geoinsight-bd/.env) set:"
 echo "    LLM_PROVIDER=ollama"
 echo "    OLLAMA_URL=http://${IP}:${PORT}"
 echo "    OLLAMA_MODEL=${MODEL}"
+echo "    OLLAMA_MODEL_FAST=${MODEL_FAST}"
 echo "    SENTIMENT_USE_MOCK=true"
 echo ""
 echo "Then recreate AI container:"

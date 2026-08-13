@@ -38,11 +38,6 @@ function redirectToLogin() {
   window.location.href = `/login?redirect=${redirect}`;
 }
 
-function redirectToForbidden(reason: string) {
-  if (typeof window === "undefined") return;
-  window.location.href = `/forbidden?reason=${encodeURIComponent(reason)}`;
-}
-
 /** In-flight GET dedupe + short TTL so parallel mounts share one network hop. */
 const getInflight = new Map<string, Promise<unknown>>();
 const getCache = new Map<string, { at: number; value: unknown }>();
@@ -92,8 +87,9 @@ async function apiClientUncached<T = unknown>(
     const message =
       (body as { message?: string }).message ??
       "Access denied for your administrative tenant";
-    redirectToForbidden(message);
-    throw new ApiClientError(403, message);
+    // Do not hard-navigate to /forbidden — optional widgets (alerts feed)
+    // must not kick local DSS users out of their session. Callers handle 403.
+    throw new ApiClientError(403, message, (body as { code?: string }).code);
   }
 
   const body = await res.json().catch(() => ({}));

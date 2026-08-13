@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { FaceAlertOverlayCard } from "@/components/face-intel/face-alert-overlay-card";
 import { useAppLang } from "@/hooks/use-app-lang";
 import { useFaceIntel } from "@/hooks/use-face-intel";
+import { apiClient } from "@/lib/api-client";
 import {
   Camera,
   Fingerprint,
@@ -16,13 +17,22 @@ import {
   Loader2,
   ScanFace,
   Upload,
+  Users,
 } from "lucide-react";
 
 export function FaceIntelPanel() {
   const t = useTranslations("modules.faceIntel");
   const lang = useAppLang();
   const fileRef = useRef<HTMLInputElement>(null);
+  const crowdRef = useRef<HTMLInputElement>(null);
   const [camOn, setCamOn] = useState(false);
+  const [crowdBusy, setCrowdBusy] = useState(false);
+  const [crowd, setCrowd] = useState<{
+    faceCount: number;
+    densityBand: string;
+    noteEn: string;
+    noteBn: string;
+  } | null>(null);
   const {
     card,
     setCard,
@@ -65,6 +75,37 @@ export function FaceIntelPanel() {
     await identifyNid(nid, lang);
   };
 
+  const estimateCrowd = async (file: File) => {
+    setCrowdBusy(true);
+    setCrowd(null);
+    try {
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += 1) {
+        binary += String.fromCharCode(bytes[i]!);
+      }
+      const image_base64 = `data:${file.type || "image/jpeg"};base64,${btoa(binary)}`;
+      const res = await apiClient<{
+        success: boolean;
+        data: {
+          faceCount: number;
+          densityBand: string;
+          noteEn: string;
+          noteBn: string;
+        };
+      }>("intelligence/face-intel/crowd-estimate", {
+        method: "POST",
+        body: JSON.stringify({ image_base64 }),
+      });
+      setCrowd(res.data);
+    } catch {
+      setCrowd(null);
+    } finally {
+      setCrowdBusy(false);
+    }
+  };
+
   return (
     <div className="relative">
       <ModuleShell
@@ -79,7 +120,13 @@ export function FaceIntelPanel() {
               <StatCard
                 label={t("ethicalScore")}
                 value={`${card.ethical_score}/100`}
-                accent={card.ethical_score < 50 ? "danger" : card.ethical_score < 75 ? "warning" : "success"}
+                accent={
+                  card.ethical_score < 50
+                    ? "danger"
+                    : card.ethical_score < 75
+                      ? "warning"
+                      : "success"
+                }
               />
               <StatCard label={t("redFlags")} value={card.red_flags_count ?? 0} accent="danger" />
               <StatCard label={t("activities")} value={card.public_activity_count ?? 0} />
@@ -107,7 +154,11 @@ export function FaceIntelPanel() {
                 disabled={loading || !camOn}
                 onClick={() => void captureAndIdentify(lang)}
               >
-                {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Fingerprint className="h-3.5 w-3.5" />}
+                {loading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Fingerprint className="h-3.5 w-3.5" />
+                )}
                 {t("scanFrame")}
               </Button>
               <Button
@@ -143,6 +194,54 @@ export function FaceIntelPanel() {
               className="aspect-video w-full object-cover"
             />
           </div>
+        </IntelCard>
+
+        <IntelCard accent="default" padding="lg" hoverLift={false} className="mt-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="flex items-center gap-2 font-display text-sm font-semibold">
+              <Users className="h-4 w-4 text-primary" />
+              {t("crowdTitle")}
+            </h3>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              disabled={crowdBusy}
+              onClick={() => crowdRef.current?.click()}
+            >
+              {crowdBusy ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Upload className="h-3.5 w-3.5" />
+              )}
+              {crowdBusy ? t("crowdBusy") : t("crowdEstimate")}
+            </Button>
+            <input
+              ref={crowdRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void estimateCrowd(f);
+                e.target.value = "";
+              }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">{t("crowdHint")}</p>
+          {crowd ? (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+              <p className="font-medium">
+                {t("crowdResult", {
+                  count: crowd.faceCount,
+                  band: crowd.densityBand,
+                })}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {lang === "bn" ? crowd.noteBn : crowd.noteEn}
+              </p>
+            </div>
+          ) : null}
         </IntelCard>
 
         <IntelCard accent="default" padding="lg" hoverLift={false} className="mt-4 space-y-3">

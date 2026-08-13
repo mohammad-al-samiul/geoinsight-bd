@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 export interface HazardExposure {
   project_id: string;
@@ -79,6 +80,8 @@ export function useHazardOverlay(lookbackDays = 1) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useRealtimeRefresh(load, true, true);
 
   return { overlay, loading, error, reload: load };
 }

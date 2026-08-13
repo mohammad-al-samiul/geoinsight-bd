@@ -1,6 +1,7 @@
 import { env } from "../../core/config/env";
 import { IntervalWorker } from "../../core/workers/interval-worker";
 import { pipelineService } from "./pipeline.service";
+import { continuousPulseService } from "./continuous-pulse.service";
 import { loggedPipelineTask } from "../intel/pipeline-run-log.service";
 
 const DAY_MS = 86_400_000;
@@ -16,6 +17,26 @@ export class PipelineOrchestrator {
       () => loggedPipelineTask(job, fn);
 
     this.workers = [
+      // Continuous national + local DB writer — runs even with no browser open.
+      new IntervalWorker(
+        "pipeline:continuous-pulse",
+        log("continuous-pulse", () => continuousPulseService.run()),
+        env.PIPELINE_PULSE_INTERVAL_MS,
+        env.PIPELINE_PULSE_RUN_ON_START,
+        env.PIPELINE_PULSE_STARTUP_DELAY_MS,
+      ),
+      new IntervalWorker(
+        "pipeline:alert-retry",
+        log("alert-retry", async () => {
+          const { alertDeliveryService } = await import(
+            "../alert-delivery/alert-delivery.service"
+          );
+          return alertDeliveryService.retryDue(40);
+        }),
+        120_000,
+        true,
+        45_000,
+      ),
       new IntervalWorker(
         "pipeline:news",
         log("news", () => pipelineService.syncNews()),

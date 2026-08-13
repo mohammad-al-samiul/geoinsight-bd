@@ -12,14 +12,17 @@ import { fetchGateway } from "@/lib/auth/fetch-gateway";
 interface GatewayAuthResponse {
   success: boolean;
   data: {
-    accessToken: string;
-    refreshToken: string;
+    requiresMfa?: boolean;
+    mfaToken?: string;
+    accessToken?: string;
+    refreshToken?: string;
     user: {
       id: string;
       email: string;
-      phone: string | null;
+      phone?: string | null;
       role: string;
-      adminUnitId: string | null;
+      adminUnitId?: string | null;
+      mfaEnabled?: boolean;
     };
   };
   message?: string;
@@ -58,11 +61,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (json.data.requiresMfa && json.data.mfaToken) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          requiresMfa: true,
+          mfaToken: json.data.mfaToken,
+          user: json.data.user,
+        },
+      });
+    }
+
+    if (!json.data.accessToken || !json.data.refreshToken) {
+      return NextResponse.json(
+        { success: false, message: "Incomplete auth response" },
+        { status: 502 },
+      );
+    }
+
     const response = NextResponse.json({
       success: true,
-      data: { user: json.data.user },
+      data: {
+        requiresMfa: false,
+        user: json.data.user,
+      },
     });
-    setAuthCookies(response, json.data);
+    setAuthCookies(response, {
+      accessToken: json.data.accessToken,
+      refreshToken: json.data.refreshToken,
+    });
     return response;
   } catch (error) {
     const message =

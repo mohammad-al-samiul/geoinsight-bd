@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -12,6 +12,22 @@ function ForbiddenContent() {
   const searchParams = useSearchParams();
   const t = useTranslations("forbidden");
   const reason = searchParams.get("reason") ?? t("defaultReason");
+  const [homeHref, setHomeHref] = useState("/");
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/auth/me", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (cancelled || !json?.success) return;
+        const role = json.data?.role as string | undefined;
+        if (role === "MP" || role === "MAYOR") setHomeHref("/local");
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6 text-center">
@@ -25,7 +41,7 @@ function ForbiddenContent() {
         <p className="mt-2 text-xs text-muted-foreground">{t("rbacNote")}</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Button asChild>
-            <Link href="/">{t("overview")}</Link>
+            <Link href={homeHref}>{t("overview")}</Link>
           </Button>
           <Button variant="outline" asChild>
             <Link href="/login">{t("switchAccount")}</Link>

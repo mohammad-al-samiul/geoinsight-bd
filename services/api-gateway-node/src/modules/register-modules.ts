@@ -28,6 +28,7 @@ import { intelModule } from "./intel/intel.module";
 import { narrativeShieldModule } from "./narrative-shield/narrative-shield.module";
 import { outlookModule } from "./outlook/outlook.module";
 import { divisionalCrisisModule } from "./divisional-crisis/divisional-crisis.module";
+import { localEntityModule } from "./local-entity/local-entity.module";
 
 const modules: AppModule[] = [
   healthModule,
@@ -51,6 +52,7 @@ const modules: AppModule[] = [
   narrativeShieldModule,
   outlookModule,
   divisionalCrisisModule,
+  localEntityModule,
   simulatorModule,
   procurementModule,
   sovereignModule,

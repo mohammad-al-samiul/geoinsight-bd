@@ -1081,25 +1081,25 @@ export function DivisionalCrisisPanel() {
                   </div>
                 </div>
 
-                <div className="w-full" style={{ height: Math.max(layout.chartHeightMd, 340) }}>
+                <div className="w-full overflow-visible" style={{ height: Math.max(layout.pieChartHeight, 340) }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart margin={{ top: 20, right: 28, bottom: 16, left: 28 }}>
+                    <PieChart margin={{ ...layout.pieMargin, bottom: 20 }}>
                       <Pie
                         data={aggregateCrimeTypeBreakdown}
                         cx="50%"
                         cy="50%"
-                        innerRadius={Math.max(48, layout.pieInner)}
-                        outerRadius={Math.min(layout.pieOuter, 88)}
+                        innerRadius={layout.pieInner}
+                        outerRadius={layout.pieOuter}
                         paddingAngle={3}
                         dataKey="value"
                         nameKey={bn ? "nameBn" : "name"}
-                        /* Percent only on the ring — full names live in the legend below */
+                        /* Percent only on the ring — full names live in the list below */
                         label={(props) =>
                           piePercentLabel({
                             ...props,
                             showName: false,
-                            fontSize: Math.max(layout.pieFontSize, 15),
-                            offset: 18,
+                            fontSize: layout.pieFontSize,
+                            offset: layout.pieLabelOffset,
                           })
                         }
                         labelLine={{ stroke: "#94a3b8", strokeWidth: 1.25 }}

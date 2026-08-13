@@ -73,6 +73,8 @@ export interface ProjectDetail extends ProjectRow {
 export interface RepresentativeRow {
   id: string;
   name: string;
+  displayName?: string;
+  portfolio?: string | null;
   nid: string;
   role: string;
   party?: string | null;

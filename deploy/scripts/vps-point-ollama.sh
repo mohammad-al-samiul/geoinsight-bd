@@ -9,9 +9,10 @@ set -euo pipefail
 
 OLLAMA_URL_ARG="${1:-}"
 MODEL_ARG="${2:-gpt-oss:20b}"
+MODEL_FAST_ARG="${3:-llama3.1:8b}"
 
 if [[ -z "$OLLAMA_URL_ARG" ]]; then
-  echo "Usage: bash deploy/scripts/vps-point-ollama.sh http://AI_SERVER_IP:11434 [model]"
+  echo "Usage: bash deploy/scripts/vps-point-ollama.sh http://AI_SERVER_IP:11434 [quality_model] [fast_model]"
   exit 1
 fi
 
@@ -40,6 +41,7 @@ patch_kv() {
 patch_kv LLM_PROVIDER ollama
 patch_kv OLLAMA_URL "$OLLAMA_URL_ARG"
 patch_kv OLLAMA_MODEL "$MODEL_ARG"
+patch_kv OLLAMA_MODEL_FAST "$MODEL_FAST_ARG"
 # Keep sentiment mock on app VPS — BERT belongs on a big box if needed
 patch_kv SENTIMENT_USE_MOCK true
 
@@ -79,4 +81,4 @@ docker exec geoinsight-ai-analytics \
   2>/dev/null || echo "(status endpoint not ready yet — check logs)"
 
 echo ""
-echo "Done. Dashboard Sovereign AI should now use: $OLLAMA_URL_ARG ($MODEL_ARG)"
+echo "Done. Dashboard Sovereign AI should now use: $OLLAMA_URL_ARG (quality=$MODEL_ARG fast=$MODEL_FAST_ARG)"

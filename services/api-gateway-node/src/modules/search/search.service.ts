@@ -1,5 +1,6 @@
 import { prismaRead } from "../../core/database/prisma.client";
 import { ingestionService } from "../ingestion/ingestion.service";
+import { UserRole } from "@prisma/client";
 
 export interface SearchResult {
   type: "page" | "project" | "representative" | "kpi" | "alert" | "news";
@@ -9,9 +10,23 @@ export interface SearchResult {
   href: string;
 }
 
-const PAGES: SearchResult[] = [
+const LOCAL_PAGES: SearchResult[] = [
+  { type: "page", id: "local-entity", title: "Local Entity DSS", href: "/local" },
+  { type: "page", id: "local-complaints", title: "Instant Action SLA", href: "/local/complaints" },
+  { type: "page", id: "local-wpi", title: "Ward Performance Index", href: "/local/wpi" },
+  { type: "page", id: "local-osint", title: "Local OSINT Feed", href: "/local/osint" },
+  { type: "page", id: "local-pulse", title: "Political Pulse", href: "/local/pulse" },
+  { type: "page", id: "local-specialty", title: "Role Specialty Pack", href: "/local/specialty" },
+  { type: "page", id: "local-alerts", title: "WhatsApp / Voice Alerts", href: "/local/alerts" },
+  { type: "page", id: "local-security", title: "Security & 2FA", href: "/local/security" },
+  { type: "page", id: "notifications", title: "Notifications", href: "/notifications" },
+];
+
+const NATIONAL_PAGES: SearchResult[] = [
   { type: "page", id: "home", title: "National Overview", href: "/" },
   { type: "page", id: "briefing", title: "PM Briefing Copilot", href: "/briefing" },
+  { type: "page", id: "narrative", title: "Narrative Shield", href: "/narrative-shield" },
+  { type: "page", id: "outlook", title: "Strategic Outlook", href: "/outlook" },
   { type: "page", id: "sovereign", title: "Sovereign Bangla LLM", href: "/sovereign-ai" },
   { type: "page", id: "twin", title: "KPI Digital Twin", href: "/digital-twin" },
   { type: "page", id: "sentiment", title: "Citizen Sentiment", href: "/sentiment" },
@@ -30,19 +45,34 @@ const PAGES: SearchResult[] = [
   { type: "page", id: "face-intel", title: "Face Intel / Ethical Card", href: "/face-intel" },
   { type: "page", id: "agro", title: "Agri Markets", href: "/agro" },
   { type: "page", id: "reps", title: "Representatives", href: "/representatives" },
+  { type: "page", id: "local-entity", title: "Local Entity DSS", href: "/local" },
 ];
 
+function pagesForRole(role: UserRole): SearchResult[] {
+  if (role === UserRole.MP || role === UserRole.MAYOR) return LOCAL_PAGES;
+  return NATIONAL_PAGES;
+}
+
 export class SearchService {
-  async search(query: string, limit = 20): Promise<SearchResult[]> {
+  async search(
+    query: string,
+    limit = 20,
+    role: UserRole = UserRole.PMO,
+  ): Promise<SearchResult[]> {
     const q = query.trim().toLowerCase();
     if (q.length < 2) return [];
 
     const results: SearchResult[] = [];
+    const localOnly = role === UserRole.MP || role === UserRole.MAYOR;
 
-    for (const page of PAGES) {
+    for (const page of pagesForRole(role)) {
       if (page.title.toLowerCase().includes(q)) {
         results.push(page);
       }
+    }
+
+    if (localOnly) {
+      return results.slice(0, limit);
     }
 
     const [projects, reps, kpis, alerts, news] = await Promise.all([

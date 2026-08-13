@@ -9,6 +9,7 @@ import re
 from datetime import UTC, datetime
 
 from app.core.config import Settings
+from app.ml.ai_policy import LlmTask
 from app.ml.ollama_client import OllamaClient
 from app.modules.narrative_shield.fact_checker import FactChecker
 from app.modules.narrative_shield.keywords import CATEGORY_KW_MAP, POLICY_REFS
@@ -509,7 +510,7 @@ class NarrativeShieldService:
             },
             ensure_ascii=False,
         )
-        raw = await self._ollama.complete(system, user, temperature=0.2)
+        raw = await self._ollama.complete(system, user, temperature=0.2, task=LlmTask.NARRATIVE_DEBUNK)
         if not raw:
             return None
         try:
@@ -546,7 +547,9 @@ class NarrativeShieldService:
             },
             ensure_ascii=False,
         )
-        return await self._ollama.complete(system, user, temperature=0.25)
+        return await self._ollama.complete(
+            system, user, temperature=0.25, task=LlmTask.NARRATIVE_DEBUNK
+        )
 
     def _rule_debunk(self, req: DebunkRequest) -> str:
         """Deterministic fallback rebuttal when LLM is unavailable."""

@@ -205,49 +205,55 @@ function ShieldCharts({ signals, bn }: { signals: NarrativeSignal[]; bn: boolean
           <p className="mb-3 text-sm font-bold uppercase tracking-widest text-muted-foreground">
             {bn ? "ঝুঁকির মাত্রা বিতরণ" : "Threat Level Distribution"}
           </p>
-          <ResponsiveContainer width="100%" height={layout.chartHeightMd}>
-            <PieChart margin={{ top: layout.narrow ? 12 : 28, right: layout.narrow ? 12 : 36, bottom: 12, left: layout.narrow ? 12 : 36 }}>
-              <Pie
-                data={threatData}
-                dataKey="value"
-                cx="50%"
-                cy="46%"
-                innerRadius={layout.pieInner}
-                outerRadius={layout.pieOuter}
-                paddingAngle={4}
-                label={(props) =>
-                  piePercentLabel({
-                    ...props,
-                    showName: layout.showPieNames,
-                    fontSize: layout.pieFontSize,
-                    offset: layout.pieLabelOffset,
-                  })
-                }
-                labelLine={{ stroke: "#94a3b8", strokeWidth: 1.5 }}
-                isAnimationActive
-                animationDuration={1200}
-                animationBegin={200}
-              >
-                {threatData.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} opacity={0.9} />
-                ))}
-              </Pie>
-              <Tooltip
-                {...chartTooltipProps}
-                formatter={(v: number, n) => {
-                  const total = threatData.reduce((s, d) => s + d.value, 0) || 1;
-                  const pct = Math.round((v / total) * 100);
-                  return [`${v} (${pct}%)`, n];
-                }}
-              />
-              <Legend
-                iconType="circle"
-                iconSize={layout.narrow ? 9 : 12}
-                wrapperStyle={layout.legend}
-                formatter={(v) => <span className="text-xs font-semibold text-foreground/90 sm:text-sm">{v}</span>}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+          <div className="w-full overflow-visible" style={{ height: layout.pieChartHeight }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart margin={layout.pieMargin}>
+                <Pie
+                  data={threatData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="45%"
+                  innerRadius={layout.pieInner}
+                  outerRadius={layout.pieOuter}
+                  paddingAngle={4}
+                  label={(props) =>
+                    piePercentLabel({
+                      ...props,
+                      showName: false,
+                      fontSize: layout.pieFontSize,
+                      offset: layout.pieLabelOffset,
+                    })
+                  }
+                  labelLine={{ stroke: "#94a3b8", strokeWidth: 1.25 }}
+                  isAnimationActive
+                  animationDuration={1200}
+                  animationBegin={200}
+                >
+                  {threatData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} opacity={0.9} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  {...chartTooltipProps}
+                  formatter={(v: number, n) => {
+                    const total = threatData.reduce((s, d) => s + d.value, 0) || 1;
+                    const pct = Math.round((v / total) * 100);
+                    return [`${v} (${pct}%)`, n];
+                  }}
+                />
+                <Legend
+                  iconType="circle"
+                  iconSize={layout.narrow ? 9 : 12}
+                  verticalAlign="bottom"
+                  wrapperStyle={{ ...layout.legend, width: "100%", paddingTop: 4 }}
+                  formatter={(v) => (
+                    <span className="text-xs font-semibold text-foreground/90 sm:text-sm">{v}</span>
+                  )}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </IntelCard>
       </motion.div>
 

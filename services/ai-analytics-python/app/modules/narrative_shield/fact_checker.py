@@ -19,6 +19,7 @@ from urllib.parse import quote_plus, urlparse
 import httpx
 
 from app.core.config import Settings
+from app.ml.ai_policy import LlmTask
 from app.ml.ollama_client import OllamaClient
 from app.modules.narrative_shield.trust_lists import (
     BLOCKED_DOMAINS,
@@ -300,7 +301,9 @@ class FactChecker:
         )
         user = f"TITLE: {title}\nBODY: {body or ''}\nMARKERS: {markers}"
         try:
-            reply = await self._ollama.complete(system, user)
+            reply = await self._ollama.complete(
+                system, user, task=LlmTask.NARRATIVE_DEBUNK
+            )
             if not reply:
                 return None
             clean = re.sub(r"\s+", " ", reply).strip()

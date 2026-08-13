@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
+import { useAdminFilter } from "@/hooks/use-admin-filter";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { appendAdminScope } from "@/lib/unit-scope";
 
 // ── Enums (mirror Prisma / Python enums) ─────────────────────────────────────
 export type NarrativeThreatLevel = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
@@ -111,7 +113,10 @@ export interface FeedQuery {
 }
 
 // ── Build query string ────────────────────────────────────────────────────────
-function buildQs(q: FeedQuery): string {
+function buildQs(
+  q: FeedQuery,
+  filter: { divisionId: string | null; districtId: string | null; upazilaId: string | null; unionId: string | null },
+): string {
   const p = new URLSearchParams();
   if (q.status) p.set("status", q.status);
   if (q.threatLevel) p.set("threatLevel", q.threatLevel);
@@ -120,12 +125,14 @@ function buildQs(q: FeedQuery): string {
   if (q.search) p.set("search", q.search);
   if (q.limit) p.set("limit", String(q.limit));
   if (q.offset) p.set("offset", String(q.offset));
+  appendAdminScope(p, filter);
   const s = p.toString();
   return s ? `?${s}` : "";
 }
 
 // ── Main feed hook ────────────────────────────────────────────────────────────
 export function useNarrativeShield(query: FeedQuery = {}) {
+  const { filter } = useAdminFilter();
   const [data, setData] = useState<ShieldFeed | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -137,7 +144,7 @@ export function useNarrativeShield(query: FeedQuery = {}) {
     if (hasDataRef.current) setRefreshing(true);
     else setLoading(true);
     try {
-      const qs = buildQs(query);
+      const qs = buildQs(query, filter);
       const json = await apiClient<{ success: boolean; data: ShieldFeed }>(
         `narrative-shield/feed${qs}`,
       );
@@ -160,13 +167,17 @@ export function useNarrativeShield(query: FeedQuery = {}) {
     query.search,
     query.limit,
     query.offset,
+    filter.divisionId,
+    filter.districtId,
+    filter.upazilaId,
+    filter.unionId,
   ]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  useRealtimeRefresh(load);
+  useRealtimeRefresh(load, true, true);
 
   return { data, loading, refreshing, error, reload: load };
 }

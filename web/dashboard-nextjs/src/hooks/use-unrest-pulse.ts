@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 export type UnrestCategory =
   | "protest"
@@ -216,6 +217,8 @@ export function useUnrestPulse() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useRealtimeRefresh(load, true, true);
 
   return { data, loading, error, reload: load };
 }

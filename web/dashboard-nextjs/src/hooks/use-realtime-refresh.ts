@@ -4,12 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useSocket } from "@/hooks/use-socket";
 import { fetchSocketToken } from "@/lib/socket-token";
 
-const POLL_INTERVAL_MS = 5 * 60 * 1000;
+const POLL_INTERVAL_MS = 90 * 1000;
 
 /**
- * Refreshes when the backend broadcasts an update and polls as a safety net
- * while the tab is visible. The poll covers sources that cannot emit sockets
- * (RSS, weather, public feeds) without wasting requests in background tabs.
+ * Refreshes when the backend broadcasts an update and polls on a fixed interval
+ * whenever the app is open (including background tabs). Focus/visibility also
+ * triggers an immediate reload when the user returns to the page.
  */
 export function useRealtimeRefresh(
   reload: () => void | Promise<void>,
@@ -29,17 +29,17 @@ export function useRealtimeRefresh(
   useEffect(() => {
     if (!enabled || !poll) return;
 
-    const refreshIfVisible = () => {
-      if (document.visibilityState === "visible") void reload();
+    const refresh = () => {
+      void reload();
     };
-    const interval = window.setInterval(refreshIfVisible, POLL_INTERVAL_MS);
-    window.addEventListener("focus", refreshIfVisible);
-    document.addEventListener("visibilitychange", refreshIfVisible);
+    const interval = window.setInterval(refresh, POLL_INTERVAL_MS);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
 
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("focus", refreshIfVisible);
-      document.removeEventListener("visibilitychange", refreshIfVisible);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, [enabled, poll, reload]);
 

@@ -8,6 +8,7 @@ import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
 import { redisCacheService } from "../../infrastructure/cache/redis-cache.service";
 import type { DashboardScopeQuery } from "../dashboard/dashboard.service";
 import { ingestionService } from "../ingestion/ingestion.service";
+import { metricSeriesService } from "../metrics/metric-series.service";
 import { isBangladeshRelevantArticle } from "../../shared/geo/bangladesh-relevance";
 
 const NATIONAL_METRICS_TTL_SEC = 90;
@@ -409,10 +410,26 @@ export class LiveDataService {
         heatmap.total_logs > 0 ? heatmap.grievance_total / heatmap.total_logs : 0;
       const completionRate = Math.round(Math.max(55, 100 - grievanceRatio * 45) * 10) / 10;
 
-      const completionTrend = weeklyTrend.map((w) => ({
-        month: w.week,
-        rate: Math.round(completionRate + Number(w.count) * 0.05),
-      }));
+      // Prefer durable KPI / metric_time_series history so charts track DB truth.
+      let completionTrend = await metricSeriesService.buildCompletionTrendFromKpis();
+      if (!completionTrend.length && weeklyTrend.length) {
+        completionTrend = weeklyTrend.map((w) => ({
+          month: w.week,
+          rate: Math.round(completionRate + Number(w.count) * 0.05),
+        }));
+      }
+      if (completionTrend.length) {
+        void metricSeriesService.upsertMany(
+          "dashboard",
+          completionTrend.map((point, i) => ({
+            seriesKey: "completion",
+            periodKey: `live-${point.month.replace(/\s+/g, "-")}`,
+            label: point.month,
+            value: point.rate,
+            recordedAt: new Date(Date.now() - (completionTrend.length - i) * 7 * 86400_000),
+          })),
+        );
+      }
 
       const arbitrageMatrix = commodityRows.slice(0, 24).map((row) => {
         const landed = Number(row.landed_cost_usd);

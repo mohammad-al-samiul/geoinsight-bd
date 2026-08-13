@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale } from "next-intl";
 import { apiClient } from "@/lib/api-client";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 export interface OutlookChallenge {
   domain: "politics" | "economy" | string;
@@ -119,6 +120,8 @@ export function useStrategicOutlook() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useRealtimeRefresh(load, true, true);
 
   return { data, loading, error, reload: load, refresh, refreshing };
 }

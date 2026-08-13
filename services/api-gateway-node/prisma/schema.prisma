@@ -6,7 +6,8 @@
 // TimescaleDB hypertables (commodity_price_logs) are created via raw SQL migration:
 //   prisma/migrations/20250627150000_timescale_commodity_perf/migration.sql
 //
-// Hierarchy: DIVISION → DISTRICT → UPAZILA → UNION (admin_units.self-reference)
+// Hierarchy: DIVISION → DISTRICT → UPAZILA → UNION (national)
+// Local DSS layer: DISTRICT → CONSTITUENCY | CITY_CORPORATION → WARD
 // Denormalized location IDs (division_id, district_id, upazila_id) enable
 // sub-millisecond scoped queries without recursive CTEs.
 // =============================================================================
@@ -28,6 +29,12 @@ enum AdminUnitType {
   DISTRICT
   UPAZILA
   UNION
+  /// Parliamentary constituency (e.g. Chattogram-8)
+  CONSTITUENCY
+  /// City corporation (e.g. CCC, COCC)
+  CITY_CORPORATION
+  /// Ward under city corp, or thana/area under constituency
+  WARD
 }
 
 /// Platform access roles (multi-tenant RBAC — scoped via admin_unit_id)
@@ -36,6 +43,10 @@ enum UserRole {
   MINISTER
   DC
   UNION_CHAIRMAN
+  /// Local DSS — scoped to CONSTITUENCY
+  MP
+  /// Local DSS — scoped to CITY_CORPORATION
+  MAYOR
 }
 
 enum RepresentativeRole {
@@ -118,6 +129,38 @@ enum LiveSignalType {
   POLICY
 }
 
+enum ComplaintSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum ComplaintCategory {
+  INFRASTRUCTURE
+  DRAINAGE
+  WASTE
+  SAFETY
+  TRAFFIC
+  HILL_CUTTING
+  HERITAGE
+  OTHER
+}
+
+enum ComplaintEventKind {
+  CREATED
+  ASSIGNED
+  STARTED
+  NOTE
+  RESOLVED
+}
+
 // ── Hierarchical Administrative Structure (Bangladesh) ───────────────────────
 
 model AdminUnit {
@@ -145,6 +188,25 @@ model AdminUnit {
   projects        Project[]
   agroMarkets     AgroMarket[]
   commodityLogs   CommodityPriceLog[]
+
+  complaintsAsWard   CitizenComplaint[]      @relation("ComplaintWard")
+  complaintsAsEntity CitizenComplaint[]      @relation("ComplaintEntity")
+  wardScoresAsWard   WardPerformanceScore[]  @relation("WpiWard")
+  wardScoresAsEntity WardPerformanceScore[]  @relation("WpiEntity")
+  influencersAsWard  LocalInfluencer[]       @relation("InfluencerWard")
+  influencersAsEntity LocalInfluencer[]      @relation("InfluencerEntity")
+  pollingAsWard      LocalPollingCenter[]    @relation("PollingWard")
+  pollingAsEntity    LocalPollingCenter[]    @relation("PollingEntity")
+  osintAsWard        LocalOsintHit[]         @relation("OsintWard")
+  osintAsEntity      LocalOsintHit[]         @relation("OsintEntity")
+  specialtyAsWard    LocalSpecialtySignal[]  @relation("SpecialtyWard")
+  specialtyAsEntity  LocalSpecialtySignal[]  @relation("SpecialtyEntity")
+  outagesAsWard      LocalServiceOutage[]    @relation("OutageWard")
+  outagesAsEntity    LocalServiceOutage[]    @relation("OutageEntity")
+  visitsAsWard       LocalVisitPlan[]        @relation("VisitWard")
+  visitsAsEntity     LocalVisitPlan[]        @relation("VisitEntity")
+  pulseEventsAsWard  LocalPulseEvent[]       @relation("PulseEventWard")
+  pulseEventsAsEntity LocalPulseEvent[]      @relation("PulseEventEntity")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -189,9 +251,15 @@ model User {
   adminUnitId String?    @map("admin_unit_id") @db.Uuid
   adminUnit   AdminUnit? @relation(fields: [adminUnitId], references: [id], onDelete: SetNull)
 
-  auditLogs        AuditLog[]
-  resolvedRedFlags RedFlagAlert[] @relation("ResolvedBy")
-  refreshTokens    RefreshToken[]
+  auditLogs             AuditLog[]
+  resolvedRedFlags      RedFlagAlert[]    @relation("ResolvedBy")
+  resolvedComplaints    CitizenComplaint[] @relation("ComplaintResolvedBy")
+  assignedComplaints    CitizenComplaint[] @relation("ComplaintAssignee")
+  complaintEvents       ComplaintStatusEvent[] @relation("ComplaintEventActor")
+  refreshTokens         RefreshToken[]
+  alertDeliveries       AlertDeliveryLog[]
+  visitPlansCreated     LocalVisitPlan[]       @relation("VisitCreatedBy")
+  pulseEventsCreated    LocalPulseEvent[]      @relation("PulseEventCreatedBy")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -623,6 +691,28 @@ model IngestionSyncRun {
   @@map("ingestion_sync_runs")
 }
 
+/// Optimized chart/time-series store for national PMO modules (upsert by period)
+model MetricTimeSeries {
+  id         String   @id @default(uuid()) @db.Uuid
+  /// dashboard | divisional-crisis | narrative | unrest | hazards | agro
+  module     String   @db.VarChar(64)
+  /// e.g. completion | dhaka:crime | chattogram:gas
+  seriesKey  String   @map("series_key") @db.VarChar(128)
+  /// e.g. 2026-01 | 2026-W12 | 2026-08-12T14
+  periodKey  String   @map("period_key") @db.VarChar(32)
+  label      String?  @db.VarChar(64)
+  value      Decimal  @db.Decimal(18, 4)
+  meta       Json?
+  recordedAt DateTime @map("recorded_at") @db.Timestamptz
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([module, seriesKey, periodKey])
+  @@index([module, seriesKey, recordedAt(sort: Desc)])
+  @@index([module, recordedAt(sort: Desc)])
+  @@map("metric_time_series")
+}
+
 // ── Narrative Shield (Counter-Disinformation) ─────────────────────────────────
 
 /// Detected disinformation / hostile-narrative signal ingested from open sources
@@ -686,4 +776,419 @@ model NarrativeAuditLog {
   @@index([signalId, createdAt(sort: Desc)])
   @@index([action, createdAt(sort: Desc)])
   @@map("narrative_audit_logs")
+}
+
+// ── Local Entity DSS — Instant Action (24hr SLA) + Ward Performance Index ─────
+
+/// Citizen / field complaint with before/after photo SLA (entity-scoped)
+model CitizenComplaint {
+  id             String            @id @default(uuid()) @db.Uuid
+  title          String            @db.VarChar(255)
+  titleBn        String?           @map("title_bn") @db.VarChar(255)
+  description    String?           @db.Text
+  category       ComplaintCategory @default(OTHER)
+  severity       ComplaintSeverity @default(MEDIUM)
+  status         ComplaintStatus   @default(OPEN)
+  citizenName    String?           @map("citizen_name") @db.VarChar(120)
+  citizenPhone   String?           @map("citizen_phone") @db.VarChar(20)
+  lat            Float?
+  lng            Float?
+  locationLabel  String?           @map("location_label") @db.VarChar(255)
+  /// HTTPS or data-URL for before photo (P1; MinIO keys later)
+  beforePhotoUrl String?           @map("before_photo_url") @db.Text
+  afterPhotoUrl  String?           @map("after_photo_url") @db.Text
+  /// Wave B photo QA: PASS | WARN | FAIL
+  photoQaStatus  String?           @map("photo_qa_status") @db.VarChar(24)
+  photoQaScore   Float?            @map("photo_qa_score")
+  photoQaNote    String?           @map("photo_qa_note") @db.Text
+  resolutionNote String?           @map("resolution_note") @db.Text
+  /// createdAt + 24h — breach marks operational OVERDUE in API
+  slaDeadline    DateTime          @map("sla_deadline") @db.Timestamptz
+  isRedAlert     Boolean           @default(false) @map("is_red_alert")
+  resolvedAt     DateTime?         @map("resolved_at") @db.Timestamptz
+
+  wardId   String    @map("ward_id") @db.Uuid
+  ward     AdminUnit @relation("ComplaintWard", fields: [wardId], references: [id], onDelete: Restrict)
+  entityId String    @map("entity_id") @db.Uuid
+  entity   AdminUnit @relation("ComplaintEntity", fields: [entityId], references: [id], onDelete: Restrict)
+
+  assigneeId String? @map("assignee_id") @db.Uuid
+  assignee   User?   @relation("ComplaintAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  resolvedById String? @map("resolved_by_id") @db.Uuid
+  resolvedBy   User?   @relation("ComplaintResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  events ComplaintStatusEvent[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([entityId, status, createdAt(sort: Desc)])
+  @@index([wardId, status])
+  @@index([isRedAlert, status, slaDeadline])
+  @@index([severity, status])
+  @@index([assigneeId, status])
+  @@map("citizen_complaints")
+}
+
+/// Append-only complaint workflow timeline (assign / start / note / resolve)
+model ComplaintStatusEvent {
+  id          String             @id @default(uuid()) @db.Uuid
+  kind        ComplaintEventKind @default(NOTE)
+  fromStatus  ComplaintStatus?   @map("from_status")
+  toStatus    ComplaintStatus?   @map("to_status")
+  note        String?            @db.VarChar(512)
+
+  complaintId String           @map("complaint_id") @db.Uuid
+  complaint   CitizenComplaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  actor       User?   @relation("ComplaintEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([complaintId, createdAt(sort: Desc)])
+  @@index([kind, createdAt(sort: Desc)])
+  @@map("complaint_status_events")
+}
+
+/// Ward Performance Index (1–100) per entity ward / area
+model WardPerformanceScore {
+  id               String   @id @default(uuid()) @db.Uuid
+  periodKey        String   @map("period_key") @db.VarChar(16)
+  /// Overall WPI 1–100
+  score            Int
+  serviceScore     Int      @map("service_score")
+  infraScore       Int      @map("infra_score")
+  resolutionScore  Int      @map("resolution_score")
+  openComplaints   Int      @default(0) @map("open_complaints")
+  resolvedWithinSla Int     @default(0) @map("resolved_within_sla")
+  totalResolved    Int      @default(0) @map("total_resolved")
+  computedAt       DateTime @default(now()) @map("computed_at") @db.Timestamptz
+
+  wardId   String    @map("ward_id") @db.Uuid
+  ward     AdminUnit @relation("WpiWard", fields: [wardId], references: [id], onDelete: Cascade)
+  entityId String    @map("entity_id") @db.Uuid
+  entity   AdminUnit @relation("WpiEntity", fields: [entityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([wardId, periodKey])
+  @@index([entityId, periodKey, score(sort: Desc)])
+  @@index([score])
+  @@map("ward_performance_scores")
+}
+
+enum LocalInfluencerRole {
+  INFLUENCER
+  VOLUNTEER
+  COMMUNITY_LEADER
+  YOUTH_ORGANIZER
+  RELIGIOUS_LEADER
+  BUSINESS_LEADER
+}
+
+enum LocalOsintChannel {
+  NEWS
+  FACEBOOK
+  SOCIAL
+  FIELD
+  OTHER
+}
+
+enum LocalOsintSentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+/// Curated / keyword-matched OSINT hit for a local entity (P2)
+model LocalOsintHit {
+  id              String              @id @default(uuid()) @db.Uuid
+  title           String              @db.VarChar(512)
+  titleBn         String?             @map("title_bn") @db.VarChar(512)
+  summary         String?             @db.Text
+  sourceName      String              @map("source_name") @db.VarChar(128)
+  sourceUrl       String?             @map("source_url") @db.VarChar(2048)
+  channel         LocalOsintChannel   @default(NEWS)
+  matchedKeyword  String              @map("matched_keyword") @db.VarChar(120)
+  sentiment       LocalOsintSentiment @default(NEUTRAL)
+  propagandaFlag  Boolean             @default(false) @map("propaganda_flag")
+  propagandaNote  String?             @map("propaganda_note") @db.VarChar(512)
+  publishedAt     DateTime?           @map("published_at") @db.Timestamptz
+
+  wardId   String?    @map("ward_id") @db.Uuid
+  ward     AdminUnit? @relation("OsintWard", fields: [wardId], references: [id], onDelete: SetNull)
+  entityId String     @map("entity_id") @db.Uuid
+  entity   AdminUnit  @relation("OsintEntity", fields: [entityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([entityId, publishedAt(sort: Desc)])
+  @@index([entityId, propagandaFlag, publishedAt(sort: Desc)])
+  @@index([entityId, sentiment])
+  @@index([matchedKeyword])
+  @@map("local_osint_hits")
+}
+
+/// Ward / area influencer & volunteer directory
+model LocalInfluencer {
+  id             String              @id @default(uuid()) @db.Uuid
+  name           String              @db.VarChar(255)
+  nameBn         String?             @map("name_bn") @db.VarChar(255)
+  roleType       LocalInfluencerRole @map("role_type")
+  phone          String?             @db.VarChar(20)
+  organization   String?             @db.VarChar(255)
+  influenceScore Int                 @default(50) @map("influence_score")
+  notes          String?             @db.Text
+  isActive       Boolean             @default(true) @map("is_active")
+
+  wardId   String?    @map("ward_id") @db.Uuid
+  ward     AdminUnit? @relation("InfluencerWard", fields: [wardId], references: [id], onDelete: SetNull)
+  entityId String     @map("entity_id") @db.Uuid
+  entity   AdminUnit  @relation("InfluencerEntity", fields: [entityId], references: [id], onDelete: Cascade)
+  pulseEvents LocalPulseEvent[] @relation("PulseEventInfluencer")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([entityId, isActive, influenceScore(sort: Desc)])
+  @@index([wardId, roleType])
+  @@map("local_influencers")
+}
+
+/// Polling centre + new-voter pulse per ward / area
+model LocalPollingCenter {
+  id            String  @id @default(uuid()) @db.Uuid
+  name          String  @db.VarChar(255)
+  nameBn        String? @map("name_bn") @db.VarChar(255)
+  code          String? @db.VarChar(32)
+  registeredVoters Int  @default(0) @map("registered_voters")
+  newVoters     Int     @default(0) @map("new_voters")
+  lat           Float?
+  lng           Float?
+  address       String? @db.VarChar(512)
+
+  wardId   String?    @map("ward_id") @db.Uuid
+  ward     AdminUnit? @relation("PollingWard", fields: [wardId], references: [id], onDelete: SetNull)
+  entityId String     @map("entity_id") @db.Uuid
+  entity   AdminUnit  @relation("PollingEntity", fields: [entityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([entityId, newVoters(sort: Desc)])
+  @@index([wardId])
+  @@map("local_polling_centers")
+}
+
+enum SpecialtySignalStatus {
+  OK
+  WATCH
+  ALERT
+  IN_PROGRESS
+}
+
+/// Role-pack specialty telemetry / alerts (P3) — keyed by catalog moduleId
+model LocalSpecialtySignal {
+  id           String                @id @default(uuid()) @db.Uuid
+  /// Matches LocalEntityDefinition.specialtyModules[].id
+  moduleId     String                @map("module_id") @db.VarChar(64)
+  title        String                @db.VarChar(255)
+  titleBn      String?               @map("title_bn") @db.VarChar(255)
+  detail       String?               @db.Text
+  detailBn     String?               @map("detail_bn") @db.Text
+  status       SpecialtySignalStatus @default(WATCH)
+  metricLabel  String?               @map("metric_label") @db.VarChar(64)
+  metricLabelBn String?              @map("metric_label_bn") @db.VarChar(64)
+  metricValue  Decimal?              @map("metric_value") @db.Decimal(18, 4)
+  metricUnit   String?               @map("metric_unit") @db.VarChar(32)
+  lat          Float?
+  lng          Float?
+  recordedAt   DateTime              @default(now()) @map("recorded_at") @db.Timestamptz
+
+  wardId   String?    @map("ward_id") @db.Uuid
+  ward     AdminUnit? @relation("SpecialtyWard", fields: [wardId], references: [id], onDelete: SetNull)
+  entityId String     @map("entity_id") @db.Uuid
+  entity   AdminUnit  @relation("SpecialtyEntity", fields: [entityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([entityId, moduleId, recordedAt(sort: Desc)])
+  @@index([entityId, status, recordedAt(sort: Desc)])
+  @@index([moduleId, status])
+  @@map("local_specialty_signals")
+}
+
+enum AlertDeliveryChannel {
+  WHATSAPP
+  VOICE
+  SMS
+}
+
+enum AlertDeliveryStatus {
+  QUEUED
+  SENT
+  DRY_RUN
+  FAILED
+}
+
+/// Outbound crisis alert delivery log (WhatsApp / voice) — P4
+model AlertDeliveryLog {
+  id          String               @id @default(uuid()) @db.Uuid
+  channel     AlertDeliveryChannel
+  status      AlertDeliveryStatus  @default(QUEUED)
+  toAddress   String               @map("to_address") @db.VarChar(64)
+  bodyPreview String               @map("body_preview") @db.VarChar(512)
+  providerRef String?              @map("provider_ref") @db.VarChar(128)
+  error       String?              @db.Text
+  /// citizen_complaint | specialty_signal | manual
+  sourceKind  String               @map("source_kind") @db.VarChar(64)
+  sourceId    String?              @map("source_id") @db.Uuid
+  entityId    String?              @map("entity_id") @db.Uuid
+  payload     Json?
+
+  retryCount  Int       @default(0) @map("retry_count")
+  nextRetryAt DateTime? @map("next_retry_at") @db.Timestamptz
+  lastAttemptAt DateTime? @map("last_attempt_at") @db.Timestamptz
+
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([entityId, createdAt(sort: Desc)])
+  @@index([channel, status, createdAt(sort: Desc)])
+  @@index([sourceKind, sourceId])
+  @@index([status, nextRetryAt])
+  @@map("alert_delivery_logs")
+}
+
+enum ServiceOutageKind {
+  POWER
+  WATER
+  DRAINAGE
+  ROAD
+  INTERNET
+  OTHER
+}
+
+enum ServiceOutageStatus {
+  ACTIVE
+  WATCH
+  RESOLVED
+}
+
+/// Local service outage / disruption board (Mayor ops + MP field awareness)
+model LocalServiceOutage {
+  id          String              @id @default(uuid()) @db.Uuid
+  kind        ServiceOutageKind   @default(OTHER)
+  status      ServiceOutageStatus @default(ACTIVE)
+  title       String              @db.VarChar(255)
+  titleBn     String?             @map("title_bn") @db.VarChar(255)
+  detail      String?             @db.Text
+  detailBn    String?             @map("detail_bn") @db.Text
+  severity    Int                 @default(3)
+  affectedCount Int               @default(0) @map("affected_count")
+  lat         Float?
+  lng         Float?
+  startedAt   DateTime            @default(now()) @map("started_at") @db.Timestamptz
+  resolvedAt  DateTime?           @map("resolved_at") @db.Timestamptz
+  etaRestoreAt DateTime?          @map("eta_restore_at") @db.Timestamptz
+
+  wardId   String?    @map("ward_id") @db.Uuid
+  ward     AdminUnit? @relation("OutageWard", fields: [wardId], references: [id], onDelete: SetNull)
+  entityId String     @map("entity_id") @db.Uuid
+  entity   AdminUnit  @relation("OutageEntity", fields: [entityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([entityId, status, startedAt(sort: Desc)])
+  @@index([entityId, kind, status])
+  @@index([wardId, status])
+  @@map("local_service_outages")
+}
+
+enum LocalVisitStatus {
+  PLANNED
+  DONE
+  CANCELLED
+}
+
+enum LocalVisitReason {
+  WPI_DROP
+  RED_ALERT
+  OUTAGE
+  SPECIALTY
+  MANUAL
+}
+
+/// Field visit / meeting planner driven by WPI + red alerts
+model LocalVisitPlan {
+  id          String           @id @default(uuid()) @db.Uuid
+  title       String           @db.VarChar(255)
+  titleBn     String?          @map("title_bn") @db.VarChar(255)
+  reason      LocalVisitReason @default(MANUAL)
+  status      LocalVisitStatus @default(PLANNED)
+  scheduledAt DateTime         @map("scheduled_at") @db.Timestamptz
+  notes       String?          @db.Text
+  priority    Int              @default(50)
+
+  wardId   String?    @map("ward_id") @db.Uuid
+  ward     AdminUnit? @relation("VisitWard", fields: [wardId], references: [id], onDelete: SetNull)
+  entityId String     @map("entity_id") @db.Uuid
+  entity   AdminUnit  @relation("VisitEntity", fields: [entityId], references: [id], onDelete: Cascade)
+
+  createdById String? @map("created_by_id") @db.Uuid
+  createdBy   User?   @relation("VisitCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([entityId, status, scheduledAt])
+  @@index([wardId, status])
+  @@map("local_visit_plans")
+}
+
+enum LocalPulseEventKind {
+  MEETING
+  RALLY
+  OUTREACH
+  FOLLOW_UP
+  OTHER
+}
+
+/// Influencer actions + local event calendar
+model LocalPulseEvent {
+  id          String              @id @default(uuid()) @db.Uuid
+  kind        LocalPulseEventKind @default(OTHER)
+  title       String              @db.VarChar(255)
+  titleBn     String?             @map("title_bn") @db.VarChar(255)
+  detail      String?             @db.Text
+  startsAt    DateTime            @map("starts_at") @db.Timestamptz
+  endsAt      DateTime?           @map("ends_at") @db.Timestamptz
+  locationLabel String?           @map("location_label") @db.VarChar(255)
+  done        Boolean             @default(false)
+
+  influencerId String?          @map("influencer_id") @db.Uuid
+  influencer   LocalInfluencer? @relation("PulseEventInfluencer", fields: [influencerId], references: [id], onDelete: SetNull)
+  wardId       String?          @map("ward_id") @db.Uuid
+  ward         AdminUnit?       @relation("PulseEventWard", fields: [wardId], references: [id], onDelete: SetNull)
+  entityId     String           @map("entity_id") @db.Uuid
+  entity       AdminUnit        @relation("PulseEventEntity", fields: [entityId], references: [id], onDelete: Cascade)
+
+  createdById String? @map("created_by_id") @db.Uuid
+  createdBy   User?   @relation("PulseEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([entityId, startsAt])
+  @@index([influencerId, startsAt])
+  @@index([wardId, startsAt])
+  @@map("local_pulse_events")
 }

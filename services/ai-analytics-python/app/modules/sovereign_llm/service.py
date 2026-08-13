@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.core.config import Settings
+from app.ml.ai_policy import LlmTask
 from app.ml.ollama_client import OllamaClient
 from app.modules.sovereign_llm.schemas import LlmChatRequest, LlmChatResponse
 
@@ -43,7 +44,11 @@ class SovereignLlmService:
                 })
             messages.extend({"role": m.role, "content": m.content} for m in req.messages)
 
-            reply = await self._ollama.chat(messages, temperature=0.25)
+            reply = await self._ollama.chat(
+                messages,
+                temperature=0.25,
+                task=LlmTask.SOVEREIGN_CHAT,
+            )
             if reply:
                 return LlmChatResponse(
                     reply=reply,

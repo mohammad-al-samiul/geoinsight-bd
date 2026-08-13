@@ -11,7 +11,14 @@
 # Then on the APP VPS set:
 #   OLLAMA_URL=http://<AI_SERVER_PRIVATE_OR_PUBLIC_IP>:11434
 #   OLLAMA_MODEL=gpt-oss:20b
+#   OLLAMA_MODEL_FAST=llama3.1:8b
 #   LLM_PROVIDER=ollama
+#
+# Pull both tiers on this host:
+#   docker exec geoinsight-ollama ollama pull gpt-oss:20b
+#   docker exec geoinsight-ollama ollama pull llama3.1:8b
+#
+# Do NOT default llama3.1:70b here — needs ≥48GB and hurts concurrency.
 
 name: geoinsight-ollama
 

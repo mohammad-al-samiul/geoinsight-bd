@@ -45,6 +45,14 @@ export interface CitizenReportPayload {
   urgency: "critical" | "warning" | "info";
 }
 
+export interface CrisisMetricPoint {
+  seriesKey: string;
+  periodKey: string;
+  label?: string | null;
+  value: number;
+  recordedAt: string;
+}
+
 export interface DivisionalLivePulse {
   generatedAt: string;
   lookbackHours: number;
@@ -57,10 +65,24 @@ export interface DivisionalLivePulse {
     grievanceArticleCount?: number;
     weatherStress?: number;
   }>;
+  series?: CrisisMetricPoint[];
 }
 
 function canonicalDivisionName(name: string): string {
   return name.toLowerCase().replace("chittagong", "chattogram").trim();
+}
+
+function divisionSlug(name: string): string {
+  return canonicalDivisionName(name).replace(/\s+/g, "-");
+}
+
+function seriesValue(
+  series: CrisisMetricPoint[] | undefined,
+  seriesKey: string,
+  periodKey: string,
+): number | null {
+  const hit = series?.find((p) => p.seriesKey === seriesKey && p.periodKey === periodKey);
+  return hit ? hit.value : null;
 }
 
 export function useDivisionalCrisis() {
@@ -86,6 +108,26 @@ export function useDivisionalCrisis() {
   const [timelineHour, setTimelineHour] = useState<number | null>(null);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
   const hasDataRef = useRef(false);
+
+  // Keep panel division filter aligned with top-bar admin scope.
+  useEffect(() => {
+    if (!globalAdminFilter.divisionId) {
+      setFilters((prev) => (prev.divisionId === "all" ? prev : { ...prev, divisionId: "all" }));
+      return;
+    }
+    const unit = getUnitById(globalAdminFilter.divisionId);
+    if (!unit?.name) return;
+    const name = unit.name.toLowerCase().replace("chittagong", "chattogram");
+    const match = BANGLADESH_DIVISIONS_DATA.find(
+      (d) =>
+        d.id === name.replace(/\s+/g, "-") ||
+        d.nameEn.toLowerCase() === name ||
+        name.includes(d.nameEn.toLowerCase()) ||
+        d.nameEn.toLowerCase().includes(name),
+    );
+    if (!match) return;
+    setFilters((prev) => (prev.divisionId === match.id ? prev : { ...prev, divisionId: match.id }));
+  }, [globalAdminFilter.divisionId]);
 
   const loadLivePulse = useCallback(async () => {
     // Blocking loader only before the first payload; refreshes swap in place.
@@ -139,7 +181,74 @@ export function useDivisionalCrisis() {
         const live = livePulse?.divisions.find(
           (item) => canonicalDivisionName(item.division) === canonicalDivisionName(division.nameEn),
         );
-        if (!live) return division;
+        const slug = divisionSlug(division.nameEn);
+        const series = livePulse?.series;
+        const crime2024 = seriesValue(series, `${slug}:crime`, "2024");
+        const crime2025 = seriesValue(series, `${slug}:crime`, "2025");
+        const crime2026 = seriesValue(series, `${slug}:crime`, "2026");
+        const gas2024 = seriesValue(series, `${slug}:gas`, "2024");
+        const gas2025 = seriesValue(series, `${slug}:gas`, "2025");
+        const gas2026 = seriesValue(series, `${slug}:gas`, "2026");
+        const power2024 = seriesValue(series, `${slug}:power`, "2024");
+        const power2025 = seriesValue(series, `${slug}:power`, "2025");
+        const power2026 = seriesValue(series, `${slug}:power`, "2026");
+        const crimeFc0 = seriesValue(series, `${slug}:crime-fc`, "m0");
+        const crimeFc1 = seriesValue(series, `${slug}:crime-fc`, "m1");
+        const crimeFc2 = seriesValue(series, `${slug}:crime-fc`, "m2");
+        const powerFc0 = seriesValue(series, `${slug}:power-fc`, "m0");
+        const powerFc1 = seriesValue(series, `${slug}:power-fc`, "m1");
+        const powerFc2 = seriesValue(series, `${slug}:power-fc`, "m2");
+        const gasNow = gas2026 ?? (live ? null : division.resources.gas.deficitPercentage);
+
+        const withDbCharts: DivisionCrisisData = {
+          ...division,
+          crime: {
+            ...division.crime,
+            totalCasesMonthly: Math.round(crimeFc0 ?? crime2026 ?? division.crime.totalCasesMonthly),
+          },
+          historicalYoY: [
+            {
+              year: 2024,
+              totalCrimes: Math.round(crime2024 ?? division.historicalYoY[0]?.totalCrimes ?? 0),
+              avgLoadShedding: power2024 ?? division.historicalYoY[0]?.avgLoadShedding ?? 3,
+              avgGasDeficit: gas2024 ?? division.historicalYoY[0]?.avgGasDeficit ?? 30,
+            },
+            {
+              year: 2025,
+              totalCrimes: Math.round(crime2025 ?? division.historicalYoY[1]?.totalCrimes ?? 0),
+              avgLoadShedding: power2025 ?? division.historicalYoY[1]?.avgLoadShedding ?? 3.5,
+              avgGasDeficit: gas2025 ?? division.historicalYoY[1]?.avgGasDeficit ?? 35,
+            },
+            {
+              year: 2026,
+              totalCrimes: Math.round(crime2026 ?? division.historicalYoY[2]?.totalCrimes ?? 0),
+              avgLoadShedding: power2026 ?? division.historicalYoY[2]?.avgLoadShedding ?? 4,
+              avgGasDeficit: gas2026 ?? division.historicalYoY[2]?.avgGasDeficit ?? 40,
+            },
+          ],
+          forecast30Days: [
+            {
+              ...division.forecast30Days[0],
+              projectedCases: Math.round(crimeFc0 ?? division.forecast30Days[0]?.projectedCases ?? division.crime.totalCasesMonthly),
+              projectedLoadShedding: powerFc0 ?? division.forecast30Days[0]?.projectedLoadShedding ?? 4,
+              projectedGasDeficit: gasNow ?? division.forecast30Days[0]?.projectedGasDeficit ?? 40,
+            },
+            {
+              ...division.forecast30Days[1],
+              projectedCases: Math.round(crimeFc1 ?? division.forecast30Days[1]?.projectedCases ?? division.crime.totalCasesMonthly),
+              projectedLoadShedding: powerFc1 ?? division.forecast30Days[1]?.projectedLoadShedding ?? 4.5,
+              projectedGasDeficit: Math.min(100, Math.round((gasNow ?? 40) * 1.08)),
+            },
+            {
+              ...division.forecast30Days[2],
+              projectedCases: Math.round(crimeFc2 ?? division.forecast30Days[2]?.projectedCases ?? division.crime.totalCasesMonthly),
+              projectedLoadShedding: powerFc2 ?? division.forecast30Days[2]?.projectedLoadShedding ?? 5,
+              projectedGasDeficit: Math.min(100, Math.round((gasNow ?? 40) * 1.15)),
+            },
+          ],
+        };
+
+        if (!live) return withDbCharts;
 
         // Live pulse nudges severity + resource stress so map/charts keep moving
         // with realtime signals (weather / alerts / grievance articles).
@@ -149,47 +258,48 @@ export function useDivisionalCrisis() {
           (live.signalCount ?? 0) * 1.5 + (live.criticalSignalCount ?? 0) * 3,
         );
         const weatherStress = live.weatherStress ?? 0;
+        const baseGas = gasNow ?? withDbCharts.resources.gas.deficitPercentage;
+        const basePower = power2026 ?? withDbCharts.resources.electricity.avgLoadSheddingHours;
 
         return {
-          ...division,
+          ...withDbCharts,
           overallSeverityScore: Math.min(
             100,
-            Math.round(division.overallSeverityScore * 0.65 + live.riskScore * 0.35),
+            Math.round(withDbCharts.overallSeverityScore * 0.65 + live.riskScore * 0.35),
           ),
           resources: {
-            ...division.resources,
+            ...withDbCharts.resources,
             gas: {
-              ...division.resources.gas,
+              ...withDbCharts.resources.gas,
               deficitPercentage: Math.min(
                 100,
-                Math.round(division.resources.gas.deficitPercentage * (1 + stress * 0.2) + signalBump * 0.35),
+                Math.round(baseGas * (1 + stress * 0.2) + signalBump * 0.35),
               ),
             },
             fuelOil: {
-              ...division.resources.fuelOil,
+              ...withDbCharts.resources.fuelOil,
               stockDeficitPercentage: Math.min(
                 100,
                 Math.round(
-                  division.resources.fuelOil.stockDeficitPercentage * (1 + stress * 0.18) +
+                  withDbCharts.resources.fuelOil.stockDeficitPercentage * (1 + stress * 0.18) +
                     signalBump * 0.25,
                 ),
               ),
             },
             electricity: {
-              ...division.resources.electricity,
+              ...withDbCharts.resources.electricity,
               avgLoadSheddingHours: Number(
                 Math.min(
                   12,
-                  division.resources.electricity.avgLoadSheddingHours * (1 + stress * 0.22) +
-                    weatherStress / 40,
+                  basePower * (1 + stress * 0.22) + weatherStress / 40,
                 ).toFixed(1),
               ),
             },
             water: {
-              ...division.resources.water,
+              ...withDbCharts.resources.water,
               scarcityIndex: Math.min(
                 100,
-                Math.round(division.resources.water.scarcityIndex * (1 + stress * 0.12) + weatherStress * 0.4),
+                Math.round(withDbCharts.resources.water.scarcityIndex * (1 + stress * 0.12) + weatherStress * 0.4),
               ),
             },
           },

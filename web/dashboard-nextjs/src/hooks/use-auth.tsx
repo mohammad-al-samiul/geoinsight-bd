@@ -187,3 +187,9 @@ export function useAuthActions() {
   if (!ctx) throw new Error("useAuthActions must be used within AuthProvider");
   return ctx;
 }
+
+export function useAuthContext(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuthContext must be used within AuthProvider");
+  return ctx;
+}

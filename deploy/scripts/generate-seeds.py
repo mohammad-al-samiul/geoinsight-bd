@@ -178,35 +178,57 @@ def generate_representatives() -> str:
     """Current-mandate officials (BNP government from Feb 2026 election — demo roster)."""
     d = district_uuid_by_name
     reps = [
+        ("d4000001-0001-4001-8001-000000000025", "Begum Khaleda Zia (Prime Minister)", "1000000000025", "MINISTER", "BNP", "2026-02-15", "a1000001-0001-4001-8001-000000000001"),
         ("d4000001-0001-4001-8001-000000000001", "Tarique Rahman (Senior Minister)", "1000000000001", "MINISTER", "BNP", "2026-02-15", "a1000001-0001-4001-8001-000000000001"),
-        ("d4000001-0001-4001-8001-000000000002", "Mirza Fakhrul Islam Alamgir (Foreign Affairs)", "1000000000002", "MP", "BNP", "2026-02-15", d("Dhaka")),
-        ("d4000001-0001-4001-8001-000000000003", "Dr. Ahmed Nawaz (DC, Gazipur)", "1000000000003", "DC", "BCS (Admin)", "2023-02-01", d("Gazipur")),
-        ("d4000001-0001-4001-8001-000000000004", "Dr. Abdul Moyeen Khan (Education)", "1000000000004", "MP", "BNP", "2026-02-15", d("Chattogram")),
-        ("d4000001-0001-4001-8001-000000000005", "Dr. Shahadat Hossain (DC, Cumilla)", "1000000000005", "DC", "BCS (Admin)", "2022-06-15", d("Cumilla")),
-        ("d4000001-0001-4001-8001-000000000010", "Nazrul Islam Khan (Road Transport)", "1000000000010", "MINISTER", "BNP", "2026-02-15", d("Chattogram")),
-        ("d4000001-0001-4001-8001-000000000011", "Rumeen Farhana (Law & Justice)", "1000000000011", "MP", "BNP", "2026-02-15", d("Faridpur")),
         ("d4000001-0001-4001-8001-000000000012", "Amir Khasru Mahmud Chowdhury (Finance)", "1000000000012", "MINISTER", "BNP", "2026-02-15", d("Dhaka")),
+        ("d4000001-0001-4001-8001-000000000002", "Mirza Fakhrul Islam Alamgir (Foreign Affairs)", "1000000000002", "MINISTER", "BNP", "2026-02-15", d("Dhaka")),
+        ("d4000001-0001-4001-8001-000000000010", "Nazrul Islam Khan (Road Transport)", "1000000000010", "MINISTER", "BNP", "2026-02-15", d("Chattogram")),
+        ("d4000001-0001-4001-8001-000000000004", "Dr. Abdul Moyeen Khan (Education)", "1000000000004", "MINISTER", "BNP", "2026-02-15", d("Chattogram")),
+        ("d4000001-0001-4001-8001-000000000011", "Rumeen Farhana (Law & Justice)", "1000000000011", "MINISTER", "BNP", "2026-02-15", d("Faridpur")),
+        ("d4000001-0001-4001-8001-000000000014", "Gayeshwar Chandra Roy (Local Government)", "1000000000014", "MINISTER", "BNP", "2026-02-15", d("Rajshahi")),
+        ("d4000001-0001-4001-8001-000000000016", "Hafiz Uddin Ahmed (Agriculture)", "1000000000016", "MINISTER", "BNP", "2026-02-15", d("Barishal")),
+        ("d4000001-0001-4001-8001-000000000015", "Shahjahan Omar (Defence)", "1000000000015", "MINISTER", "BNP", "2026-02-15", d("Sylhet")),
+        ("d4000001-0001-4001-8001-000000000017", "Barrister Kayser Kamal (Information)", "1000000000017", "MINISTER", "BNP", "2026-02-15", d("Dhaka")),
+        ("d4000001-0001-4001-8001-000000000003", "Dr. Ahmed Nawaz (DC, Gazipur)", "1000000000003", "DC", "BCS (Admin)", "2023-02-01", d("Gazipur")),
+        ("d4000001-0001-4001-8001-000000000005", "Dr. Shahadat Hossain (DC, Cumilla)", "1000000000005", "DC", "BCS (Admin)", "2022-06-15", d("Cumilla")),
         ("d4000001-0001-4001-8001-000000000013", "Muhammad Imran (DC, Khulna)", "1000000000013", "DC", "BCS (Admin)", "2021-11-01", d("Khulna")),
-        ("d4000001-0001-4001-8001-000000000014", "Gayeshwar Chandra Roy (Local Govt)", "1000000000014", "MP", "BNP", "2026-02-15", d("Rajshahi")),
-        ("d4000001-0001-4001-8001-000000000015", "Shahjahan Omar (Home Affairs)", "1000000000015", "MP", "BNP", "2026-02-15", d("Sylhet")),
-        ("d4000001-0001-4001-8001-000000000016", "Hafiz Uddin Ahmed (Agriculture)", "1000000000016", "MP", "BNP", "2026-02-15", d("Barishal")),
-        ("d4000001-0001-4001-8001-000000000017", "Barrister Moudud Ahmed (Law Minister)", "1000000000017", "MINISTER", "BNP", "2026-02-15", d("Dhaka")),
         ("d4000001-0001-4001-8001-000000000018", "Md. Tofazzel Hossain (DC, Rangpur)", "1000000000018", "DC", "BCS (Admin)", "2020-09-01", d("Rangpur")),
         ("d4000001-0001-4001-8001-000000000019", "Md. Shafiul Alam (DC, Mymensingh)", "1000000000019", "DC", "BCS (Admin)", "2022-01-15", d("Mymensingh")),
         ("d4000001-0001-4001-8001-000000000020", "Md. Anwar Hossain (Union Chairman, Savar)", "1000000000020", "UNION_CHAIRMAN", "Local Govt", "2022-01-01", upazila_uuid_by_name("Savar")),
     ]
     lines = [
-        "-- Representatives under current government mandate (BNP, Feb 2026–)",
+        "-- Current government duty-holders only (BNP mandate, Feb 2026–).",
+        "-- No Awami League. Same UUIDs kept for KPI FK stability where possible.",
         "",
-        "INSERT INTO representatives (id, name, nid, role, party, tenure_start, admin_unit_id, created_at, updated_at)",
+        "INSERT INTO representatives (id, name, nid, role, party, tenure_start, tenure_end, admin_unit_id, created_at, updated_at)",
         "VALUES",
     ]
     rows = [
-        f"  ({sql_str(r[0])}, {sql_str(r[1])}, {sql_str(r[2])}, '{r[3]}', {sql_str(r[4])}, '{r[5]}', {sql_str(r[6])}, NOW(), NOW())"
+        f"  ({sql_str(r[0])}, {sql_str(r[1])}, {sql_str(r[2])}, '{r[3]}', {sql_str(r[4])}, '{r[5]}', NULL, {sql_str(r[6])}, NOW(), NOW())"
         for r in reps
     ]
     lines.append(",\n".join(rows))
-    lines.append("ON CONFLICT (nid) DO UPDATE SET name = EXCLUDED.name, party = EXCLUDED.party, updated_at = NOW();")
+    lines.append(
+        "ON CONFLICT (nid) DO UPDATE SET\n"
+        "  name = EXCLUDED.name,\n"
+        "  role = EXCLUDED.role,\n"
+        "  party = EXCLUDED.party,\n"
+        "  tenure_start = EXCLUDED.tenure_start,\n"
+        "  tenure_end = NULL,\n"
+        "  admin_unit_id = EXCLUDED.admin_unit_id,\n"
+        "  updated_at = NOW();"
+    )
+    lines.append("")
+    lines.append(
+        "UPDATE representatives\n"
+        "SET tenure_end = '2026-02-14', updated_at = NOW()\n"
+        "WHERE (\n"
+        "  party ILIKE '%Awami%'\n"
+        "  OR name ILIKE '%Hasina%'\n"
+        "  OR name ILIKE '%Moudud Ahmed%'\n"
+        ")\n"
+        "AND (tenure_end IS NULL OR tenure_end > DATE '2026-02-14');"
+    )
     return "\n".join(lines)
 
 

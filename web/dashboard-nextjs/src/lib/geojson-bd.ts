@@ -29,6 +29,9 @@ const BOX_DELTA: Record<AdminUnit["type"], number> = {
   DISTRICT: 0.22,
   UPAZILA: 0.1,
   UNION: 0.05,
+  CONSTITUENCY: 0.12,
+  CITY_CORPORATION: 0.14,
+  WARD: 0.04,
 };
 
 /** Fallback division/district polygons when hierarchy API has not loaded yet. */

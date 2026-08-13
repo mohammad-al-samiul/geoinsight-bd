@@ -27,6 +27,10 @@ export function getDrillParentId(filter: AdminFilterState): string | null {
       return filter.districtId;
     case "UNION":
       return filter.upazilaId;
+    case "CONSTITUENCY":
+    case "CITY_CORPORATION":
+    case "WARD":
+      return filter.districtId;
     default:
       return null;
   }

@@ -13,6 +13,7 @@ import { applyUnitScoreOverlay, getUnitCentroid } from "@/lib/geojson-bd";
 import { useSocket } from "@/hooks/use-socket";
 import { fetchSocketToken } from "@/lib/socket-token";
 import { loadAdminHierarchy } from "@/lib/admin-hierarchy";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 export function useDashboardData(filter: AdminFilterState) {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -72,6 +73,8 @@ export function useDashboardData(filter: AdminFilterState) {
     filter.unionId,
     load,
   ]);
+
+  useRealtimeRefresh(() => load({ silent: true }), true, true);
 
   const handleKpiUpdate = useCallback(
     (payload: SocketKpiPayload) => {

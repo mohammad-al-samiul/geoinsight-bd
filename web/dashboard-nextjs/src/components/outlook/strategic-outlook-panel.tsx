@@ -23,7 +23,7 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useStrategicOutlook } from "@/hooks/use-strategic-outlook";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { chartTooltipProps } from "@/lib/chart-tooltip";
-import { chartLayout } from "@/lib/chart-theme";
+import { chartLayout, RadarAngleTick } from "@/lib/chart-theme";
 import { cn } from "@/lib/utils";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -588,29 +588,43 @@ function ChallengeDomainView({
                 {bn ? "রাডারে তুলনামূলক চাপ" : "Comparative pressure radar"}
               </span>
             </div>
-            <ResponsiveContainer width="100%" height={layout.narrow ? layout.chartHeightSm : layout.chartHeightMd}>
-              <RadarChart
-                data={sorted.slice(0, 6).map((c) => ({
-                  subject: c.title.length > 22 ? `${c.title.slice(0, 20)}…` : c.title,
-                  value: c.severity,
-                }))}
-                cx="50%"
-                cy="50%"
-                outerRadius={layout.narrow ? "48%" : "55%"}
-              >
-                <PolarGrid stroke="rgba(148,163,184,0.12)" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: "#94a3b8", fontSize: layout.tick.fontSize }} />
-                <Radar
-                  name={t("severity")}
-                  dataKey="value"
-                  stroke={radarStroke}
-                  fill={radarStroke}
-                  fillOpacity={0.28}
-                  strokeWidth={2.5}
-                />
-                <Tooltip {...chartTooltipProps} />
-              </RadarChart>
-            </ResponsiveContainer>
+            <div className="w-full overflow-visible" style={{ height: layout.narrow ? 320 : 380 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart
+                  data={sorted.slice(0, 6).map((c) => ({
+                    subject: c.title,
+                    value: c.severity,
+                  }))}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={layout.narrow ? "38%" : "42%"}
+                  margin={{ top: 28, right: 36, bottom: 28, left: 36 }}
+                >
+                  <PolarGrid stroke="rgba(148,163,184,0.12)" />
+                  <PolarAngleAxis
+                    dataKey="subject"
+                    tick={(tickProps) => (
+                      <RadarAngleTick
+                        {...tickProps}
+                        fill="#cbd5e1"
+                        fontSize={layout.narrow ? 10 : 11}
+                        maxCharsPerLine={layout.narrow ? 11 : 15}
+                        maxLines={4}
+                      />
+                    )}
+                  />
+                  <Radar
+                    name={t("severity")}
+                    dataKey="value"
+                    stroke={radarStroke}
+                    fill={radarStroke}
+                    fillOpacity={0.28}
+                    strokeWidth={2.5}
+                  />
+                  <Tooltip {...chartTooltipProps} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
           </IntelCard>
         </FloatCard>
       )}
@@ -660,12 +674,12 @@ export function StrategicOutlookPanel() {
 
   const radarData = [
     ...pol.slice(0, 3).map((c) => ({
-      subject: c.title.length > 18 ? `${c.title.slice(0, 16)}…` : c.title,
+      subject: c.title,
       politics: Math.round((c.severity / 5) * 100),
       economy: 0,
     })),
     ...eco.slice(0, 3).map((c) => ({
-      subject: c.title.length > 18 ? `${c.title.slice(0, 16)}…` : c.title,
+      subject: c.title,
       politics: 0,
       economy: Math.round((c.severity / 5) * 100),
     })),
@@ -739,22 +753,40 @@ export function StrategicOutlookPanel() {
                 value={ecoRisk} max={eco.length * 5 || 20} color="#f59e0b" />
             </IntelCard>
             {radarData.length >= 3 && (
-              <IntelCard padding="sm" className="sm:col-span-2">
+              <IntelCard padding="sm" className="sm:col-span-2 !overflow-visible">
                 <p className="mb-1 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
                   {t("challengeIntensity")}
                 </p>
-                <ResponsiveContainer width="100%" height={layout.chartHeightSm}>
-                  <RadarChart data={radarData} cx="50%" cy="50%" outerRadius={layout.narrow ? "46%" : "52%"}>
-                    <PolarGrid stroke="rgba(148,163,184,0.12)" />
-                    <PolarAngleAxis dataKey="subject"
-                      tick={{ fill: "#94a3b8", fontSize: layout.tick.fontSize }} />
-                    <Radar name={t("politics")} dataKey="politics"
-                      stroke="#a855f7" fill="#a855f7" fillOpacity={0.25} strokeWidth={2} />
-                    <Radar name={t("economy")} dataKey="economy"
-                      stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.25} strokeWidth={2} />
-                    <Tooltip {...chartTooltipProps} />
-                  </RadarChart>
-                </ResponsiveContainer>
+                <div className="w-full overflow-visible" style={{ height: layout.narrow ? 300 : 360 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart
+                      data={radarData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={layout.narrow ? "36%" : "40%"}
+                      margin={{ top: 32, right: 48, bottom: 32, left: 48 }}
+                    >
+                      <PolarGrid stroke="rgba(148,163,184,0.12)" />
+                      <PolarAngleAxis
+                        dataKey="subject"
+                        tick={(tickProps) => (
+                          <RadarAngleTick
+                            {...tickProps}
+                            fill="#e2e8f0"
+                            fontSize={layout.narrow ? 10 : 12}
+                            maxCharsPerLine={layout.narrow ? 12 : 16}
+                            maxLines={4}
+                          />
+                        )}
+                      />
+                      <Radar name={t("politics")} dataKey="politics"
+                        stroke="#a855f7" fill="#a855f7" fillOpacity={0.25} strokeWidth={2} />
+                      <Radar name={t("economy")} dataKey="economy"
+                        stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.25} strokeWidth={2} />
+                      <Tooltip {...chartTooltipProps} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
               </IntelCard>
             )}
           </div>

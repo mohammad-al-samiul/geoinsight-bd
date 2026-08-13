@@ -1,6 +1,19 @@
-export type UserRole = "PMO" | "MINISTER" | "DC" | "UNION_CHAIRMAN";
+export type UserRole =
+  | "PMO"
+  | "MINISTER"
+  | "DC"
+  | "UNION_CHAIRMAN"
+  | "MP"
+  | "MAYOR";
 
-export type AdminUnitType = "DIVISION" | "DISTRICT" | "UPAZILA" | "UNION";
+export type AdminUnitType =
+  | "DIVISION"
+  | "DISTRICT"
+  | "UPAZILA"
+  | "UNION"
+  | "CONSTITUENCY"
+  | "CITY_CORPORATION"
+  | "WARD";
 
 export interface AdminUnit {
   id: string;
@@ -36,6 +49,12 @@ export const ADMIN_FILTER_PARAMS = {
   union: "union",
 } as const;
 
+export const LOCAL_ENTITY_ROLES: UserRole[] = ["MP", "MAYOR"];
+
+export function isLocalEntityRole(role: UserRole): boolean {
+  return LOCAL_ENTITY_ROLES.includes(role);
+}
+
 export const ROLE_META: Record<
   UserRole,
   { label: string; labelBn: string; tier: number; badgeClass: string }
@@ -63,5 +82,17 @@ export const ROLE_META: Record<
     labelBn: "ইউনিয়ন চেয়ারম্যান",
     tier: 4,
     badgeClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  },
+  MP: {
+    label: "Member of Parliament",
+    labelBn: "সংসদ সদস্য",
+    tier: 5,
+    badgeClass: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+  },
+  MAYOR: {
+    label: "City Corporation Mayor",
+    labelBn: "সিটি কর্পোরেশন মেয়র",
+    tier: 5,
+    badgeClass: "bg-orange-500/15 text-orange-300 border-orange-500/30",
   },
 };
