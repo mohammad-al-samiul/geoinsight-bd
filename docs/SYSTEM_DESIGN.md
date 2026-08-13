@@ -5,7 +5,7 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 
 এই ডকুমেন্টে আছে: **HLD**, **LLD**, functional/non-functional requirements, **ERD**, tech stack rationale — সব একসাথে।
 
-**Related:** [Docs hub](./README.md) · [Interactive SRS (HTML)](./srs-interactive.html) · [README (quick start)](../README.md) · [CI/CD & VPS](./DEPLOYMENT_AND_OPS.md) · [Ollama production](./OLLAMA_PRODUCTION.md)
+**Related:** [Docs hub](./README.md) · [README (quick start)](../README.md) · [CI/CD & VPS](./DEPLOYMENT_AND_OPS.md) · [Ollama production](./OLLAMA_PRODUCTION.md)
 
 ---
 
@@ -24,6 +24,7 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 - [১১. Monorepo Structure](#১১-monorepo-structure)
 - [১২. Service Ports](#১২-service-ports-reference)
 - [১৩. Architecture Decision Summary](#১৩-summary--architecture-decision-record-adr)
+- [১৪. Cost model (indicative)](#১৪-cost-model-indicative)
 
 ---
 
@@ -44,7 +45,8 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 
 - Email/password দিয়ে login
 - **JWT** access token (১৫ মিনিট) + refresh token (৭ দিন) — rotation সহ
-- Role-based access: `PMO`, `MINISTER`, `DC`, `UNION_CHAIRMAN`
+- Optional **TOTP MFA** (`/auth/mfa/setup|enable|verify|disable`)
+- Role-based access: `PMO`, `MINISTER`, `DC`, `UNION_CHAIRMAN`, `MP`, `MAYOR`
 - প্রতিটি role নির্দিষ্ট `admin_unit_id` **scope**-এ সীমাবদ্ধ
 - Session revoke / JWT denylist
 - User registration শুধু **PMO** করতে পারে
@@ -52,6 +54,7 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 ### ২.২ Administrative Hierarchy
 
 - Bangladesh admin structure: `DIVISION → DISTRICT → UPAZILA → UNION`
+- Local DSS units: `CONSTITUENCY` (MP), `CITY_CORPORATION` (Mayor)
 - **GeoJSON** boundary সহ admin unit management
 - Hierarchy-based filtering (denormalized `division_id`, `district_id`, `upazila_id`)
 
@@ -227,6 +230,21 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 | **Pipeline** | Interval workers + `POST /pipeline/sync/:job` for news, weather, unrest, narrative, outlook, briefing, commodities, … |
 | **Intel** | Read APIs for `IntelAnalysisSnapshot`, `PipelineJobRun`, `IngestionSyncRun` |
 
+### ২.২১ Local Entity DSS (MP / Mayor)
+
+Ward-level command surface — PMO oversight + MP/Mayor desks. Catalog: **CTG-8, CTG-9, CTG-10, CCC, COCC**.
+
+| Capability | Path / API | Notes |
+|------------|------------|-------|
+| Overview + morning brief | `/local` · `/local-entity/overview`, `/morning-brief` | CSV export + digest |
+| Complaints SLA | `/local/complaints` | Triage (fast LLM), assign, before/after photo, OVERDUE |
+| WPI / heatmap / scorecard | `/local/wpi`, `/heatmap`, `/scorecard` | Ward scores + Ollama explain |
+| OSINT / pulse / specialty | `/local/osint`, `/pulse`, `/specialty` | Entity keywords + niche packs |
+| Outages, visits, alerts | `/local/outage`, `/visits`, `/alerts` | Alert delivery retry / voice test |
+| MFA | `/local/security` | Same TOTP as national auth |
+
+Roles: `PMO`, `MP`, `MAYOR`. Gateway module: `local-entity`.
+
 ---
 
 ## ৩. Non-Functional Requirements
@@ -236,7 +254,7 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 | **Performance** | Dashboard query < 500ms; commodity time-series fast aggregation | TimescaleDB hypertable, read replica, PgBouncer pooling, Redis cache |
 | **Scalability** | Horizontal gateway scaling | Socket.io Redis adapter, stateless API, RabbitMQ async |
 | **Availability** | Production 99.5%+ uptime | Docker healthchecks, retry workers, dead-letter queues |
-| **Security** | JWT in HTTP-only cookies; browser-এ localStorage token নেই | Next.js **BFF** pattern, Helmet, CORS, bcrypt (12 rounds) |
+| **Security** | JWT in HTTP-only cookies; optional TOTP MFA; browser-এ localStorage token নেই | Next.js **BFF** pattern, Helmet, CORS, bcrypt (12 rounds), `/auth/mfa/*` |
 | **Data Sovereignty** | Tier-4 NDC deployment — external telemetry বন্ধ | Ollama on-prem, `SOVEREIGN_MODE`, HF offline, MinIO self-hosted |
 | **Rate Limiting** | Public feed-এ DDoS protection | Redis-backed rate limiter, nginx edge limits |
 | **Observability** | Metrics, alerts, dashboards | Prometheus, Grafana, Alertmanager |
@@ -468,6 +486,8 @@ PMO            → admin_unit_id = NULL → সব unit access
 MINISTER       → DIVISION level unit
 DC             → DISTRICT level unit
 UNION_CHAIRMAN → UNION level unit
+MP             → CONSTITUENCY → Local DSS `/local`
+MAYOR          → CITY_CORPORATION → Local DSS `/local`
 
 authorize(targetAdminUnitId):
   userScopeChain = Redis cache (admin hierarchy)
@@ -1029,11 +1049,24 @@ Windows Hyper-V frequently blocks `5432`, `4000`, `8000`, `9000` — তাই l
 
 ---
 
+## ১৪. Cost model (indicative)
+
+August 2026 বাজারের আনুমানিক হিসাব — commercial bid নয়। Application stack **OSS / self-hosted**, তাই software license ≈ **৳0**। খরচ আসে সার্ভার, মানুষ, backup, optional GPU থেকে।
+
+| Profile | CAPEX | Monthly OPEX (approx.) | 3-year TCO |
+|---------|-------|------------------------|------------|
+| **Pilot** (slim VPS, remote Ollama, sentiment mock) | ৳0–2 লক্ষ | ৳1.2–2.2 লক্ষ | ৳45–85 লক্ষ |
+| **Production** (dedicated AI box, staffed ops) | ৳8–20 লক্ষ | ৳3.5–6 লক্ষ | ৳1.5–2.5 কোটি |
+| **NDC / national** (HA, GPU, 24/7) | ৳40 লক্ষ – 1.2 কোটি | ৳8–15 লক্ষ | ৳4–8 কোটি |
+
+Greenfield build (যদি এই repo না থাকত): ৬–৯ মাস, ৫–৭ ইঞ্জিনিয়ার ≈ ৳৮০ লক্ষ – ১.৫ কোটি one-time। এখন remaining cost = harden, train, NDC onboarding, data integration.
+
+---
+
 ## Related Documentation
 
 | Document | Location |
 |----------|----------|
-| **Interactive SRS + diagrams** | [`docs/srs-interactive.html`](./srs-interactive.html) |
 | Docs index | [`docs/README.md`](./README.md) |
 | Setup & quick start | [`README.md`](../README.md) |
 | API Gateway | [`services/api-gateway-node/README.md`](../services/api-gateway-node/README.md) |

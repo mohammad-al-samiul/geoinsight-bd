@@ -5,8 +5,7 @@
 
 | Document | Audience | কী আছে |
 |----------|----------|--------|
-| **[Interactive SRS (HTML)](./srs-interactive.html)** | Stakeholder / reviewer | **Browser-এ খুলুন** — SRS, 20+ HLD/LLD/ERD/flow diagrams, tech stack, 40+ features, cost/TCO calculator; responsive |
-| **[SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md)** | Architect / reviewer | HLD, LLD, ERD, NFR, security, ADR — incl. Narrative Shield, Unrest, Outlook, Divisional Crisis, Weather, DSS modules |
+| **[SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md)** | Architect / reviewer | SRS, HLD, LLD, ERD, NFR, Local DSS, cost/TCO, security, ADR |
 | **[DEPLOYMENT_AND_OPS.md](./DEPLOYMENT_AND_OPS.md)** | DevOps / operator | CI/CD (`deploy-vps.yml`), Hostinger VPS, slim compose, performance, day-to-day ops |
 | **[OLLAMA_PRODUCTION.md](./OLLAMA_PRODUCTION.md)** | AI ops | আলাদা AI server, `OLLAMA_URL`, GPU optional, local Windows tip |
 
@@ -38,8 +37,7 @@
 ```
 README (quick start / features)
    │
-   ├─► docs/srs-interactive.html      ← interactive SRS + diagrams (open in browser)
-   ├─► docs/SYSTEM_DESIGN.md          ← কেন এমন architecture
+   ├─► docs/SYSTEM_DESIGN.md          ← SRS + architecture + cost
    ├─► docs/DEPLOYMENT_AND_OPS.md     ← কীভাবে CI/CD + VPS
    │       └─► docs/OLLAMA_PRODUCTION.md  ← LLM server detail
    ├─► services/*/README.md           ← per-service runbook

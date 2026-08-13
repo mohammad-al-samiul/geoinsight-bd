@@ -86,6 +86,17 @@ push main
 | `VPS_SSH_PORT` | Optional, default `22` |
 | `VPS_DEPLOY_PATH` | Optional, default `/opt/geoinsight-bd` |
 
+**One-time SSH key (laptop → GitHub + VPS):**
+
+```bash
+ssh-keygen -t ed25519 -C "github-deploy" -f ./geoinsight-deploy -N ""
+```
+
+- Public key → VPS `/root/.ssh/authorized_keys`
+- Private key (`geoinsight-deploy`) → GitHub secret `VPS_SSH_KEY`
+
+VPS must be a **git clone** of the repo (not only uploaded files).
+
 ### 2.2 Optional path — `deploy.yml` (GHCR, manual)
 
 **Trigger:** শুধু **workflow_dispatch** (manual) — automatic `main` push-এ চলে না।
@@ -329,6 +340,21 @@ grep -E 'PIPELINE_RUN_ON_START|SENTIMENT_USE_MOCK|OLLAMA_URL' .env
 
 - Dashboard: `http://VPS_IP:3000`
 - Default PMO (seed): README / db-init অনুযায়ী
+
+### `db-init` exit 3
+
+| Cause | What happens | Fix |
+|-------|----------------|-----|
+| Schema before migrate | Seeds run before Prisma → missing tables | `db-migrate` runs `prisma migrate deploy`, then `db-init` |
+| Re-deploy seed duplicates | Redeploy re-runs `db-init` on an existing volume; non-idempotent inserts fail (`duplicate key …_pkey`) and `api-gateway` never starts (`depends_on: db-init`) | Local seed inserts use `ON CONFLICT … DO NOTHING/UPDATE` |
+
+If stuck on the VPS:
+
+```bash
+cd /opt/geoinsight-bd
+git pull origin main
+docker compose -f docker-compose.yml -f docker-compose.apps.yml logs db-migrate db-init --tail 100
+```
 
 ---
 

@@ -14,9 +14,8 @@
 
 - [Overview](#overview)
 - [Documentation](#documentation)
-- [Quick Start (Bangla)](#quick-start-bangla)
-- [Features](#features)
 - [Quick Start](#quick-start)
+- [Features](#features)
 - [How Frontend Connects to Backend](#how-frontend-connects-to-backend)
 - [Environment Variables](#environment-variables)
 - [Service Ports](#service-ports)
@@ -56,21 +55,18 @@ GeoInsight BD is a **monorepo** that gives the Government of Bangladesh a single
 | **AI Analytics** | Python 3.12, FastAPI, Bangla-BERT, Ollama client | internal `8000` | NLP, briefing, predictive scoring |
 | **Infrastructure** | Docker Compose | — | TimescaleDB, PgBouncer, Redis, RabbitMQ, MinIO |
 
-Architecture, CI/CD, Ollama, এবং **interactive SRS (diagrams + cost)** live under **[docs/](docs/README.md)** — এই README শুধু quick start ও feature index।
-
-**Stakeholder / review walkthrough:** browser-এ খুলুন → **[docs/srs-interactive.html](docs/srs-interactive.html)** (HLD/LLD/ERD/flow diagrams, tech stack, 40+ features, cost calculator; responsive).
+Architecture, CI/CD, এবং Ollama details live under **[docs/](docs/README.md)** — এই README শুধু quick start ও feature index।
 
 ---
 
 ## Documentation
 
-System design, CI/CD, VPS, এবং Ollama **`docs/`**-এ আলাদা page — README শুধু integrate করে link দেয়।
+System design, CI/CD, VPS, এবং Ollama **`docs/`**-এ Markdown — README শুধু integrate করে link দেয়।
 
 | Document | কী পাবেন |
 |----------|----------|
-| **[Interactive SRS (HTML)](docs/srs-interactive.html)** | **Browser-এ খুলুন** — SRS, HLD/LLD/ERD diagrams, feature encyclopedia, cost/TCO |
 | **[Docs hub](docs/README.md)** | সব docs-এর index + nav map |
-| **[System Design](docs/SYSTEM_DESIGN.md)** | HLD, LLD, ERD, tech stack rationale, ADR (Markdown source) |
+| **[System Design](docs/SYSTEM_DESIGN.md)** | SRS, HLD, LLD, ERD, tech stack, Local DSS, cost/TCO, ADR |
 | **[CI/CD · VPS · Ops](docs/DEPLOYMENT_AND_OPS.md)** | Deploy pipeline, slim VPS, performance, day-to-day ops |
 | **[Ollama Production](docs/OLLAMA_PRODUCTION.md)** | আলাদা AI server + `OLLAMA_URL` setup |
 | **[API Gateway README](services/api-gateway-node/README.md)** | Gateway modules + local run |
@@ -80,8 +76,7 @@ System design, CI/CD, VPS, এবং Ollama **`docs/`**-এ আলাদা page
 | **[`.env.production.example`](.env.production.example)** | Hostinger / production VPS |
 
 ```
-README  ──►  docs/srs-interactive.html   ← interactive SRS + all diagrams
-         ──►  docs/README.md
+README  ──►  docs/README.md
                ├─ SYSTEM_DESIGN.md
                ├─ DEPLOYMENT_AND_OPS.md
                └─ OLLAMA_PRODUCTION.md
@@ -90,13 +85,14 @@ README  ──►  docs/srs-interactive.html   ← interactive SRS + all diagram
 
 ---
 
-## Quick Start (Bangla)
+## Quick Start
 
 ### Option A — এক কমান্ডে full stack (Windows, recommended)
 
 ```powershell
+git clone <repository-url> geoinsight-bd
 cd geoinsight-bd
-cp .env.example .env          # প্রথমবার
+cp .env.example .env          # প্রথমবার — strong passwords + JWT_SECRET (≥ 32 chars)
 .\deploy\scripts\docker-up.ps1
 ```
 
@@ -114,10 +110,64 @@ cp .env.example .env          # প্রথমবার
 
 ### Option B — Manual local development (৪টা terminal)
 
-1. **Infrastructure:** `docker compose up -d`
-2. **API Gateway:** `cd services/api-gateway-node && npm run dev` → `:4000` (service port; Docker host often `4800`)
-3. **AI Analytics:** `cd services/ai-analytics-python && uvicorn app.main:app --reload --port 8000`
-4. **Dashboard:** `cd web/dashboard-nextjs && npm run dev` → `:3000`
+#### 1. Infrastructure
+
+```bash
+cp .env.example .env
+docker compose up -d
+docker compose ps   # wait for healthy postgres, rabbitmq, minio
+```
+
+| UI | URL |
+|----|-----|
+| RabbitMQ Management | http://localhost:15672 |
+| MinIO Console | http://localhost:19001 |
+
+#### 2. API Gateway
+
+```bash
+cd services/api-gateway-node
+cp .env.example .env
+npm install
+npx prisma generate
+npx prisma migrate deploy
+npm run dev
+```
+
+Gateway service port `:4000` — Docker host mapping often `4800`.
+
+#### 3. AI Analytics
+
+```bash
+cd services/ai-analytics-python
+cp .env.example .env
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+Ollama (optional, for generative AI):
+
+```bash
+ollama pull gpt-oss:20b
+ollama serve   # default :11434
+```
+
+#### 4. Dashboard
+
+```bash
+cd web/dashboard-nextjs
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+#### 5. Seed database (if not using docker-up)
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.apps.yml run --rm db-init
+```
 
 **Frontend ↔ Backend:** Browser সরাসরি JWT দেখে না। Login → Next.js **BFF** → HTTP-only cookie → `/api/proxy/*` → Gateway `/api/v1/*`. Real-time → **Socket.io** সরাসরি Gateway-এ।
 
@@ -205,82 +255,6 @@ Constituency ও City Corporation desk — national choropleth নয়, ward-l
 - **Notification Center** — `/notifications` + live red flag bell
 - **AI Anomaly Feed** — right panel, Socket.io live
 - **Locale Switcher** — বাংলা / English
-
----
-
-## Quick Start
-
-### Option A — Docker full stack (recommended)
-
-```powershell
-git clone <repository-url> geoinsight-bd
-cd geoinsight-bd
-cp .env.example .env
-# Edit .env — strong passwords + JWT_SECRET (≥ 32 chars)
-
-.\deploy\scripts\docker-up.ps1
-```
-
-Open **http://localhost:3600** — login: `pmo@geoinsight.gov.bd` / `ChangeMe@123`
-
-### Option B — Manual local development
-
-#### 1. Infrastructure
-
-```bash
-cp .env.example .env
-docker compose up -d
-docker compose ps   # wait for healthy postgres, rabbitmq, minio
-```
-
-| UI | URL |
-|----|-----|
-| RabbitMQ Management | http://localhost:15672 |
-| MinIO Console | http://localhost:19001 |
-
-#### 2. API Gateway
-
-```bash
-cd services/api-gateway-node
-cp .env.example .env
-npm install
-npx prisma generate
-npx prisma migrate deploy
-npm run dev
-```
-
-#### 3. AI Analytics
-
-```bash
-cd services/ai-analytics-python
-cp .env.example .env
-python -m venv .venv
-.venv\Scripts\activate          # Windows
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-
-Ollama (optional, for generative AI):
-
-```bash
-ollama pull gpt-oss:20b
-ollama serve   # default :11434
-```
-
-#### 4. Dashboard
-
-```bash
-cd web/dashboard-nextjs
-cp .env.example .env.local
-npm install
-npm run dev
-```
-
-#### 5. Seed database (if not using docker-up)
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.apps.yml run --rm db-init
-```
 
 ---
 
@@ -432,6 +406,7 @@ Sidebar filter: `minTier >= userTier` (PMO=`1` … UNION_CHAIRMAN=`4`); **PMO al
 | 5 | MP / MAYOR | Local DSS tree (`/local/*`) only |
 
 Gateway `requireRoles` is often **wider** than sidebar (e.g. DC can call unrest/outlook APIs even if nav is PMO-only). See [System Design](docs/SYSTEM_DESIGN.md) §২.১৫–২.২০.
+
 ---
 
 ## Data Seeding
@@ -528,8 +503,7 @@ docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up
 geoinsight-bd/
 ├── docs/
 │   ├── README.md                   # Docs hub (start here)
-│   ├── srs-interactive.html        # Interactive SRS + HLD/LLD/ERD diagrams
-│   ├── SYSTEM_DESIGN.md            # HLD / LLD / ERD / ADR
+│   ├── SYSTEM_DESIGN.md            # SRS / HLD / LLD / ERD / ADR / cost
 │   ├── DEPLOYMENT_AND_OPS.md       # CI/CD + VPS
 │   └── OLLAMA_PRODUCTION.md        # Dedicated Ollama server
 ├── .github/workflows/              # deploy-vps.yml, deploy.yml
@@ -607,7 +581,4 @@ Proprietary — Government of Bangladesh / authorized partners.
 
 ---
 
-<p align="center">
-  <strong>GeoInsight BD</strong> — Evidence-based governance for every admin unit.<br/>
-  <em>National data · Sovereign AI · Transparent governance</em>
-</p>
+**GeoInsight BD** — Evidence-based governance for every admin unit. National data · Sovereign AI · Transparent governance
