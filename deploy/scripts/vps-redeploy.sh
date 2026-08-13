@@ -67,10 +67,10 @@ run_deploy() {
     exit 1
   fi
 
-  # Load .env for POSTGRES_* checks (ignore noisy unset extras)
+  # Load .env for POSTGRES_* checks (tolerate Windows CRLF from editors/SCP)
   set -a
   # shellcheck disable=SC1091
-  source .env
+  source <(sed 's/\r$//' .env)
   set +a
 
   echo "==> Deploy path: $DEPLOY_PATH"
@@ -131,6 +131,8 @@ run_deploy() {
 
   # Keep VPS .env intervals aligned with recommended defaults (15m heavy / 5m pulse)
   if [[ -f .env ]]; then
+    # Normalize CRLF so later sed/source never trips on $'\r'
+    sed -i 's/\r$//' .env || true
     patch_env_kv() {
       local key="$1" val="$2"
       if grep -qE "^${key}=" .env; then
