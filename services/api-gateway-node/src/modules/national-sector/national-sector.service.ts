@@ -2,8 +2,10 @@ import { AdminUnitType, EvidenceGeoScope, LocalSector, LocalSiteStatus, UserRole
 import { prismaRead } from "../../core/database/prisma.client";
 import { ApiError } from "../../core/errors/api.error";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
+import { flag, isCsvOrigin, num, pressureOf } from "./national-sector.metrics";
+import { ingestNationalSectorCsv } from "./national-sector.ingest";
 
-const CACHE_KEY = "national:sectors:v1";
+const CACHE_KEY = "national:sectors:v2";
 const TTL_SEC = 60;
 
 export type NationalSectorCode = "EDUCATION" | "HEALTH" | "EMPLOYMENT";
@@ -76,6 +78,9 @@ export type NationalSectorEvidence = {
 export type NationalSectorBoard = {
   generatedAt: string;
   sourceNote: string;
+  provenance: "SEED" | "LIVE";
+  csvDistricts: number;
+  seedDistricts: number;
   summary: {
     districts: number;
     divisions: number;
@@ -111,45 +116,9 @@ export type NationalSectorBoard = {
 
 let mem: { exp: number; data: NationalSectorBoard } | null = null;
 
-function num(m: Record<string, unknown>, key: string): number {
-  const v = m[key];
-  return typeof v === "number" && Number.isFinite(v) ? v : 0;
-}
-
-function flag(m: Record<string, unknown>, key: string): boolean {
-  return m[key] === true;
-}
-
 function avg(xs: number[]): number {
   if (!xs.length) return 0;
   return Math.round(xs.reduce((s, n) => s + n, 0) / xs.length);
-}
-
-function pressureOf(sector: LocalSector, metrics: Record<string, unknown>): number {
-  if (sector === LocalSector.EDUCATION) {
-    return Math.min(
-      100,
-      num(metrics, "dropoutPct") * 3.2 +
-        num(metrics, "teacherGap") * 8 +
-        Math.max(0, 88 - num(metrics, "attendancePct")) * 1.1,
-    );
-  }
-  if (sector === LocalSector.HEALTH) {
-    return Math.min(
-      100,
-      num(metrics, "dengueCases7d") * 4.5 +
-        Math.max(0, num(metrics, "occupancyPct") - 80) * 1.4 +
-        (flag(metrics, "stockout") ? 22 : 0) +
-        Math.max(0, 5 - num(metrics, "orsStockDays")) * 4,
-    );
-  }
-  return Math.min(
-    100,
-    num(metrics, "unemploymentPct") * 2.2 +
-      num(metrics, "youthUnempPct") * 0.8 +
-      (flag(metrics, "jobFairGap") ? 16 : 0) +
-      Math.max(0, 20 - num(metrics, "vacanciesListed")) * 1.2,
-  );
 }
 
 function opsHint(sector: LocalSector, metrics: Record<string, unknown>): OpsHint {
@@ -354,6 +323,71 @@ function jobActions(
   return actions.filter((a) => a.affectedDistricts > 0 || a.targetDivisions.length > 0);
 }
 
+function boardSummary(
+  education: NationalDistrictSlice[],
+  health: NationalDistrictSlice[],
+  jobs: NationalDistrictSlice[],
+  divisionCount: number,
+): NationalSectorBoard["summary"] {
+  return {
+    districts: new Set([...education, ...health, ...jobs].map((d) => d.id)).size,
+    divisions: divisionCount,
+    educationAlerts: education.filter((d) => d.status === LocalSiteStatus.ALERT).length,
+    healthAlerts: health.filter((d) => d.status === LocalSiteStatus.ALERT).length,
+    jobsAlerts: jobs.filter((d) => d.status === LocalSiteStatus.ALERT).length,
+    attendanceAvg: avg(education.map((d) => num(d.metrics, "attendancePct"))),
+    teacherGap: education.reduce((s, d) => s + num(d.metrics, "teacherGap"), 0),
+    dengue7d: health.reduce((s, d) => s + num(d.metrics, "dengueCases7d"), 0),
+    stockouts: health.filter((d) => flag(d.metrics, "stockout")).length,
+    unemploymentAvg: avg(jobs.map((d) => num(d.metrics, "unemploymentPct"))),
+    jobFairGaps: jobs.filter((d) => flag(d.metrics, "jobFairGap")).length,
+    vacancies: jobs.reduce((s, d) => s + num(d.metrics, "vacanciesListed"), 0),
+    trainingSeats: jobs.reduce((s, d) => s + num(d.metrics, "trainingSeats"), 0),
+  };
+}
+
+function boardProvenance(districts: NationalDistrictSlice[]): {
+  provenance: "SEED" | "LIVE";
+  csvDistricts: number;
+  seedDistricts: number;
+} {
+  const ids = new Set(districts.map((d) => d.id));
+  const csvDistricts = [...ids].filter((id) =>
+    districts.some((d) => d.id === id && isCsvOrigin(d.metrics)),
+  ).length;
+  const seedDistricts = ids.size - csvDistricts;
+  return {
+    provenance: csvDistricts > 0 ? "LIVE" : "SEED",
+    csvDistricts,
+    seedDistricts,
+  };
+}
+
+function sourceNoteFor(prov: ReturnType<typeof boardProvenance>): string {
+  if (prov.csvDistricts <= 0) {
+    return "District roll-up of seeded education / health / employment pressure — not a live EMIS, DGHS, or BBS labour feed. Abstracts only, not full papers.";
+  }
+  return `CSV ingest for ${prov.csvDistricts} district(s); remaining ${prov.seedDistricts} stay on seed. Not a live EMIS / DGHS / BBS feed.`;
+}
+
+function filterBoard(board: NationalSectorBoard, divisionId: string): NationalSectorBoard {
+  const divisions = board.divisions.filter((d) => d.id === divisionId);
+  const education = board.districts.education.filter((d) => d.divisionId === divisionId);
+  const health = board.districts.health.filter((d) => d.divisionId === divisionId);
+  const jobs = board.districts.jobs.filter((d) => d.divisionId === divisionId);
+  const mixed = [...education, ...health, ...jobs];
+  const prov = boardProvenance(mixed);
+  return {
+    ...board,
+    ...prov,
+    sourceNote: sourceNoteFor(prov),
+    summary: boardSummary(education, health, jobs, divisions.length),
+    divisions,
+    districts: { education, health, jobs },
+    jobActions: jobActions(divisions, jobs),
+  };
+}
+
 async function readCache(): Promise<NationalSectorBoard | null> {
   if (mem && mem.exp > Date.now()) return mem.data;
   if (!isRedisEnabled()) return null;
@@ -362,6 +396,7 @@ async function readCache(): Promise<NationalSectorBoard | null> {
     if (!raw) return null;
     const data = JSON.parse(raw) as NationalSectorBoard;
     if (!data?.divisions?.[0]?.education || !data?.jobActions) return null;
+    if (typeof data.csvDistricts !== "number") return null;
     mem = { exp: Date.now() + TTL_SEC * 1000, data };
     return data;
   } catch {
@@ -386,7 +421,29 @@ export class NationalSectorService {
     }
 
     const cached = await readCache();
-    if (cached) return cached;
+    const full = cached ?? (await this.buildNationalBoard());
+    if (!cached) await writeCache(full);
+
+    if (user.role === UserRole.MINISTER && user.adminUnitId) {
+      return filterBoard(full, user.adminUnitId);
+    }
+    return full;
+  }
+
+  async ingestCsv(csvText?: string) {
+    const result = await ingestNationalSectorCsv(csvText);
+    mem = null;
+    if (isRedisEnabled()) {
+      try {
+        await getRedisClient().del(CACHE_KEY);
+      } catch {
+        /* ignore */
+      }
+    }
+    return result;
+  }
+
+  private async buildNationalBoard(): Promise<NationalSectorBoard> {
 
     const [divisions, rows, evidenceRows] = await Promise.all([
       prismaRead.adminUnit.findMany({
@@ -492,33 +549,19 @@ export class NationalSectorService {
       };
     });
 
-    const data: NationalSectorBoard = {
+    const mixed = [...education, ...health, ...jobs];
+    const prov = boardProvenance(mixed);
+
+    return {
       generatedAt: new Date().toISOString(),
-      sourceNote:
-        "District roll-up of seeded education / health / employment pressure — not a live EMIS, DGHS, or BBS labour feed. Abstracts only, not full papers.",
-      summary: {
-        districts: new Set([...education, ...health, ...jobs].map((d) => d.id)).size,
-        divisions: packed.length,
-        educationAlerts: education.filter((d) => d.status === LocalSiteStatus.ALERT).length,
-        healthAlerts: health.filter((d) => d.status === LocalSiteStatus.ALERT).length,
-        jobsAlerts: jobs.filter((d) => d.status === LocalSiteStatus.ALERT).length,
-        attendanceAvg: avg(education.map((d) => num(d.metrics, "attendancePct"))),
-        teacherGap: education.reduce((s, d) => s + num(d.metrics, "teacherGap"), 0),
-        dengue7d: health.reduce((s, d) => s + num(d.metrics, "dengueCases7d"), 0),
-        stockouts: health.filter((d) => flag(d.metrics, "stockout")).length,
-        unemploymentAvg: avg(jobs.map((d) => num(d.metrics, "unemploymentPct"))),
-        jobFairGaps: jobs.filter((d) => flag(d.metrics, "jobFairGap")).length,
-        vacancies: jobs.reduce((s, d) => s + num(d.metrics, "vacanciesListed"), 0),
-        trainingSeats: jobs.reduce((s, d) => s + num(d.metrics, "trainingSeats"), 0),
-      },
+      sourceNote: sourceNoteFor(prov),
+      ...prov,
+      summary: boardSummary(education, health, jobs, packed.length),
       divisions: packed,
       districts: { education, health, jobs },
       jobActions: jobActions(packed, jobs),
       evidence,
     };
-
-    await writeCache(data);
-    return data;
   }
 }
 

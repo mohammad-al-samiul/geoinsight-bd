@@ -43,6 +43,7 @@ import { IntelCard } from "@/components/ui/intel-card";
 import { FloatCard } from "@/components/ui/module-motion";
 import { SourceLink } from "@/components/ui/source-link";
 import { MapSkeleton } from "@/components/ui/skeleton";
+import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { chartTooltipProps } from "@/lib/chart-tooltip";
 import { chartLayout } from "@/lib/chart-theme";
@@ -189,8 +190,9 @@ export function UnrestPulsePanel() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ lat: number; lng: number } | null>(null);
   const [compareIds, setCompareIds] = useState<[string, string] | null>(null);
-  const [citizenReports, setCitizenReports] = useState<ProtestMovement[]>([]);
   const [showCitizenModal, setShowCitizenModal] = useState(false);
+  const [citizenSubmitting, setCitizenSubmitting] = useState(false);
+  const [citizenError, setCitizenError] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const voiceRef = useRef<{ stop: () => void } | null>(null);
 
@@ -204,7 +206,7 @@ export function UnrestPulsePanel() {
   });
 
   const movements = useMemo(() => {
-    const raw = [...(data?.movements ?? []), ...citizenReports].map((m) =>
+    const raw = (data?.movements ?? []).map((m) =>
       ensureConfidence(enrichMovement(m)),
     );
 
@@ -230,7 +232,7 @@ export function UnrestPulsePanel() {
     }
     if (statusFilter !== "all") base = base.filter((m) => m.status === statusFilter);
     return [...base].sort((a, b) => movementWeight(b) - movementWeight(a));
-  }, [data?.movements, citizenReports, timeFilterDays, groupBy, groupFilter, statusFilter]);
+  }, [data?.movements, timeFilterDays, groupBy, groupFilter, statusFilter]);
 
   const liveMovements = useMemo(
     () => movements.filter((m) => !isHistoricalMovement(m)),
@@ -308,7 +310,7 @@ export function UnrestPulsePanel() {
   };
 
   const allForGroups = useMemo(() => {
-    const raw = [...(data?.movements ?? []), ...citizenReports].map((m) =>
+    const raw = (data?.movements ?? []).map((m) =>
       ensureConfidence(enrichMovement(m)),
     );
     const now = new Date();
@@ -320,7 +322,7 @@ export function UnrestPulsePanel() {
           );
           return diffDays <= timeFilterDays;
         });
-  }, [data?.movements, citizenReports, timeFilterDays]);
+  }, [data?.movements, timeFilterDays]);
 
   const themeGroups = useMemo(
     () =>
@@ -459,74 +461,46 @@ export function UnrestPulsePanel() {
     setIsSpeaking(false);
   };
 
-  const submitCitizen = (e: React.FormEvent) => {
+  const submitCitizen = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!citizenForm.title.trim() || !citizenForm.place.trim()) return;
+    if (!citizenForm.title.trim() || !citizenForm.place.trim() || citizenSubmitting) return;
     const coords = resolveUnrestCoords(citizenForm.district, null, citizenForm.place) ?? {
       lat: 23.81,
       lng: 90.41,
     };
-    const now = new Date().toISOString();
-    const themeOpt =
-      CITIZEN_THEME_OPTIONS.find((x) => x.id === citizenForm.themeId) ?? CITIZEN_THEME_OPTIONS[6];
-    const partyOpt =
-      CITIZEN_PARTY_OPTIONS.find((x) => x.id === citizenForm.partyId) ?? CITIZEN_PARTY_OPTIONS[7];
-    const themeLabel = bn ? themeOpt.bn : themeOpt.en;
-    const report: ProtestMovement = {
-      id: `citizen-${Date.now()}`,
-      title: `${themeLabel} — ${citizenForm.place} (${partyOpt.en})`,
-      title_bn: `${themeOpt.bn} — ${citizenForm.place} (${partyOpt.bn})`,
-      theme_id: themeOpt.id,
-      theme: themeOpt.en,
-      theme_bn: themeOpt.bn,
-      party_id: partyOpt.id,
-      party: partyOpt.en,
-      party_bn: partyOpt.bn,
-      place: citizenForm.place,
-      place_bn: citizenForm.place,
-      district: citizenForm.district,
-      division: null,
-      status: citizenForm.urgency,
-      status_bn: citizenForm.urgency === "active" ? "চলমান / সক্রিয়" : "সাম্প্রতিক",
-      status_en: citizenForm.urgency === "active" ? "Active now" : "Recent",
-      event_at: now,
-      event_period_en: new Date(now).toLocaleString("en-BD", { month: "long", year: "numeric" }),
-      event_period_bn: new Date(now).toLocaleString("bn-BD", { month: "long", year: "numeric" }),
-      temporal_class: "live",
-      first_seen_at: now,
-      last_seen_at: now,
-      article_count: 1,
-      severity: citizenForm.urgency === "active" ? 75 : 50,
-      impact: {
-        deaths: 0,
-        civilian_deaths: 0,
-        injuries: 0,
-        homes_damaged: 0,
-        livestock_lost: 0,
-        damage_mentions: 0,
-        evidence: [],
-      },
-      summary_bn: `নাগরিক/ফিল্ড রিপোর্ট: ${citizenForm.title} · ইস্যু: ${themeOpt.bn} · দল: ${partyOpt.bn}`,
-      summary_en: `Citizen/field report: ${citizenForm.title} · issue: ${themeOpt.en} · party: ${partyOpt.en}`,
-      articles: [],
-      lat: coords.lat + (Math.random() - 0.5) * 0.05,
-      lng: coords.lng + (Math.random() - 0.5) * 0.05,
-      source_confidence: 0.35,
-      unique_sources: 1,
-      timeline: [{ at: now, title: citizenForm.title, source_name: "Citizen", url: "#" }],
-      source: "citizen",
-    };
-    setCitizenReports((prev) => [report, ...prev]);
-    setShowCitizenModal(false);
-    focusMovement(report);
-    setCitizenForm({
-      title: "",
-      place: "",
-      district: "Dhaka",
-      themeId: "gas_fuel",
-      partyId: "bnp",
-      urgency: "active",
-    });
+    const lat = coords.lat + (Math.random() - 0.5) * 0.05;
+    const lng = coords.lng + (Math.random() - 0.5) * 0.05;
+    setCitizenSubmitting(true);
+    setCitizenError(null);
+    try {
+      await apiClient("unrest/citizen-reports", {
+        method: "POST",
+        body: JSON.stringify({
+          title: citizenForm.title.trim(),
+          place: citizenForm.place.trim(),
+          district: citizenForm.district,
+          themeId: citizenForm.themeId,
+          partyId: citizenForm.partyId,
+          urgency: citizenForm.urgency,
+          lat,
+          lng,
+        }),
+      });
+      setShowCitizenModal(false);
+      setCitizenForm({
+        title: "",
+        place: "",
+        district: "Dhaka",
+        themeId: "gas_fuel",
+        partyId: "bnp",
+        urgency: "active",
+      });
+      await reload();
+    } catch {
+      setCitizenError(t("submitFailed"));
+    } finally {
+      setCitizenSubmitting(false);
+    }
   };
 
   return (
@@ -565,7 +539,10 @@ export function UnrestPulsePanel() {
               size="sm"
               variant="outline"
               className="h-8 gap-1.5 text-xs border-primary/40 text-primary"
-              onClick={() => setShowCitizenModal(true)}
+              onClick={() => {
+                setCitizenError(null);
+                setShowCitizenModal(true);
+              }}
             >
               <PlusCircle className="h-3.5 w-3.5" />
               {bn ? "ফিল্ড/নাগরিক রিপোর্ট" : "Citizen / field report"}
@@ -1199,9 +1176,7 @@ export function UnrestPulsePanel() {
                 {bn ? "নাগরিক / ফিল্ড রিপোর্ট" : "Citizen / field report"}
               </h3>
               <p className="text-xs text-muted-foreground">
-                {bn
-                  ? "যাচাইয়ের আগে কম কনফিডেন্স পিন হিসেবে ম্যাপে যোগ হবে"
-                  : "Added as a lower-confidence pin until verified"}
+                {t("savedAsPin")}
               </p>
             </div>
             <form onSubmit={submitCitizen} className="space-y-3 text-xs">
@@ -1258,13 +1233,16 @@ export function UnrestPulsePanel() {
                   { value: "recent", label: bn ? "সাম্প্রতিক" : "Recent" },
                 ]}
               />
+              {citizenError ? (
+                <p className="text-xs text-destructive">{citizenError}</p>
+              ) : null}
               <div className="flex justify-end gap-2 pt-1">
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowCitizenModal(false)}>
                   {bn ? "বাতিল" : "Cancel"}
                 </Button>
-                <Button type="submit" size="sm" className="gap-1.5">
+                <Button type="submit" size="sm" className="gap-1.5" disabled={citizenSubmitting}>
                   <Send className="h-3.5 w-3.5" />
-                  {bn ? "জমা দিন" : "Submit"}
+                  {citizenSubmitting ? t("submitting") : t("submitReport")}
                 </Button>
               </div>
             </form>

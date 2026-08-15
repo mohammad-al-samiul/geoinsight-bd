@@ -1,4 +1,5 @@
 import {
+  AdminUnitType,
   IngestionSentiment,
   LiveSignalType,
   Prisma,
@@ -10,6 +11,7 @@ import type { DashboardScopeQuery } from "../dashboard/dashboard.service";
 import { ingestionService } from "../ingestion/ingestion.service";
 import { metricSeriesService } from "../metrics/metric-series.service";
 import { isBangladeshRelevantArticle } from "../../shared/geo/bangladesh-relevance";
+import { notSyntheticLiveSignalWhere, signalProvenance } from "../../shared/provenance";
 
 const NATIONAL_METRICS_TTL_SEC = 90;
 
@@ -112,6 +114,24 @@ function severityFor(text: string, sentiment: IngestionSentiment | null): number
   return 2;
 }
 
+function matchAdminUnitId(
+  units: Array<{ id: string; name: string; nameBn: string | null }>,
+  district?: string | null,
+  division?: string | null,
+): string | null {
+  const name = district ?? division;
+  if (!name) return null;
+  const lower = name.toLowerCase();
+  const first = name.split(" ")[0].toLowerCase();
+  const bn4 = name.slice(0, 4);
+  const exact = units.find((u) => u.name.toLowerCase() === lower);
+  if (exact) return exact.id;
+  const contains = units.find((u) => u.name.toLowerCase().includes(first));
+  if (contains) return contains.id;
+  const bn = units.find((u) => (u.nameBn ?? "").includes(bn4));
+  return bn?.id ?? null;
+}
+
 export class LiveDataService {
   async extractSignalsFromNews(days = 7): Promise<{ inserted: number; scanned: number }> {
     const since = new Date(Date.now() - days * 86400 * 1000);
@@ -120,11 +140,23 @@ export class LiveDataService {
       orderBy: { fetchedAt: "desc" },
       take: 300,
     });
+    if (articles.length === 0) return { inserted: 0, scanned: 0 };
 
-    let inserted = 0;
+    const [existing, units] = await Promise.all([
+      prismaRead.liveSignal.findMany({
+        where: { url: { in: articles.map((a) => a.url) } },
+        select: { url: true },
+      }),
+      prismaRead.adminUnit.findMany({
+        where: { type: { in: [AdminUnitType.DISTRICT, AdminUnitType.DIVISION] } },
+        select: { id: true, name: true, nameBn: true },
+      }),
+    ]);
+    const have = new Set(existing.map((row) => row.url));
+
+    const rows: Prisma.LiveSignalCreateManyInput[] = [];
     for (const article of articles) {
-      const exists = await prismaRead.liveSignal.findUnique({ where: { url: article.url } });
-      if (exists) continue;
+      if (have.has(article.url)) continue;
 
       const text = `${article.title} ${article.summary ?? ""}`;
       if (
@@ -143,26 +175,33 @@ export class LiveDataService {
       const signalType = classifyArticle(text, article.sentimentCategory);
       if (!signalType) continue;
 
-      const adminUnitId = await this.resolveAdminUnitId(article.district, article.division);
-
-      await prismaWrite.liveSignal.create({
-        data: {
-          signalType,
-          title: article.title,
-          body: article.summary,
-          url: article.url,
-          sourceName: article.sourceName,
-          district: article.district,
-          division: article.division,
-          adminUnitId,
-          severity: signalType === LiveSignalType.ALERT ? severityFor(text, article.sentimentCategory) : null,
-          flagType: signalType === LiveSignalType.ALERT ? alertFlagType(text) : null,
-          sentimentCategory: article.sentimentCategory,
-          articleId: article.id,
-          publishedAt: article.publishedAt,
-        },
+      const adminUnitId = matchAdminUnitId(units, article.district, article.division);
+      rows.push({
+        signalType,
+        title: article.title,
+        body: article.summary,
+        url: article.url,
+        sourceName: article.sourceName,
+        district: article.district,
+        division: article.division,
+        adminUnitId,
+        severity: signalType === LiveSignalType.ALERT ? severityFor(text, article.sentimentCategory) : null,
+        flagType: signalType === LiveSignalType.ALERT ? alertFlagType(text) : null,
+        sentimentCategory: article.sentimentCategory,
+        articleId: article.id,
+        publishedAt: article.publishedAt,
       });
-      inserted += 1;
+    }
+
+    let inserted = 0;
+    const CHUNK = 100;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK);
+      const created = await prismaWrite.liveSignal.createMany({
+        data: chunk,
+        skipDuplicates: true,
+      });
+      inserted += created.count;
     }
 
     return { inserted, scanned: articles.length };
@@ -201,6 +240,7 @@ export class LiveDataService {
       where: {
         signalType: { in: [LiveSignalType.PROJECT, LiveSignalType.POLICY] },
         ...this.signalScope(query),
+        ...notSyntheticLiveSignalWhere,
       },
       orderBy: { publishedAt: "desc" },
       take: query.limit ?? 100,
@@ -272,6 +312,7 @@ export class LiveDataService {
       where: {
         signalType: LiveSignalType.REPRESENTATIVE,
         ...this.signalScope(query),
+        ...notSyntheticLiveSignalWhere,
       },
       orderBy: { publishedAt: "desc" },
       take: 80,
@@ -297,6 +338,7 @@ export class LiveDataService {
         signalType: LiveSignalType.ALERT,
         ...(query.unresolvedOnly !== false && { resolvedAt: null }),
         ...(query.unitId && { adminUnitId: query.unitId }),
+        ...notSyntheticLiveSignalWhere,
       },
       orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
       take: query.limit ?? 50,
@@ -315,6 +357,7 @@ export class LiveDataService {
       sourceName: s.sourceName,
       sourceUrl: s.url,
       district: s.district ?? s.division ?? "National",
+      provenance: signalProvenance(s),
       project: {
         id: s.id,
         title: s.title.slice(0, 120),

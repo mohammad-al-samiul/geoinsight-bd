@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { IntelCard } from "@/components/ui/intel-card";
 import { FloatCard } from "@/components/ui/module-motion";
+import { SourceLink } from "@/components/ui/source-link";
 import { AiStatusBadge } from "@/components/ai/ai-status-badge";
 import { useAppLang } from "@/hooks/use-app-lang";
 import { useTranslations } from "next-intl";
@@ -134,10 +135,12 @@ function BriefingPointCard({
   bullet,
   index,
   bn,
+  sourceChip,
 }: {
   bullet: BriefingBullet;
   index: number;
   bn: boolean;
+  sourceChip: string;
 }) {
   const cat = resolveCat(bullet.category);
   const meta = CAT_META[cat];
@@ -213,6 +216,11 @@ function BriefingPointCard({
                   {bn ? "তীব্রতা" : "Severity"} {parsed.severity}/5
                 </Badge>
               )}
+              {bullet.source ? (
+                <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                  {sourceChip}: {bullet.source}
+                </Badge>
+              ) : null}
             </div>
 
             {parsed.project ? (
@@ -234,6 +242,14 @@ function BriefingPointCard({
                   : "Immediate monitoring and follow-up recommended"}
               </div>
             )}
+            {bullet.source_url ? (
+              <SourceLink
+                href={bullet.source_url}
+                title={bullet.source || (bn ? "উৎস খুলুন" : "Open source")}
+                clamp={1}
+                openText={bn ? "লিংক" : "Link"}
+              />
+            ) : null}
           </div>
         </div>
       </div>
@@ -318,6 +334,11 @@ export function BriefingCopilot() {
               </div>
             </div>
           </div>
+          {briefing.llm_used === false ? (
+            <p className="relative mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              {t("templateNotice")}
+            </p>
+          ) : null}
 
           <PmoLocalEvidenceSnippets />
 
@@ -339,6 +360,7 @@ export function BriefingCopilot() {
                     bullet={bullet}
                     index={i}
                     bn={bn}
+                    sourceChip={t("sourceChip")}
                   />
                 ))}
               </div>

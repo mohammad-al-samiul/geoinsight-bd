@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useLocalEntityId } from "@/hooks/use-local-entity-id";
+import { DataTrustBanner } from "@/components/ui/data-trust-banner";
 
 interface ApiOk<T> {
   success: boolean;
@@ -200,6 +201,9 @@ export function AlertDeliveryPanel() {
         )
       }
     >
+      {data && (data.mode === "dry_run" || data.summary.dryRun > 0) ? (
+        <DataTrustBanner kind="dry-run" className="mb-4" />
+      ) : null}
       <div className="mb-4 grid gap-4 lg:grid-cols-3">
         <LocalVizCard title={tv("deliveryStatus")} icon={MessageSquare} delay={0.05}>
           <LocalDonut data={statusPie} height={240} />

@@ -33,6 +33,9 @@ export interface AuthUser {
   role: UserRole;
   adminUnitId: string | null;
   adminUnitName?: string;
+  mfaEnabled?: boolean;
+  mfaRequired?: boolean;
+  mfaEnforced?: boolean;
 }
 
 export interface AdminFilterState {

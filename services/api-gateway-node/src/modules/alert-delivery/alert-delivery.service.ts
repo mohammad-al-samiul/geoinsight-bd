@@ -183,6 +183,57 @@ async function deliverVoice(to: string, sayText: string): Promise<{
   }
 }
 
+async function deliverSms(to: string, body: string): Promise<{
+  status: AlertDeliveryStatus;
+  providerRef?: string;
+  error?: string;
+}> {
+  if (!env.ALERT_SMS_ENABLED) {
+    return { status: AlertDeliveryStatus.DRY_RUN, providerRef: "sms-disabled" };
+  }
+  if (env.ALERT_DELIVERY_MODE === "dry_run") {
+    return { status: AlertDeliveryStatus.DRY_RUN, providerRef: `sms-dry:${Date.now()}` };
+  }
+  const from = env.TWILIO_SMS_FROM ?? env.TWILIO_VOICE_FROM;
+  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !from) {
+    return { status: AlertDeliveryStatus.FAILED, error: "Twilio SMS env incomplete" };
+  }
+  try {
+    const auth = Buffer.from(
+      `${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`,
+    ).toString("base64");
+    const params = new URLSearchParams({
+      To: to,
+      From: from,
+      Body: body.slice(0, 1600),
+    });
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params,
+      },
+    );
+    const json = (await res.json().catch(() => ({}))) as { sid?: string; message?: string };
+    if (!res.ok) {
+      return {
+        status: AlertDeliveryStatus.FAILED,
+        error: json.message ?? `Twilio SMS HTTP ${res.status}`,
+      };
+    }
+    return { status: AlertDeliveryStatus.SENT, providerRef: json.sid };
+  } catch (err) {
+    return {
+      status: AlertDeliveryStatus.FAILED,
+      error: err instanceof Error ? err.message : "Twilio SMS failed",
+    };
+  }
+}
+
 export class AlertDeliveryService {
   async notifyCrisis(input: CrisisAlertInput) {
     const recipients = await recipientsForEntity(input.entityId);
@@ -227,6 +278,29 @@ export class AlertDeliveryService {
             retryCount: 0,
             lastAttemptAt: new Date(),
             nextRetryAt: waFailed ? new Date(Date.now() + 5 * 60_000) : null,
+          },
+        }),
+      );
+
+      const sms = await deliverSms(phone, body);
+      const smsFailed = sms.status === AlertDeliveryStatus.FAILED;
+      logs.push(
+        await prismaWrite.alertDeliveryLog.create({
+          data: {
+            channel: AlertDeliveryChannel.SMS,
+            status: smsFailed ? AlertDeliveryStatus.QUEUED : sms.status,
+            toAddress: phone,
+            bodyPreview: preview(body),
+            providerRef: sms.providerRef,
+            error: sms.error,
+            sourceKind: input.sourceKind,
+            sourceId: input.sourceId,
+            entityId: input.entityId,
+            userId: user.id,
+            payload: { mode: env.ALERT_DELIVERY_MODE, title: input.title, body, voiceText },
+            retryCount: 0,
+            lastAttemptAt: new Date(),
+            nextRetryAt: smsFailed ? new Date(Date.now() + 5 * 60_000) : null,
           },
         }),
       );
@@ -290,7 +364,9 @@ export class AlertDeliveryService {
       const result =
         row.channel === AlertDeliveryChannel.VOICE
           ? await deliverVoice(row.toAddress, voiceText)
-          : await deliverWhatsApp(row.toAddress, body);
+          : row.channel === AlertDeliveryChannel.SMS
+            ? await deliverSms(row.toAddress, body)
+            : await deliverWhatsApp(row.toAddress, body);
 
       const nextCount = row.retryCount + 1;
       const stillFail = result.status === AlertDeliveryStatus.FAILED;
@@ -356,11 +432,13 @@ export class AlertDeliveryService {
       queued: items.filter((i) => i.status === AlertDeliveryStatus.QUEUED).length,
       whatsapp: items.filter((i) => i.channel === AlertDeliveryChannel.WHATSAPP).length,
       voice: items.filter((i) => i.channel === AlertDeliveryChannel.VOICE).length,
+      sms: items.filter((i) => i.channel === AlertDeliveryChannel.SMS).length,
     };
     return {
       entityId,
       mode: env.ALERT_DELIVERY_MODE,
       voiceEnabled: env.ALERT_VOICE_ENABLED,
+      smsEnabled: env.ALERT_SMS_ENABLED,
       summary,
       items,
     };

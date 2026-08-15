@@ -1,11 +1,9 @@
 import { Prisma } from "@prisma/client";
 
 import { env } from "../../core/config/env";
-
 import { prismaWrite, prismaRead } from "../../core/database/prisma.client";
-
 import { ApiError } from "../../core/errors/api.error";
-
+import { kpiProvenance } from "../../shared/provenance";
 import { CreateKpiRecordDto, ListKpiRecordsQuery } from "./kpi.validator";
 
 
@@ -112,9 +110,12 @@ export class KpiService {
 
 
 
-    if (!env.LIVE_DATA_ONLY) return rows.slice(0, query.limit);
-
-
+    if (!env.LIVE_DATA_ONLY) {
+      return rows.slice(0, query.limit).map((row) => ({
+        ...row,
+        provenance: kpiProvenance(row.blockchainHash),
+      }));
+    }
 
     const latest = new Map<string, (typeof rows)[number]>();
 
@@ -126,13 +127,16 @@ export class KpiService {
 
     }
 
-
-
     return [...latest.values()]
 
       .sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime())
 
-      .slice(0, query.limit);
+      .slice(0, query.limit)
+
+      .map((row) => ({
+        ...row,
+        provenance: kpiProvenance(row.blockchainHash),
+      }));
 
   }
 

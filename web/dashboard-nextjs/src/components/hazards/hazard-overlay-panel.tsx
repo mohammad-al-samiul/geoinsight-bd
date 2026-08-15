@@ -118,6 +118,8 @@ export function HazardOverlayPanel() {
                 livestock: t("impactLivestock"),
                 damageMentions: t("impactDamageMentions"),
                 evidence: t("impactEvidence"),
+                newsDerived: t("newsDerived"),
+                newsDerivedHint: t("newsDerivedHint"),
                 estimate: t("impactEstimate"),
                 mentions: t("impactMentions"),
                 window1: t("impactWindow1"),

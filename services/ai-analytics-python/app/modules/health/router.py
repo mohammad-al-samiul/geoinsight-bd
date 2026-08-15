@@ -42,13 +42,23 @@ async def _check_rabbitmq() -> str:
 
 
 @router.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "healthy", "service": "geoinsight-ai-analytics"}
+async def health() -> dict[str, object]:
+    settings = get_settings()
+    return {
+        "status": "healthy",
+        "service": "geoinsight-ai-analytics",
+        "sentiment_mock": settings.sentiment_use_mock,
+    }
 
 
 @router.get("/health/live")
-async def health_live() -> dict[str, str]:
-    return {"status": "healthy", "service": "geoinsight-ai-analytics"}
+async def health_live() -> dict[str, object]:
+    settings = get_settings()
+    return {
+        "status": "healthy",
+        "service": "geoinsight-ai-analytics",
+        "sentiment_mock": settings.sentiment_use_mock,
+    }
 
 
 @router.get("/health/ready")

@@ -1,5 +1,6 @@
 import { AdminUnitType, LiveSignalType } from "@prisma/client";
 import { prismaRead } from "../../core/database/prisma.client";
+import { notSyntheticLiveSignalWhere } from "../../shared/provenance";
 import { normalizeDivisionName } from "../../shared/scope/scope-context";
 import { metricSeriesService, type MetricPoint } from "../metrics/metric-series.service";
 
@@ -40,7 +41,7 @@ export class DivisionalCrisisService {
         orderBy: { name: "asc" },
       }),
       prismaRead.liveSignal.findMany({
-        where: { signalType: LiveSignalType.ALERT, createdAt: { gte: since } },
+        where: { signalType: LiveSignalType.ALERT, createdAt: { gte: since }, ...notSyntheticLiveSignalWhere },
         select: { division: true, severity: true, createdAt: true },
       }),
       prismaRead.externalArticle.findMany({

@@ -5,7 +5,6 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Calculator,
-  CheckCircle2,
   CircleAlert,
   Globe2,
   Leaf,
@@ -22,7 +21,7 @@ import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-she
 import { useAgroMarketsList } from "@/hooks/use-module-data";
 import { Badge } from "@/components/ui/badge";
 import { resolveUnitName } from "@/lib/unit-names";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
 import { fetchDashboardMetricsSafe } from "@/lib/dashboard-data";
 import type { DashboardMetrics, TradeFlow } from "@/types/dashboard";
@@ -32,6 +31,7 @@ import { buildTradeFlowsFromMatrix } from "@/lib/trade-flows";
 import { IntelCard } from "@/components/ui/intel-card";
 import { FloatCard } from "@/components/ui/module-motion";
 import { cn } from "@/lib/utils";
+import { DataTrustBanner } from "@/components/ui/data-trust-banner";
 
 const typeColor: Record<string, string> = {
   WHOLESALE: "bg-emerald-500/20 text-emerald-400",
@@ -47,10 +47,10 @@ function formatPrice(value: string | number | null | undefined): string {
   return `৳${n.toFixed(2)}/kg`;
 }
 
-function formatUpdated(at: string | null | undefined): string {
+function formatUpdated(at: string | null | undefined, locale: string): string {
   if (!at) return "";
   try {
-    return new Date(at).toLocaleString("bn-BD", {
+    return new Date(at).toLocaleString(locale.startsWith("bn") ? "bn-BD" : "en-GB", {
       hour: "2-digit",
       minute: "2-digit",
       day: "numeric",
@@ -90,26 +90,33 @@ function flowCommodity(flow: TradeFlow, bangla: boolean): string {
 
 export default function AgroPage() {
   const t = useTranslations("modules.agro");
+  const locale = useLocale();
+  const bangla = locale.startsWith("bn");
   const { rows, loading, error, reload } = useAgroMarketsList();
   const { filter } = useAdminFilter();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [tradeLoading, setTradeLoading] = useState(true);
+  const [tradeError, setTradeError] = useState<string | null>(null);
   const [mapView, setMapView] = useState<"domestic" | "trade">("domestic");
 
   const wholesale = rows.filter((r) => r.type === "WHOLESALE").length;
   const retail = rows.filter((r) => r.type === "RETAIL").length;
   const haat = rows.filter((r) => r.type === "HAAT").length;
   const withLivePrice = rows.filter((r) => r.priceBdtPerKg != null).length;
-  const bangla = true;
 
   useEffect(() => {
     let active = true;
     setTradeLoading(true);
-    void fetchDashboardMetricsSafe(filter).then((data) => {
-      if (active) {
-        setMetrics(data);
-        setTradeLoading(false);
+    void fetchDashboardMetricsSafe(filter).then((result) => {
+      if (!active) return;
+      if (result.ok) {
+        setMetrics(result.metrics);
+        setTradeError(null);
+      } else {
+        setMetrics(null);
+        setTradeError(result.error);
       }
+      setTradeLoading(false);
     });
     return () => {
       active = false;
@@ -194,7 +201,7 @@ export default function AgroPage() {
     if (type === "WHOLESALE") return t("wholesale");
     if (type === "RETAIL") return t("retail");
     if (type === "HAAT") return t("haat");
-    if (type === "MANDI") return "মাণ্ডি";
+    if (type === "MANDI") return t("mandi");
     return type;
   };
 
@@ -229,19 +236,19 @@ export default function AgroPage() {
                 </div>
                 <div>
                   <p className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
-                    কৃষি বাণিজ্য কমান্ড
+                    {t("heroTitle")}
                   </p>
                   <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                    দেশীয় বাজারদর ও আন্তর্জাতিক বাণিজ্য করিডোর মিলিয়ে আমদানি–রপ্তানির সিদ্ধান্ত সহায়তা।
+                    {t("heroBody")}
                   </p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge className="gap-1.5 border-emerald-500/35 bg-emerald-500/10 text-emerald-200">
-                  <Globe2 className="h-3.5 w-3.5" /> আন্তর্জাতিক মূল্য সংকেত
+                  <Globe2 className="h-3.5 w-3.5" /> {t("intlPriceBadge")}
                 </Badge>
                 <Badge variant="outline" className="gap-1.5 text-muted-foreground">
-                  <Sparkles className="h-3.5 w-3.5 text-amber-300" /> সিদ্ধান্ত-সহায়ক
+                  <Sparkles className="h-3.5 w-3.5 text-amber-300" /> {t("decisionSupport")}
                 </Badge>
               </div>
             </div>
@@ -263,12 +270,10 @@ export default function AgroPage() {
                     </div>
                     <div>
                       <h2 className="font-display text-base font-semibold">
-                        {mapView === "domestic" ? "দেশীয় কৃষি বাজার GeoMap" : "আন্তর্জাতিক কৃষি GeoMap"}
+                        {mapView === "domestic" ? t("mapDomestic") : t("mapTrade")}
                       </h2>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        {mapView === "domestic"
-                          ? "বাজার marker-এ ধরন, পণ্য ও সর্বশেষ কেজি-দর দেখুন"
-                          : "সবুজ রেখা: কম দামের আমদানি উৎস · সোনালি রেখা: উচ্চমূল্যের রপ্তানি বাজার"}
+                        {t("description")}
                       </p>
                     </div>
                   </div>
@@ -281,7 +286,7 @@ export default function AgroPage() {
                         mapView === "domestic" ? "bg-emerald-500/20 text-emerald-200" : "text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      দেশীয় বাজার
+                      {t("mapDomestic")}
                     </button>
                     <button
                       type="button"
@@ -291,13 +296,15 @@ export default function AgroPage() {
                         mapView === "trade" ? "bg-sky-500/20 text-sky-200" : "text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      আন্তর্জাতিক বাণিজ্য
+                      {t("mapTrade")}
                     </button>
                   </div>
                 </div>
                 <div className="pt-3">
                   {mapView === "domestic" ? (
                     <AgroMarketsMap filter={filter} markets={rows} />
+                  ) : tradeError && !metrics ? (
+                    <DataTrustBanner kind="error" />
                   ) : (
                     <TradeFlowMap
                       flows={metrics?.tradeFlows ?? []}
@@ -372,32 +379,38 @@ export default function AgroPage() {
             {[
               {
                 icon: Calculator,
-                title: "Landed Cost ক্যালকুলেটর",
-                detail: "পণ্যের দাম, freight, শুল্ক ও ডলার রেট মিলিয়ে প্রকৃত আমদানি খরচ নির্ণয়।",
+                title: t("plannedLandedTitle"),
+                detail: t("plannedLandedBody"),
                 color: "text-sky-300 border-sky-500/25 bg-sky-500/8",
               },
               {
                 icon: ShipWheel,
-                title: "রুট ও বন্দর পরামর্শ",
-                detail: "চট্টগ্রাম/মোংলা/স্থলবন্দরের সময়, খরচ ও বিকল্প রুট তুলনা।",
+                title: t("plannedRouteTitle"),
+                detail: t("plannedRouteBody"),
                 color: "text-violet-300 border-violet-500/25 bg-violet-500/8",
               },
               {
                 icon: CircleAlert,
-                title: "বাণিজ্য ঝুঁকি সতর্কতা",
-                detail: "মূল্য অস্থিরতা, export ban, currency ও সরবরাহ বিঘ্নের সতর্ক সংকেত।",
+                title: t("plannedRiskTitle"),
+                detail: t("plannedRiskBody"),
                 color: "text-orange-300 border-orange-500/25 bg-orange-500/8",
               },
             ].map((feature, i) => {
               const Icon = feature.icon;
               return (
                 <FloatCard key={feature.title} index={i + 3} shimmer={false}>
-                  <div className={cn("h-full rounded-2xl border p-4", feature.color)}>
+                  <div
+                    aria-disabled="true"
+                    className={cn(
+                      "pointer-events-none h-full rounded-2xl border p-4 opacity-60",
+                      feature.color,
+                    )}
+                  >
                     <Icon className="h-5 w-5" />
                     <h3 className="mt-3 font-display text-sm font-semibold">{feature.title}</h3>
                     <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{feature.detail}</p>
-                    <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-foreground/80">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> পরিকল্পিত ফিচার
+                    <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                      {t("plannedBadge")}
                     </span>
                   </div>
                 </FloatCard>
@@ -511,7 +524,7 @@ export default function AgroPage() {
                       </div>
                       <div className="text-right">
                         <p className="font-mono text-xs font-semibold text-emerald-300">{formatPrice(market.priceBdtPerKg)}</p>
-                        <p className="mt-0.5 text-[9px] text-muted-foreground">{formatUpdated(market.priceUpdatedAt)}</p>
+                        <p className="mt-0.5 text-[9px] text-muted-foreground">{formatUpdated(market.priceUpdatedAt, locale)}</p>
                       </div>
                     </div>
                   ))}

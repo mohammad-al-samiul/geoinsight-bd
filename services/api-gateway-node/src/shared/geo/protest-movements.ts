@@ -61,6 +61,8 @@ export interface ProtestMovement {
   unique_sources: number;
   /** Chronological event trail for timeline UI */
   timeline: Array<{ at: string; title: string; source_name: string; url: string }>;
+  /** Desk-submitted field pin — not a news cluster */
+  source?: "news" | "citizen";
 }
 
 const DISTRICT_COORDS = new Map(

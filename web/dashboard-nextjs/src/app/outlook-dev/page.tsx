@@ -1,7 +1,5 @@
-"use client";
-
-import { StrategicOutlookPanel } from "@/components/outlook/strategic-outlook-panel";
+import { redirect } from "next/navigation";
 
 export default function OutlookDevPage() {
-  return <StrategicOutlookPanel />;
+  redirect("/outlook");
 }

@@ -74,6 +74,7 @@ export interface SegmentedImpactStats {
   disclaimer_bn?: string;
   disclaimer_en?: string;
   disclaimer?: string;
+  tally_kind?: "NEWS_DERIVED";
   default_window?: number;
   place_count?: number;
   windows?: Record<string, Omit<SegmentedImpactStats, "windows" | "default_window">>;
@@ -105,6 +106,8 @@ interface ImpactStatsPanelProps {
     historicalNote?: string;
     rawSumHint?: string;
     methodHint?: string;
+    newsDerived?: string;
+    newsDerivedHint?: string;
   };
   className?: string;
   windowDays?: number;
@@ -238,8 +241,18 @@ export function ImpactStatsPanel({
     <IntelCard accent="danger" padding="lg" hoverLift={false} className={className}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="font-display text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+          <h3 className="inline-flex flex-wrap items-center gap-2 font-display text-sm font-semibold tracking-tight text-foreground">
+            {title}
+            {(active.tally_kind ?? stats.tally_kind) === "NEWS_DERIVED" ? (
+              <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-100">
+                {labels.newsDerived ?? (locale === "bn" ? "খবর থেকে আনুমানিক" : "News-derived")}
+              </span>
+            ) : null}
+          </h3>
           {subtitle && <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>}
+          {(active.tally_kind ?? stats.tally_kind) === "NEWS_DERIVED" && labels.newsDerivedHint ? (
+            <p className="mt-1 text-[10px] text-amber-100/80">{labels.newsDerivedHint}</p>
+          ) : null}
           <p className="mt-1.5 text-[10px] text-muted-foreground/90">
             {labels.methodHint ??
               (locale === "bn"

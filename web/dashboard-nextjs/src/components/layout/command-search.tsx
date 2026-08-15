@@ -45,6 +45,7 @@ const PAGE_HREF_TO_NAV: Record<string, string> = {
   "/local/field": "localField",
   "/local/alerts": "localAlerts",
   "/local/security": "localSecurity",
+  "/security": "localSecurity",
   "/briefing": "briefing",
   "/divisional-crisis": "divisionalCrisis",
   "/sectors": "nationalSectors",
@@ -66,7 +67,8 @@ const PAGE_HREF_TO_NAV: Record<string, string> = {
   "/proximity": "proximity",
   "/face-intel": "faceIntel",
   "/representatives": "representatives",
-  "/agro": "agro",
+  "/tools": "tools",
+  "/ops": "ops",
 };
 
 export function CommandSearch() {
@@ -74,7 +76,7 @@ export function CommandSearch() {
   const t = useTranslations("search");
   const tn = useTranslations("nav");
   const tc = useTranslations("common");
-  const { query, setQuery, results, loading, clear } = useGlobalSearch();
+  const { query, setQuery, results, loading, failed, clear } = useGlobalSearch();
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -164,6 +166,8 @@ export function CommandSearch() {
         <div className="absolute left-0 right-0 top-full z-[200] mt-1.5 max-h-80 overflow-y-auto rounded-xl border border-border/70 bg-popover/95 shadow-panel backdrop-blur-xl">
           {loading && results.length === 0 ? (
             <p className="px-4 py-3 text-sm text-muted-foreground">{t("searching")}</p>
+          ) : failed ? (
+            <p className="px-4 py-3 text-sm text-destructive">{t("failed")}</p>
           ) : results.length === 0 ? (
             <p className="px-4 py-3 text-sm text-muted-foreground">
               {t("noResults", { query })}

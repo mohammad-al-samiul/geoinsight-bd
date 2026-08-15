@@ -4,6 +4,7 @@ import { BaseModule } from "../../core/module/app-module.interface";
 import { authenticate } from "../../core/middlewares/auth.middleware";
 import { container } from "../../core/di/container";
 import { asyncHandler, sendSuccess } from "../../core/utils/async-handler";
+import { loggedPipelineTask } from "../intel/pipeline-run-log.service";
 import { pipelineOrchestrator } from "./pipeline.orchestrator";
 import { pipelineService } from "./pipeline.service";
 
@@ -16,10 +17,7 @@ export class PipelineModule extends BaseModule {
       authenticate(),
       container.rbac.requireRoles(UserRole.PMO, UserRole.MINISTER),
       asyncHandler(async (_req, res) => {
-        sendSuccess(res, {
-          enabled: true,
-          last_runs: pipelineService.getLastRuns(),
-        });
+        sendSuccess(res, await pipelineService.getStatus());
       }),
     );
 
@@ -39,26 +37,12 @@ export class PipelineModule extends BaseModule {
       container.rbac.requireRoles(UserRole.PMO, UserRole.MINISTER),
       asyncHandler(async (req, res) => {
         const job = String(req.params.job);
-        const runners: Record<string, () => Promise<Record<string, unknown>>> = {
-          news: () => pipelineService.syncNews(),
-          commodity: () => pipelineService.syncCommodityPrices(),
-          kpi: () => pipelineService.syncKpiRecords(),
-          alerts: () => pipelineService.detectAnomalies(),
-          agro: () => pipelineService.syncAgroPrices(),
-          hazard: () => pipelineService.refreshHazardSignals(),
-          weather: () => pipelineService.syncWeatherData(),
-          unrest: () => pipelineService.refreshUnrestPulse(),
-          narrative: () => pipelineService.refreshNarrativeShield(),
-          outlook: () => pipelineService.refreshStrategicOutlook(),
-          briefing: () => pipelineService.refreshMorningBriefing(),
-          signals: () => pipelineService.extractLiveSignals(),
-        };
-        const fn = runners[job];
+        const fn = pipelineService.jobRunners()[job];
         if (!fn) {
           res.status(404).json({ success: false, message: `Unknown job: ${job}` });
           return;
         }
-        const detail = await fn();
+        const detail = await loggedPipelineTask(job, fn);
         sendSuccess(res, { job, detail, completed_at: new Date().toISOString() });
       }),
     );

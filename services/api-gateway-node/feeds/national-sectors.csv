@@ -1,0 +1,10 @@
+district,sector,observed_at,attendance_pct,dropout_pct,teacher_gap,dengue_cases_7d,occupancy_pct,stockout,ors_stock_days,unemployment_pct,youth_unemp_pct,vacancies_listed,training_seats,job_fair_gap
+Dhaka,EDUCATION,2026-08-14T06:00:00+06:00,86,7,2,,,,,,,,,
+Dhaka,HEALTH,2026-08-14T06:00:00+06:00,,,,18,88,false,6,,,,,
+Dhaka,EMPLOYMENT,2026-08-14T06:00:00+06:00,,,,,,,,9,19,42,120,false
+Chattogram,EDUCATION,2026-08-14T06:00:00+06:00,81,11,4,,,,,,,,,
+Chattogram,HEALTH,2026-08-14T06:00:00+06:00,,,,24,91,true,3,,,,,
+Chattogram,EMPLOYMENT,2026-08-14T06:00:00+06:00,,,,,,,,12,23,28,90,true
+Cox's Bazar,EDUCATION,2026-08-14T06:00:00+06:00,78,13,5,,,,,,,,,
+Cox's Bazar,HEALTH,2026-08-14T06:00:00+06:00,,,,31,93,true,2,,,,,
+Cox's Bazar,EMPLOYMENT,2026-08-14T06:00:00+06:00,,,,,,,,15,26,18,60,true

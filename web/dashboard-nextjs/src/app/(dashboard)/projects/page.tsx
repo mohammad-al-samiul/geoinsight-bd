@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { ModuleShell, DataTable, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { ProjectDetailModal } from "@/components/projects/project-detail-modal";
 import { useProjectsList } from "@/hooks/use-module-data";
+import { usePlatformFeatures } from "@/hooks/use-platform-features";
 import { Badge } from "@/components/ui/badge";
 import { formatCrore } from "@/lib/format";
 import type { ProjectRow } from "@/lib/module-types";
@@ -22,6 +23,7 @@ export default function ProjectsPage() {
   const locale = useLocale();
   const bn = locale === "bn";
   const { rows, loading, error, reload } = useProjectsList();
+  const { fabricEnabled } = usePlatformFeatures();
   const [selected, setSelected] = useState<ProjectRow | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -145,11 +147,15 @@ export default function ProjectsPage() {
                   );
                 },
               },
-              {
-                key: "blockchainTx",
-                label: t("colBlockchain"),
-                render: (r) => (r.blockchainTx ? t("anchored") : t("pending")),
-              },
+              ...(fabricEnabled
+                ? [
+                    {
+                      key: "blockchainTx",
+                      label: t("colBlockchain"),
+                      render: (r: ProjectRow) => (r.blockchainTx ? t("anchored") : t("pending")),
+                    },
+                  ]
+                : []),
             ]}
             emptyMessage={t("emptyScope")}
           />

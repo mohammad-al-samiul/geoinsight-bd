@@ -10,6 +10,7 @@ import { FaceAlertOverlayCard } from "@/components/face-intel/face-alert-overlay
 import { useAppLang } from "@/hooks/use-app-lang";
 import { useFaceIntel } from "@/hooks/use-face-intel";
 import { apiClient } from "@/lib/api-client";
+import { DataTrustBanner } from "@/components/ui/data-trust-banner";
 import {
   Camera,
   Fingerprint,
@@ -26,6 +27,7 @@ export function FaceIntelPanel() {
   const fileRef = useRef<HTMLInputElement>(null);
   const crowdRef = useRef<HTMLInputElement>(null);
   const [camOn, setCamOn] = useState(false);
+  const [camDenied, setCamDenied] = useState(false);
   const [crowdBusy, setCrowdBusy] = useState(false);
   const [crowd, setCrowd] = useState<{
     faceCount: number;
@@ -51,10 +53,17 @@ export function FaceIntelPanel() {
     if (camOn) {
       stopCamera();
       setCamOn(false);
+      setCamDenied(false);
       return;
     }
-    await startCamera();
-    setCamOn(true);
+    try {
+      await startCamera();
+      setCamOn(true);
+      setCamDenied(false);
+    } catch {
+      setCamDenied(true);
+      setCamOn(false);
+    }
   };
 
   const onSampleMatch = async (vipId: string, nid: string) => {
@@ -135,6 +144,12 @@ export function FaceIntelPanel() {
           )
         }
       >
+        <DataTrustBanner kind="demo" className="mb-4" />
+        {camDenied ? (
+          <p className="mb-4 rounded-xl border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
+            {t("cameraDenied")}
+          </p>
+        ) : null}
         <IntelCard accent="info" padding="lg" hoverLift={false} className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight">

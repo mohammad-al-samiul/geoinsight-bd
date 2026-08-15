@@ -19,6 +19,7 @@ export function useDashboardData(filter: AdminFilterState) {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [markers, setMarkers] = useState<RedFlagMarker[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [pulseKeys, setPulseKeys] = useState<Record<string, number>>({});
   const [socketToken, setSocketToken] = useState<string | null>(null);
   const hasDataRef = useRef(false);
@@ -40,16 +41,25 @@ export function useDashboardData(filter: AdminFilterState) {
 
       // Unblock UI as soon as metrics arrive; markers stream in independently.
       const metricsTask = fetchDashboardMetricsSafe(filter)
-        .then((m) => {
-          setMetrics(m);
-          if (m?.unitScores?.length) {
-            applyUnitScoreOverlay(m.unitScores);
+        .then((result) => {
+          if (result.ok) {
+            setMetrics(result.metrics);
+            setError(null);
+            if (result.metrics.unitScores?.length) {
+              applyUnitScoreOverlay(result.metrics.unitScores);
+            }
+            hasDataRef.current = true;
+          } else {
+            setError(result.error);
+            if (!hasDataRef.current) setMetrics(null);
           }
-          hasDataRef.current = true;
           setLoading(false);
         })
         .catch(() => {
-          if (!hasDataRef.current) setLoading(false);
+          if (!hasDataRef.current) {
+            setMetrics(null);
+            setLoading(false);
+          }
         });
 
       const markersTask = fetchRedFlagMarkers(filter)
@@ -139,6 +149,7 @@ export function useDashboardData(filter: AdminFilterState) {
     metrics,
     markers,
     loading,
+    error,
     socketStatus,
     pulseKeys,
     refresh: load,

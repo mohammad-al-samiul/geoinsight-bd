@@ -153,7 +153,7 @@ export interface ProtestMovement {
   source_confidence?: number;
   unique_sources?: number;
   timeline?: Array<{ at: string; title: string; source_name: string; url: string }>;
-  /** Local citizen / field pin (not from API) */
+  /** Desk-submitted field pin persisted via POST /unrest/citizen-reports */
   source?: "news" | "citizen";
 }
 
@@ -202,7 +202,10 @@ export function useUnrestPulse() {
     setError(null);
     try {
       const qs = scopeQuery(filter);
-      const json = await apiClient<{ success: boolean; data: UnrestPulse }>(`unrest/pulse${qs}`);
+      const json = await apiClient<{ success: boolean; data: UnrestPulse }>(
+        `unrest/pulse${qs}`,
+        { cache: "no-store" },
+      );
       setData(json.data);
       hasDataRef.current = true;
     } catch (err) {

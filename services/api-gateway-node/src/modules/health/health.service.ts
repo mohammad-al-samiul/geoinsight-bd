@@ -1,3 +1,4 @@
+import { env } from "../../core/config/env";
 import { prismaRead } from "../../core/database/prisma.client";
 import { isGovQueueConnected } from "../../infrastructure/messaging/gov-queue.consumer";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
@@ -9,6 +10,14 @@ export interface ReadinessReport {
   status: "healthy" | "degraded" | "unhealthy";
   service: string;
   checks: Record<string, HealthCheckStatus>;
+  info: {
+    fabricEnabled: boolean;
+    sentimentMock: boolean;
+    alertDeliveryMode: string;
+    mfaEnforce: boolean;
+    seedVersion: string | null;
+    seedAppliedAt: string | null;
+  };
 }
 
 export async function getLiveness(): Promise<{ success: true; service: string; status: "healthy" }> {
@@ -53,10 +62,46 @@ export async function getReadiness(): Promise<ReadinessReport> {
   if (criticalFailed) status = "unhealthy";
   else if (optionalFailed) status = "degraded";
 
+  let seedVersion: string | null = null;
+  let seedAppliedAt: string | null = null;
+  try {
+    const rows = await prismaRead.$queryRaw<
+      Array<{ version: string; applied_at: Date | string }>
+    >`SELECT version, applied_at FROM seed_version WHERE id = true LIMIT 1`;
+    const row = rows[0];
+    if (row) {
+      seedVersion = row.version;
+      seedAppliedAt =
+        row.applied_at instanceof Date
+          ? row.applied_at.toISOString()
+          : String(row.applied_at);
+    }
+  } catch {
+    /* table missing until db-init */
+  }
+
   return {
     status,
     service: "geoinsight-api-gateway",
     checks,
+    info: {
+      fabricEnabled: env.FABRIC_ENABLED,
+      sentimentMock: env.SENTIMENT_USE_MOCK,
+      alertDeliveryMode: env.ALERT_DELIVERY_MODE,
+      mfaEnforce: env.MFA_ENFORCE,
+      seedVersion,
+      seedAppliedAt,
+    },
+  };
+}
+
+export function getPlatformFeatures() {
+  return {
+    fabricEnabled: env.FABRIC_ENABLED,
+    sentimentMock: env.SENTIMENT_USE_MOCK,
+    alertDeliveryMode: env.ALERT_DELIVERY_MODE,
+    mfaEnforce: env.MFA_ENFORCE,
+    mfaRequiredRoles: env.MFA_REQUIRED_ROLES,
   };
 }
 

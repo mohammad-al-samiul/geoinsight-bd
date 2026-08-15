@@ -113,6 +113,7 @@ cp .env.example .env          # প্রথমবার — strong passwords + 
 | Minister | `minister@geoinsight.gov.bd` |
 | DC | `dc.dhaka@geoinsight.gov.bd` |
 | MP (CTG-8) | `mp.ctg8@geoinsight.gov.bd` |
+| MP (CTG-11) | `mp.ctg11@geoinsight.gov.bd` |
 | Mayor (CCC) | `mayor.ccc@geoinsight.gov.bd` |
 
 `db-init` automatically চলে — national hierarchy + local entities (wards, complaints, sectors, integrity) seed হয়।
@@ -435,13 +436,15 @@ Gateway `requireRoles` is often **wider** than sidebar (e.g. DC can call unrest/
 
 ## Data Seeding
 
-Automatic via `deploy/scripts/docker-db-init.sh` — core `seed-national-data.sql` তারপর `deploy/scripts/seed/01-*.sql` … `24-*.sql` (idempotent `ON CONFLICT`).
+Automatic via `deploy/scripts/docker-db-init.sh` — core `seed-national-data.sql` তারপর `deploy/scripts/seed/00-*.sql` … `25-*.sql` (idempotent `ON CONFLICT`).
 
 | Scripts | Contents |
 |---------|----------|
+| `00` | `seed_version` stamp (health `info.seedVersion`) |
 | `01`–`10` | Districts, upazilas, reps, projects, agro, KPIs, red flags, commodities, demo users, extra national |
-| `11`–`18` | Local entities (CTG-8/9/10, CCC, COCC + 68 wards), complaints/WPI, OSINT/pulse, specialty, alerts, outages, visits |
+| `11`–`18` | Local entities (CTG-8/9/10, CCC, COCC + wards), complaints/WPI, OSINT/pulse, specialty, alerts, outages, visits |
 | `19`–`24` | Map-layer topics, local unrest, evidence, sector sites, integrity incidents, **national sector snapshots** |
+| `25` | Sixth Local DSS seat — CTG-11 (Patiya) unit + empty wards, `mp.ctg11@geoinsight.gov.bd` |
 | `fix-admin-unit-bn.sql` / `bootstrap-pmo.sql` | Bengali labels + PMO password |
 
 ```bash

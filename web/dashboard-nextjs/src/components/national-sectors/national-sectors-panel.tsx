@@ -14,8 +14,16 @@ import {
   type NationalJobAction,
 } from "@/hooks/use-national-sectors";
 import { cn } from "@/lib/utils";
+import { DataTrustBanner, ProvenanceBadge } from "@/components/ui/data-trust-banner";
 
 type Tab = "education" | "health" | "jobs";
+type StatusFilter = "ALL" | "ALERT" | "WATCH" | "OK";
+
+function csvCell(value: string | number): string {
+  const s = String(value);
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
 
 function actionKey(
   id: NationalJobAction["id"],
@@ -47,14 +55,45 @@ export function NationalSectorsPanel() {
     initialTab === "health" || initialTab === "jobs" ? initialTab : "education",
   );
   const [divisionId, setDivisionId] = useState(initialDiv ?? "all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const { data, error, loading, reload, allowed } = useNationalSectors();
 
   const rows = useMemo(() => {
     if (!data) return [] as NationalDistrictSlice[];
     const list =
       tab === "health" ? data.districts.health : tab === "jobs" ? data.districts.jobs : data.districts.education;
-    return divisionId === "all" ? list : list.filter((r) => r.divisionId === divisionId);
-  }, [data, tab, divisionId]);
+    const byDiv = divisionId === "all" ? list : list.filter((r) => r.divisionId === divisionId);
+    return statusFilter === "ALL" ? byDiv : byDiv.filter((r) => r.status === statusFilter);
+  }, [data, tab, divisionId, statusFilter]);
+
+  const exportCsv = () => {
+    const extra =
+      tab === "education"
+        ? ["attendancePct", "dropoutPct", "teacherGap"]
+        : tab === "health"
+          ? ["dengueCases7d", "occupancyPct", "orsStockDays"]
+          : ["unemploymentPct", "youthUnempPct", "vacanciesListed"];
+    const header = ["district", "division", "status", "pressure", ...extra];
+    const lines = [
+      header.join(","),
+      ...rows.map((row) =>
+        [
+          csvCell(isBn ? row.nameBn || row.name : row.name),
+          csvCell(isBn ? row.divisionNameBn || row.divisionName : row.divisionName),
+          csvCell(row.status),
+          csvCell(row.pressure),
+          ...extra.map((key) => csvCell(metric(row, key))),
+        ].join(","),
+      ),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `national-sectors-${tab}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (!allowed) {
     return (
@@ -159,6 +198,17 @@ export function NationalSectorsPanel() {
         ) : undefined
       }
     >
+      {data ? (
+        <DataTrustBanner
+          kind={(data.csvDistricts ?? 0) > 0 ? "live" : "seed"}
+          className="mb-4"
+          body={
+            (data.csvDistricts ?? 0) > 0
+              ? t("csvPartial", { csv: data.csvDistricts ?? 0, seed: data.seedDistricts ?? 0 })
+              : undefined
+          }
+        />
+      ) : null}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant={tab === "education" ? "default" : "outline"} onClick={() => setTab("education")}>
@@ -175,6 +225,19 @@ export function NationalSectorsPanel() {
           </Button>
         </div>
         <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          {t("filterStatus")}
+          <select
+            className="rounded-md border border-border/60 bg-background px-2 py-1 text-xs text-foreground"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          >
+            <option value="ALL">{t("statusAll")}</option>
+            <option value="ALERT">{t("statusAlert")}</option>
+            <option value="WATCH">{t("statusWatch")}</option>
+            <option value="OK">{t("statusOk")}</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
           {t("filterDivision")}
           <select
             className="rounded-md border border-border/60 bg-background px-2 py-1 text-xs text-foreground"
@@ -189,6 +252,9 @@ export function NationalSectorsPanel() {
             ))}
           </select>
         </label>
+        <Button size="sm" variant="outline" onClick={exportCsv} disabled={!rows.length}>
+          {t("exportCsv")}
+        </Button>
       </div>
 
       {data ? (
@@ -238,7 +304,12 @@ export function NationalSectorsPanel() {
           {
             key: "name",
             label: t("colDistrict"),
-            render: (row) => (isBn ? row.nameBn || row.name : row.name),
+            render: (row) => (
+              <span className="inline-flex items-center gap-1.5">
+                {isBn ? row.nameBn || row.name : row.name}
+                {row.metrics.origin === "csv" ? <ProvenanceBadge provenance="LIVE" /> : null}
+              </span>
+            ),
           },
           {
             key: "divisionName",
@@ -300,8 +371,6 @@ export function NationalSectorsPanel() {
           </div>
         </div>
       ) : null}
-
-      <p className="mt-4 text-[10px] text-muted-foreground/80">{t("sourceNote")}</p>
     </ModuleShell>
   );
 }

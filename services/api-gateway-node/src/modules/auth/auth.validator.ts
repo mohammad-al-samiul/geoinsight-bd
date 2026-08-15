@@ -36,6 +36,12 @@ export const mfaVerifySchema = z.object({
   code: z.string().regex(/^\d{6}$/),
 });
 
+export const mfaEnrollSchema = z.object({
+  enrollToken: z.string().min(20).max(2048),
+  secret: z.string().min(16).max(128),
+  code: z.string().regex(/^\d{6}$/),
+});
+
 export const mfaEnableSchema = z.object({
   secret: z.string().min(16).max(128),
   code: z.string().regex(/^\d{6}$/),
@@ -49,4 +55,5 @@ export type RefreshDto = z.infer<typeof refreshSchema>;
 export type LogoutDto = z.infer<typeof logoutSchema>;
 export type MfaVerifyDto = z.infer<typeof mfaVerifySchema>;
 export type MfaEnableDto = z.infer<typeof mfaEnableSchema>;
+export type MfaEnrollDto = z.infer<typeof mfaEnrollSchema>;
 export type MfaDisableDto = z.infer<typeof mfaDisableSchema>;

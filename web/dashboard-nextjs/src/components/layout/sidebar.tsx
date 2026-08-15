@@ -50,6 +50,7 @@ import {
   HeartPulse,
   Briefcase,
   Layers3,
+  Wrench,
 } from "lucide-react";
 
 interface NavItem {
@@ -62,12 +63,12 @@ interface NavItem {
 }
 
 const NATIONAL_NAV: NavItem[] = [
-  { href: "/", key: "nationalOverview", icon: Globe2, minTier: 1 },
+  { href: "/", key: "nationalOverview", icon: Globe2, minTier: 2 },
   { href: "/briefing", key: "briefing", icon: Sun, minTier: 1 },
   { href: "/narrative-shield", key: "narrativeShield", icon: ShieldOff, minTier: 1 },
   { href: "/outlook", key: "outlook", icon: LineChart, minTier: 1 },
   { href: "/unrest", key: "unrest", icon: Scale, minTier: 1 },
-  { href: "/divisional-crisis", key: "divisionalCrisis", icon: Flame, minTier: 4 },
+  { href: "/divisional-crisis", key: "divisionalCrisis", icon: Flame, minTier: 2 },
   { href: "/sectors", key: "nationalSectors", icon: GraduationCap, minTier: 1, roles: ["PMO", "MINISTER"] },
   { href: "/anti-phishing", key: "antiPhishing", icon: ShieldAlert, minTier: 1 },
   { href: "/hazards", key: "hazards", icon: CloudRain, minTier: 2 },
@@ -79,8 +80,10 @@ const NATIONAL_NAV: NavItem[] = [
   { href: "/documents", key: "documents", icon: FileText, minTier: 2 },
   { href: "/audit-trail", key: "auditTrail", icon: Link2, minTier: 2 },
   { href: "/notifications", key: "notifications", icon: BellRing, minTier: 1 },
+  { href: "/security", key: "localSecurity", icon: ShieldCheck, minTier: 1, roles: ["PMO", "MINISTER"] },
   { href: "/representatives", key: "representatives", icon: Users, minTier: 4 },
   { href: "/face-intel", key: "faceIntel", icon: ScanFace, minTier: 4 },
+  { href: "/tools", key: "tools", icon: Wrench, minTier: 1, roles: ["PMO", "MINISTER"] },
   // PMO oversight entry into Local DSS (not the full local nav tree)
   { href: "/local", key: "localEntity", icon: Building2, minTier: 1, roles: ["PMO"] },
 ];

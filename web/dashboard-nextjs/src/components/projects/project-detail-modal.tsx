@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectDetail } from "@/hooks/use-module-data";
+import { usePlatformFeatures } from "@/hooks/use-platform-features";
 import { formatCrore, formatDate } from "@/lib/format";
 import type { ProjectRow } from "@/lib/module-types";
 import { resolveUnitName } from "@/lib/unit-names";
@@ -32,6 +33,7 @@ const statusColor: Record<string, string> = {
 
 export function ProjectDetailModal({ project, open, onOpenChange }: ProjectDetailModalProps) {
   const { detail, loading, error } = useProjectDetail(project?.id ?? null);
+  const { fabricEnabled } = usePlatformFeatures();
 
   if (!project) return null;
 
@@ -83,13 +85,15 @@ export function ProjectDetailModal({ project, open, onOpenChange }: ProjectDetai
 
         <div className="flex flex-wrap gap-2">
           <Badge className={statusColor[String(project.status)] ?? ""}>{String(project.status)}</Badge>
-          {project.blockchainTx ? (
-            <Badge variant="outline" className="border-emerald-500/40 text-emerald-400">
-              Blockchain Anchored
-            </Badge>
-          ) : (
-            <Badge variant="outline">Anchoring Pending</Badge>
-          )}
+          {fabricEnabled ? (
+            project.blockchainTx ? (
+              <Badge variant="outline" className="border-emerald-500/40 text-emerald-400">
+                Blockchain Anchored
+              </Badge>
+            ) : (
+              <Badge variant="outline">Anchoring Pending</Badge>
+            )
+          ) : null}
           {project.contractorNid && (
             <Badge variant="outline">NID: {project.contractorNid}</Badge>
           )}

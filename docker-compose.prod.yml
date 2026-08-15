@@ -244,6 +244,15 @@ services:
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
       AI_SERVICE_URL: http://ai-analytics:8000
       CORS_ORIGIN: ${CORS_ORIGIN:-https://geoinsight.gov.bd}
+      SENTIMENT_USE_MOCK: ${SENTIMENT_USE_MOCK:-true}
+      MFA_REQUIRED_ROLES: ${MFA_REQUIRED_ROLES:-PMO,MINISTER}
+      MFA_ENFORCE: ${MFA_ENFORCE:-true}
+      ALERT_SMS_ENABLED: ${ALERT_SMS_ENABLED:-true}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_DOCS: ${MINIO_BUCKET_DOCS:-national-intelligence-docs}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
     depends_on:
       pgbouncer:
         condition: service_started

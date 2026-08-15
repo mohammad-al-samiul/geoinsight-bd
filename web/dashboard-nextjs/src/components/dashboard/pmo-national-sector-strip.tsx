@@ -6,6 +6,7 @@ import { Briefcase, GraduationCap, HeartPulse } from "lucide-react";
 import { MotionSection } from "@/components/ui/module-motion";
 import { useNationalSectors } from "@/hooks/use-national-sectors";
 import { cn } from "@/lib/utils";
+import { DataTrustBadge } from "@/components/ui/data-trust-banner";
 
 export function PmoNationalSectorStrip() {
   const t = useTranslations("modules.nationalSectors");
@@ -20,7 +21,10 @@ export function PmoNationalSectorStrip() {
         <div>
           <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             <GraduationCap className="h-3.5 w-3.5 text-sky-300" />
+            {t("countryWide")}
+            <span className="text-border">·</span>
             {t("title")}
+            <DataTrustBadge kind={(data?.csvDistricts ?? 0) > 0 ? "live" : "seed"} />
           </p>
           <p className="mt-1 text-xs text-muted-foreground">{t("homeNote")}</p>
         </div>

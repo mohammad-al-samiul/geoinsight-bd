@@ -112,6 +112,30 @@ export async function getRecentIngestionRuns(limit = 20) {
   });
 }
 
+export async function getLatestPipelineJobStatus(): Promise<
+  Array<{ job: string; at: string | null; ok: boolean | null; durationMs: number | null }>
+> {
+  const rows = await prismaRead.pipelineJobRun.findMany({
+    orderBy: { completedAt: "desc" },
+    take: 200,
+    select: { job: true, ok: true, durationMs: true, completedAt: true },
+  });
+  const seen = new Map<
+    string,
+    { job: string; at: string | null; ok: boolean | null; durationMs: number | null }
+  >();
+  for (const row of rows) {
+    if (seen.has(row.job)) continue;
+    seen.set(row.job, {
+      job: row.job,
+      at: row.completedAt.toISOString(),
+      ok: row.ok,
+      durationMs: row.durationMs,
+    });
+  }
+  return [...seen.values()];
+}
+
 /** Wrap a pipeline job with DB audit logging (used by orchestrator). */
 export async function loggedPipelineTask(
   job: string,

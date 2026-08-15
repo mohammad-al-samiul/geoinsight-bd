@@ -9,6 +9,7 @@ import {
   logoutSchema,
   mfaDisableSchema,
   mfaEnableSchema,
+  mfaEnrollSchema,
   mfaVerifySchema,
   refreshSchema,
   registerSchema,
@@ -34,6 +35,12 @@ export function createAuthRoutes(
     authRateLimiter,
     validate(mfaVerifySchema),
     controller.verifyMfa,
+  );
+  router.post(
+    "/mfa/enroll",
+    authRateLimiter,
+    validate(mfaEnrollSchema),
+    controller.enrollMfa,
   );
   router.post("/mfa/setup", authenticate(), controller.setupMfa);
   router.post(

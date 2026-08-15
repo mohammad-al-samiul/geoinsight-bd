@@ -66,7 +66,7 @@ export function useProximityLive(enabled = true) {
     abortRef.current = ac;
     try {
       const json = await apiClient<{ success: boolean; data: ProximityLiveSnapshot }>(
-        "intelligence/proximity/live?include_demo_vips=true",
+        "intelligence/proximity/live?include_demo_vips=false",
       );
       if (ac.signal.aborted) return;
       setData(json.data);

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuthContext } from "@/hooks/use-auth";
 import { isLocalEntityRole } from "@/types";
 
-const LOCAL_ALLOWED_PREFIXES = ["/local", "/forbidden"];
+const LOCAL_ALLOWED_PREFIXES = ["/local", "/forbidden", "/narrative-shield"];
 
 function isLocalAllowedPath(pathname: string): boolean {
   return LOCAL_ALLOWED_PREFIXES.some(

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { CheckCircle2, Info, TrendingUp, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { IntelCard, MotionList, fadeUp } from "@/components/ui/intel-card";
+import { ProvenanceBadge } from "@/components/ui/data-trust-banner";
 import { ProgressMeter } from "@/components/ui/progress-meter";
 import { cn } from "@/lib/utils";
 import { formatDate, formatPercent } from "@/lib/format";
@@ -342,6 +343,7 @@ export function KpiOverview({ definitions, records }: KpiOverviewProps) {
                                     {isBn ? "যাচাইকৃত" : "Verified"}
                                   </span>
                                 )}
+                                <ProvenanceBadge provenance={rec.provenance} />
                               </div>
                             </div>
                           </div>

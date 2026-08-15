@@ -13,6 +13,8 @@ import { hashAiExplanation } from "../twin/twin.service";
 import { ingestionService } from "../ingestion/ingestion.service";
 import { broadcastDashboardRefresh, broadcastKpiUpdate } from "./pipeline.broadcast";
 import { AI_FETCH_LLM_MS, fetchAi } from "../../shared/http/fetch-ai";
+import { PIPELINE_JOB_IDS } from "./pipeline.jobs";
+import { getLatestPipelineJobStatus, loggedPipelineTask } from "../intel/pipeline-run-log.service";
 
 const COMMODITIES = ["rice", "wheat", "lentil", "onion"] as const;
 const HAZARD_CACHE_KEY = "pipeline:hazard:v1";
@@ -76,34 +78,65 @@ function commodityCode(raw: string): string {
 }
 
 export class PipelineService {
-  private lastRuns = new Map<string, string>();
+  jobRunners(): Record<string, () => Promise<Record<string, unknown>>> {
+    return {
+      news: () => this.syncNews(),
+      commodity: () => this.syncCommodityPrices(),
+      kpi: () => this.syncKpiRecords(),
+      alerts: () => this.detectAnomalies(),
+      agro: () => this.syncAgroPrices(),
+      hazard: () => this.refreshHazardSignals(),
+      weather: () => this.syncWeatherData(),
+      unrest: () => this.refreshUnrestPulse(),
+      narrative: () => this.refreshNarrativeShield(),
+      outlook: () => this.refreshStrategicOutlook(),
+      briefing: () => this.refreshMorningBriefing(),
+      signals: () => this.extractLiveSignals(),
+      "national-sectors": () => this.syncNationalSectors(),
+      "continuous-pulse": async () => {
+        const { continuousPulseService } = await import("./continuous-pulse.service");
+        return continuousPulseService.run();
+      },
+      "alert-retry": async () => {
+        const { alertDeliveryService } = await import("../alert-delivery/alert-delivery.service");
+        return alertDeliveryService.retryDue(40);
+      },
+      maintenance: async () => {
+        const { pruneIntelSnapshots } = await import("../intel/intel-snapshot.service");
+        const { pruneAuditLogs } = await import("../intel/pipeline-run-log.service");
+        const intel = await pruneIntelSnapshots();
+        const audit = await pruneAuditLogs();
+        return { intel, audit };
+      },
+    };
+  }
 
-  getLastRuns(): Record<string, string> {
-    return Object.fromEntries(this.lastRuns);
+  async getStatus(): Promise<{
+    enabled: boolean;
+    jobs: string[];
+    last_runs: Record<string, { at: string | null; ok: boolean | null; duration_ms: number | null }>;
+  }> {
+    const rows = await getLatestPipelineJobStatus();
+    const last_runs: Record<string, { at: string | null; ok: boolean | null; duration_ms: number | null }> = {};
+    for (const job of PIPELINE_JOB_IDS) {
+      last_runs[job] = { at: null, ok: null, duration_ms: null };
+    }
+    for (const row of rows) {
+      last_runs[row.job] = { at: row.at, ok: row.ok, duration_ms: row.durationMs };
+    }
+    return { enabled: true, jobs: [...PIPELINE_JOB_IDS], last_runs };
   }
 
   async runAll(): Promise<PipelineRunSummary> {
     const jobs: PipelineJobResult[] = [];
-    const runners: Array<[string, () => Promise<Record<string, unknown>>]> = [
-      ["news", () => this.syncNews()],
-      ["commodity", () => this.syncCommodityPrices()],
-      ["kpi", () => this.syncKpiRecords()],
-      ["alerts", () => this.detectAnomalies()],
-      ["agro", () => this.syncAgroPrices()],
-      ["hazard", () => this.refreshHazardSignals()],
-      ["weather", () => this.syncWeatherData()],
-      ["unrest", () => this.refreshUnrestPulse()],
-      ["narrative", () => this.refreshNarrativeShield()],
-      ["outlook", () => this.refreshStrategicOutlook()],
-      ["briefing", () => this.refreshMorningBriefing()],
-      ["signals", () => this.extractLiveSignals()],
-    ];
+    const runners = this.jobRunners();
 
-    for (const [job, fn] of runners) {
+    for (const job of PIPELINE_JOB_IDS) {
+      const fn = runners[job];
+      if (!fn) continue;
       try {
-        const detail = await fn();
+        const detail = await loggedPipelineTask(job, fn);
         jobs.push({ job, ok: true, detail, completed_at: new Date().toISOString() });
-        this.lastRuns.set(job, new Date().toISOString());
       } catch (err) {
         jobs.push({
           job,
@@ -116,6 +149,13 @@ export class PipelineService {
 
     await broadcastDashboardRefresh("pipeline:full");
     return { jobs, completed_at: new Date().toISOString() };
+  }
+
+  async syncNationalSectors(): Promise<Record<string, unknown>> {
+    const { nationalSectorService } = await import("../national-sector/national-sector.service");
+    const result = await nationalSectorService.ingestCsv();
+    await broadcastDashboardRefresh("pipeline:national-sectors");
+    return { ...result } as Record<string, unknown>;
   }
 
   async syncNews(): Promise<Record<string, unknown>> {
@@ -206,33 +246,77 @@ export class PipelineService {
     });
 
     const since = new Date(Date.now() - KPI_MIN_INTERVAL_MS);
-    let upserted = 0;
     const fy = fiscalYear();
+    if (reps.length === 0) {
+      await broadcastKpiUpdate("completion_rate", 0, { source: "kpi_pipeline" });
+      return { upserted: 0, representatives: 0 };
+    }
+
+    const [projects, signals, articles, ricePrice, recentRows] = await Promise.all([
+      prismaRead.project.findMany({
+        select: {
+          status: true,
+          budgetAllocated: true,
+          budgetSpent: true,
+          adminUnit: { select: { id: true, districtId: true, divisionId: true } },
+        },
+      }),
+      prismaRead.liveSignal.findMany({
+        where: {
+          signalType: { in: [LiveSignalType.PROJECT, LiveSignalType.POLICY, LiveSignalType.ALERT] },
+        },
+        select: { signalType: true, district: true, adminUnitId: true },
+      }),
+      prismaRead.externalArticle.findMany({
+        where: { fetchedAt: { gte: since } },
+        select: { district: true, sentimentCategory: true },
+      }),
+      prismaRead.commodityPriceLog.findFirst({
+        where: { commodityCode: "RICE", countryCode: "BGD" },
+        orderBy: { createdAt: "desc" },
+      }),
+      prismaRead.kpiRecord.findMany({
+        where: {
+          representativeId: { in: reps.map((r) => r.id) },
+          recordedAt: { gte: since },
+          blockchainHash: { startsWith: "pipeline:" },
+        },
+        orderBy: { recordedAt: "desc" },
+        select: { representativeId: true, kpiDefId: true, value: true },
+      }),
+    ]);
+
+    const recentMap = new Map<string, number>();
+    for (const row of recentRows) {
+      const key = `${row.representativeId}:${row.kpiDefId}`;
+      if (!recentMap.has(key)) recentMap.set(key, Number(row.value));
+    }
+
+    const agriGrowth = ricePrice
+      ? Math.round(72 + Number(ricePrice.landedCostUsd) * 0.02)
+      : 74;
+
+    const toCreate: Prisma.KpiRecordCreateManyInput[] = [];
+    const now = new Date();
 
     for (const rep of reps) {
       const districtName = rep.adminUnit.name;
       const districtKey = districtName.split(" ")[0];
+      const districtKeyLower = districtKey.toLowerCase();
+
+      const matchedProjects = projects.filter((p) => {
+        if (p.adminUnit.id === rep.adminUnitId) return true;
+        if (rep.adminUnit.districtId && p.adminUnit.districtId === rep.adminUnit.districtId) return true;
+        if (p.adminUnit.divisionId === rep.adminUnitId) return true;
+        return false;
+      });
 
       let completion: number;
       let budgetUtil: number;
 
-      // Prefer real ADP project rows even when LIVE_DATA_ONLY — signal heuristics are fallback only.
-      const projects = await prismaRead.project.findMany({
-        where: {
-          adminUnit: {
-            OR: [
-              { id: rep.adminUnitId },
-              { districtId: rep.adminUnit.districtId ?? undefined },
-              { divisionId: rep.adminUnitId },
-            ],
-          },
-        },
-        select: { status: true, budgetAllocated: true, budgetSpent: true },
-      });
-
-      if (projects.length > 0) {
+      if (matchedProjects.length > 0) {
         completion = Math.round(
-          projects.reduce((sum, p) => {
+          matchedProjects.reduce((sum, p) => {
             const pct =
               p.status === ProjectStatus.COMPLETED
                 ? 100
@@ -245,37 +329,26 @@ export class PipelineService {
                     ? 35
                     : 10;
             return sum + pct;
-          }, 0) / projects.length,
+          }, 0) / matchedProjects.length,
         );
         budgetUtil = Math.round(
-          (projects.reduce(
+          (matchedProjects.reduce(
             (sum, p) => sum + Number(p.budgetSpent) / Math.max(Number(p.budgetAllocated), 1),
             0,
           ) /
-            projects.length) *
+            matchedProjects.length) *
             100,
         );
       } else {
-        const [projectSignals, alertSignals] = await Promise.all([
-          prismaRead.liveSignal.count({
-            where: {
-              signalType: { in: [LiveSignalType.PROJECT, LiveSignalType.POLICY] },
-              OR: [
-                { district: { contains: districtKey, mode: "insensitive" } },
-                { adminUnitId: rep.adminUnitId },
-              ],
-            },
-          }),
-          prismaRead.liveSignal.count({
-            where: {
-              signalType: LiveSignalType.ALERT,
-              OR: [
-                { district: { contains: districtKey, mode: "insensitive" } },
-                { adminUnitId: rep.adminUnitId },
-              ],
-            },
-          }),
-        ]);
+        let projectSignals = 0;
+        let alertSignals = 0;
+        for (const s of signals) {
+          const districtHit = s.district?.toLowerCase().includes(districtKeyLower) ?? false;
+          const unitHit = s.adminUnitId === rep.adminUnitId;
+          if (!districtHit && !unitHit) continue;
+          if (s.signalType === LiveSignalType.ALERT) alertSignals += 1;
+          else projectSignals += 1;
+        }
         completion = Math.round(
           Math.max(52, Math.min(97, 82 - alertSignals * 3 + projectSignals * 2)),
         );
@@ -283,29 +356,19 @@ export class PipelineService {
           Math.max(58, Math.min(94, 68 + projectSignals * 1.5 - alertSignals * 2)),
         );
       }
-      const grievanceArticles = await prismaRead.externalArticle.count({
-        where: {
-          fetchedAt: { gte: since },
-          sentimentCategory: IngestionSentiment.Grievance,
-          OR: [{ district: districtName }, { district: { contains: districtName.split(" ")[0] } }],
-        },
-      });
-      const totalArticles = await prismaRead.externalArticle.count({
-        where: {
-          fetchedAt: { gte: since },
-          OR: [{ district: districtName }, { district: { contains: districtName.split(" ")[0] } }],
-        },
-      });
+
+      let grievanceArticles = 0;
+      let totalArticles = 0;
+      const firstWord = districtName.split(" ")[0];
+      for (const a of articles) {
+        const d = a.district ?? "";
+        if (d === districtName || d.includes(firstWord)) {
+          totalArticles += 1;
+          if (a.sentimentCategory === IngestionSentiment.Grievance) grievanceArticles += 1;
+        }
+      }
       const grievanceRatio = totalArticles > 0 ? grievanceArticles / totalArticles : 0.15;
       const grievanceResolution = Math.round(Math.max(40, 100 - grievanceRatio * 120));
-
-      const ricePrice = await prismaRead.commodityPriceLog.findFirst({
-        where: { commodityCode: "RICE", countryCode: "BGD" },
-        orderBy: { createdAt: "desc" },
-      });
-      const agriGrowth = ricePrice
-        ? Math.round(72 + Number(ricePrice.landedCostUsd) * 0.02)
-        : 74;
 
       const values: Array<[string, number]> = [
         ["COMPLETION", completion],
@@ -317,37 +380,27 @@ export class PipelineService {
       for (const [code, value] of values) {
         const defId = defByCode.get(code);
         if (!defId) continue;
-
-        const recent = await prismaRead.kpiRecord.findFirst({
-          where: {
-            representativeId: rep.id,
-            kpiDefId: defId,
-            recordedAt: { gte: since },
-            blockchainHash: { startsWith: "pipeline:" },
-          },
-          orderBy: { recordedAt: "desc" },
+        const recent = recentMap.get(`${rep.id}:${defId}`);
+        if (recent !== undefined && Math.abs(recent - value) < 1.5) continue;
+        toCreate.push({
+          representativeId: rep.id,
+          kpiDefId: defId,
+          value: new Prisma.Decimal(value),
+          fiscalYear: fy,
+          status: KpiRecordStatus.VERIFIED,
+          verified: true,
+          recordedAt: now,
+          blockchainHash: "pipeline:auto",
         });
-
-        if (recent && Math.abs(Number(recent.value) - value) < 1.5) continue;
-
-        await prismaWrite.kpiRecord.create({
-          data: {
-            representativeId: rep.id,
-            kpiDefId: defId,
-            value: new Prisma.Decimal(value),
-            fiscalYear: fy,
-            status: KpiRecordStatus.VERIFIED,
-            verified: true,
-            recordedAt: new Date(),
-            blockchainHash: "pipeline:auto",
-          },
-        });
-        upserted += 1;
       }
     }
 
-    await broadcastKpiUpdate("completion_rate", upserted, { source: "kpi_pipeline" });
-    return { upserted, representatives: reps.length };
+    if (toCreate.length) {
+      await prismaWrite.kpiRecord.createMany({ data: toCreate });
+    }
+
+    await broadcastKpiUpdate("completion_rate", toCreate.length, { source: "kpi_pipeline" });
+    return { upserted: toCreate.length, representatives: reps.length };
   }
 
   async detectAnomalies(): Promise<Record<string, unknown>> {

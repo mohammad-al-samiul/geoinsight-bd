@@ -18,9 +18,21 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [enrollToken, setEnrollToken] = useState<string | null>(null);
+  const [enrollSecret, setEnrollSecret] = useState<string | null>(null);
+  const [enrollOtpauth, setEnrollOtpauth] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const resetMfa = () => {
+    setMfaToken(null);
+    setEnrollToken(null);
+    setEnrollSecret(null);
+    setEnrollOtpauth(null);
+    setMfaCode("");
+    setError(null);
+  };
 
   const finishLogin = async (role: string | null | undefined) => {
     let resolvedRole = role ?? null;
@@ -54,6 +66,22 @@ function LoginForm() {
     setError(null);
     setLoading(true);
     try {
+      if (enrollToken && enrollSecret) {
+        const enrollRes = await authFetch<{
+          success: boolean;
+          data?: { user?: { role?: string } };
+        }>("/api/auth/mfa/enroll", {
+          method: "POST",
+          body: JSON.stringify({
+            enrollToken,
+            secret: enrollSecret,
+            code: mfaCode,
+          }),
+        });
+        await finishLogin(enrollRes.data?.user?.role);
+        return;
+      }
+
       if (mfaToken) {
         const verifyRes = await authFetch<{
           success: boolean;
@@ -70,7 +98,11 @@ function LoginForm() {
         success: boolean;
         data?: {
           requiresMfa?: boolean;
+          requiresMfaEnrollment?: boolean;
           mfaToken?: string;
+          enrollToken?: string;
+          secret?: string;
+          otpauthUrl?: string;
           user?: { role?: string };
         };
       }>("/api/auth/login", {
@@ -80,6 +112,18 @@ function LoginForm() {
 
       if (loginRes.data?.requiresMfa && loginRes.data.mfaToken) {
         setMfaToken(loginRes.data.mfaToken);
+        setMfaCode("");
+        return;
+      }
+
+      if (
+        loginRes.data?.requiresMfaEnrollment &&
+        loginRes.data.enrollToken &&
+        loginRes.data.secret
+      ) {
+        setEnrollToken(loginRes.data.enrollToken);
+        setEnrollSecret(loginRes.data.secret);
+        setEnrollOtpauth(loginRes.data.otpauthUrl ?? null);
         setMfaCode("");
         return;
       }
@@ -114,12 +158,16 @@ function LoginForm() {
               GeoInsight BD
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              {mfaToken ? t("mfaSubtitle") : t("subtitle")}
+              {enrollToken
+                ? t("enrollSubtitle")
+                : mfaToken
+                  ? t("mfaSubtitle")
+                  : t("subtitle")}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!mfaToken ? (
+            {!mfaToken && !enrollToken ? (
               <>
                 <div>
                   <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -150,7 +198,18 @@ function LoginForm() {
                 </div>
               </>
             ) : (
-              <div>
+              <div className="space-y-3">
+                {enrollSecret && (
+                  <>
+                    <p className="text-xs text-muted-foreground">{t("enrollSecret")}</p>
+                    <code className="block break-all rounded-lg bg-secondary/40 px-3 py-2 font-mono text-xs">
+                      {enrollSecret}
+                    </code>
+                    {enrollOtpauth && (
+                      <p className="break-all text-[10px] text-muted-foreground">{enrollOtpauth}</p>
+                    )}
+                  </>
+                )}
                 <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   {t("mfaCode")}
                 </label>
@@ -169,11 +228,7 @@ function LoginForm() {
                 <button
                   type="button"
                   className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:underline"
-                  onClick={() => {
-                    setMfaToken(null);
-                    setMfaCode("");
-                    setError(null);
-                  }}
+                  onClick={resetMfa}
                 >
                   {t("mfaBack")}
                 </button>
@@ -189,9 +244,11 @@ function LoginForm() {
             <Button type="submit" className="mt-2 w-full" size="lg" disabled={loading}>
               {loading
                 ? t("submitting")
-                : mfaToken
-                  ? t("mfaSubmit")
-                  : t("submit")}
+                : enrollToken
+                  ? t("enrollSubmit")
+                  : mfaToken
+                    ? t("mfaSubmit")
+                    : t("submit")}
             </Button>
           </form>
 
@@ -212,6 +269,7 @@ function LoginForm() {
               <p>mp.ctg8@geoinsight.gov.bd · ChangeMe@123</p>
               <p>mp.ctg9@geoinsight.gov.bd · ChangeMe@123</p>
               <p>mp.ctg10@geoinsight.gov.bd · ChangeMe@123</p>
+              <p>mp.ctg11@geoinsight.gov.bd · ChangeMe@123</p>
               <p>mayor.ccc@geoinsight.gov.bd · ChangeMe@123</p>
               <p>mayor.cocc@geoinsight.gov.bd · ChangeMe@123</p>
             </div>

@@ -1,5 +1,6 @@
-import { IngestionSentiment } from "@prisma/client";
-import { prismaRead } from "../../core/database/prisma.client";
+import { randomUUID } from "crypto";
+import { IngestionSentiment, LiveSignalType } from "@prisma/client";
+import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
 import { broadcastDashboardRefresh } from "../pipeline/pipeline.broadcast";
 import {
@@ -28,7 +29,8 @@ import {
   mandatePublicMeta,
 } from "../../shared/gov/current-mandate";
 import { isBangladeshRelevantArticle } from "../../shared/geo/bangladesh-relevance";
-import { clusterProtestMovements } from "../../shared/geo/protest-movements";
+import { clusterProtestMovements, type ProtestMovement } from "../../shared/geo/protest-movements";
+import bdDistricts from "../../shared/geo/data/bd-districts.json";
 
 const UNREST_CACHE_KEY = "unrest:pulse:v11";
 const UNREST_TTL_SEC = 900;
@@ -351,7 +353,7 @@ export class UnrestService {
       const cached = await getRedisClient().get(UNREST_CACHE_KEY);
       if (cached) {
         pulse = JSON.parse(cached) as UnrestPulse;
-        return this.applyScope(pulse, ctx);
+        return this.mergeCitizenMovements(this.applyScope(pulse, ctx), ctx);
       }
     }
 
@@ -362,14 +364,82 @@ export class UnrestService {
       if (isRedisEnabled()) {
         await getRedisClient().setex(UNREST_CACHE_KEY, UNREST_TTL_SEC, JSON.stringify(pulse));
       }
-      return this.applyScope(pulse, ctx);
+      return this.mergeCitizenMovements(this.applyScope(pulse, ctx), ctx);
     }
 
     pulse = await this.buildPulse();
     if (isRedisEnabled()) {
       await getRedisClient().setex(UNREST_CACHE_KEY, UNREST_TTL_SEC, JSON.stringify(pulse));
     }
-    return this.applyScope(pulse, ctx);
+    return this.mergeCitizenMovements(this.applyScope(pulse, ctx), ctx);
+  }
+
+  async createCitizenReport(input: CitizenReportInput): Promise<ProtestMovement> {
+    const id = randomUUID();
+    const theme = CITIZEN_THEMES[input.themeId] ?? CITIZEN_THEMES.general;
+    const party = CITIZEN_PARTIES[input.partyId] ?? CITIZEN_PARTIES.unaffiliated;
+    const now = new Date();
+    const body = JSON.stringify({
+      place: input.place,
+      themeId: input.themeId,
+      themeEn: theme.en,
+      themeBn: theme.bn,
+      partyId: input.partyId,
+      partyEn: party.en,
+      partyBn: party.bn,
+      lat: input.lat ?? null,
+      lng: input.lng ?? null,
+      titleBn: input.title,
+    } satisfies CitizenReportBody);
+
+    const row = await prismaWrite.liveSignal.create({
+      data: {
+        signalType: LiveSignalType.ALERT,
+        title: input.title,
+        body,
+        url: `citizen://${id}`,
+        sourceName: "Citizen",
+        district: input.district,
+        division: divisionNameForDistrict(input.district),
+        severity: input.urgency === "active" ? 75 : 50,
+        flagType: "CITIZEN",
+        publishedAt: now,
+      },
+    });
+
+    return citizenRowToMovement(row);
+  }
+
+  private async mergeCitizenMovements(pulse: UnrestPulse, ctx: ScopeContext): Promise<UnrestPulse> {
+    const extra = await this.listCitizenMovements(ctx);
+    if (extra.length === 0) return pulse;
+    const existing = pulse.movements ?? [];
+    const seen = new Set(existing.map((m) => m.id));
+    const movements = [...extra.filter((m) => !seen.has(m.id)), ...existing];
+    return {
+      ...pulse,
+      movements,
+      summary: {
+        ...pulse.summary,
+        active_protests: movements.filter((m) => m.status === "active").length,
+        active_movements: movements.filter((m) => m.status === "active").length,
+      },
+    };
+  }
+
+  private async listCitizenMovements(ctx: ScopeContext): Promise<ProtestMovement[]> {
+    const rows = await prismaRead.liveSignal.findMany({
+      where: {
+        flagType: "CITIZEN",
+        url: { startsWith: "citizen://" },
+        resolvedAt: null,
+      },
+      orderBy: { publishedAt: "desc" },
+      take: 200,
+    });
+    return rows
+      .map(citizenRowToMovement)
+      .filter((m) => matchesScopeDistrict(m.district, m.division, ctx));
   }
 
   private applyScope(pulse: UnrestPulse, ctx: ScopeContext): UnrestPulse {
@@ -643,6 +713,147 @@ export class UnrestService {
       },
     };
   }
+}
+
+export interface CitizenReportInput {
+  title: string;
+  place: string;
+  district: string;
+  themeId: string;
+  partyId: string;
+  urgency: "active" | "recent";
+  lat?: number;
+  lng?: number;
+}
+
+interface CitizenReportBody {
+  place?: string;
+  themeId?: string;
+  themeEn?: string;
+  themeBn?: string;
+  partyId?: string;
+  partyEn?: string;
+  partyBn?: string;
+  lat?: number | null;
+  lng?: number | null;
+  titleBn?: string;
+}
+
+const EMPTY_IMPACT: NewsImpactExtract = {
+  deaths: 0,
+  civilian_deaths: 0,
+  injuries: 0,
+  homes_damaged: 0,
+  livestock_lost: 0,
+  damage_mentions: 0,
+  evidence: [],
+};
+
+const CITIZEN_THEMES: Record<string, { en: string; bn: string }> = {
+  gas_fuel: { en: "Gas / fuel price protest", bn: "গ্যাস/জ্বালানি দাম আন্দোলন" },
+  power: { en: "Electricity tariff / load-shedding", bn: "বিদ্যুৎ দাম/লোডশেডিং আন্দোলন" },
+  political_opposition: { en: "Opposition / political protest", bn: "বিরোধী দল/রাজনৈতিক আন্দোলন" },
+  student: { en: "Student protest", bn: "ছাত্র আন্দোলন" },
+  hartal_blockade: { en: "Hartal / blockade", bn: "হরতাল/অবরোধ" },
+  wage: { en: "Wage / labour protest", bn: "মজুরি/শ্রমিক আন্দোলন" },
+  general: { en: "Public protest", bn: "জন আন্দোলন / বিক্ষোভ" },
+};
+
+const CITIZEN_PARTIES: Record<string, { en: string; bn: string }> = {
+  bnp: { en: "BNP", bn: "বিএনপি" },
+  jamaat: { en: "Jamaat-e-Islami", bn: "জামায়াতে ইসলামী" },
+  ncp: { en: "NCP", bn: "এনসিপি" },
+  jatiya_party: { en: "Jatiya Party", bn: "জাতীয় পার্টি" },
+  student_org: { en: "Student organizations", bn: "ছাত্র সংগঠন" },
+  labour_union: { en: "Labour / trade union", bn: "শ্রমিক সংগঠন" },
+  civil_society: { en: "Civil society", bn: "নাগরিক সমাজ" },
+  unaffiliated: { en: "Unaffiliated / public", bn: "অদলীয় / সাধারণ জনতা" },
+};
+
+const DIVISION_BY_ID: Record<string, string> = {
+  "1": "Barishal",
+  "2": "Chattogram",
+  "3": "Dhaka",
+  "4": "Khulna",
+  "5": "Rajshahi",
+  "6": "Rangpur",
+  "7": "Sylhet",
+  "8": "Mymensingh",
+};
+
+function divisionNameForDistrict(district: string): string | null {
+  const hit = (bdDistricts as { districts: Array<{ name: string; division_id: string }> }).districts.find(
+    (d) => d.name.toLowerCase() === district.trim().toLowerCase(),
+  );
+  return hit ? DIVISION_BY_ID[hit.division_id] ?? null : null;
+}
+
+function parseCitizenBody(raw: string | null): CitizenReportBody {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as CitizenReportBody;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function citizenRowToMovement(row: {
+  id: string;
+  title: string;
+  body: string | null;
+  url: string;
+  district: string | null;
+  division: string | null;
+  severity: number | null;
+  publishedAt: Date | null;
+  createdAt: Date;
+}): ProtestMovement {
+  const extra = parseCitizenBody(row.body);
+  const themeId = extra.themeId && CITIZEN_THEMES[extra.themeId] ? extra.themeId : "general";
+  const partyId = extra.partyId && CITIZEN_PARTIES[extra.partyId] ? extra.partyId : "unaffiliated";
+  const theme = CITIZEN_THEMES[themeId];
+  const party = CITIZEN_PARTIES[partyId];
+  const place = extra.place?.trim() || row.district || "Unknown";
+  const status: "active" | "recent" = (row.severity ?? 0) >= 70 ? "active" : "recent";
+  const at = (row.publishedAt ?? row.createdAt).toISOString();
+  const when = new Date(at);
+  return {
+    id: row.id,
+    title: `${theme.en} — ${place} (${party.en})`,
+    title_bn: `${theme.bn} — ${place} (${party.bn})`,
+    theme_id: themeId,
+    theme: extra.themeEn || theme.en,
+    theme_bn: extra.themeBn || theme.bn,
+    party_id: partyId,
+    party: extra.partyEn || party.en,
+    party_bn: extra.partyBn || party.bn,
+    place,
+    place_bn: place,
+    district: row.district,
+    division: row.division,
+    status,
+    status_bn: status === "active" ? "চলমান / সক্রিয়" : "সাম্প্রতিক",
+    status_en: status === "active" ? "Active now" : "Recent",
+    event_at: at,
+    event_period_en: when.toLocaleString("en-BD", { month: "long", year: "numeric" }),
+    event_period_bn: when.toLocaleString("bn-BD", { month: "long", year: "numeric" }),
+    temporal_class: "live",
+    first_seen_at: at,
+    last_seen_at: at,
+    article_count: 1,
+    severity: row.severity ?? (status === "active" ? 75 : 50),
+    impact: EMPTY_IMPACT,
+    summary_bn: `নাগরিক/ফিল্ড রিপোর্ট: ${row.title} · ইস্যু: ${theme.bn} · দল: ${party.bn}`,
+    summary_en: `Citizen/field report: ${row.title} · issue: ${theme.en} · party: ${party.en}`,
+    articles: [],
+    lat: typeof extra.lat === "number" ? extra.lat : null,
+    lng: typeof extra.lng === "number" ? extra.lng : null,
+    source_confidence: 0.35,
+    unique_sources: 1,
+    timeline: [{ at, title: row.title, source_name: "Citizen", url: row.url }],
+    source: "citizen",
+  };
 }
 
 export const unrestService = new UnrestService();

@@ -15,6 +15,7 @@ import { LocalWardMap } from "@/components/local-entity/local-ward-map";
 import { LocalMapLayerBar } from "@/components/local-entity/local-map-layer-bar";
 import { LocalEvidenceFeed } from "@/components/local-entity/local-evidence-feed";
 import { Button } from "@/components/ui/button";
+import { DataTrustBanner } from "@/components/ui/data-trust-banner";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useLocalEntityId, withLocalEntityHref } from "@/hooks/use-local-entity-id";
@@ -433,9 +434,7 @@ export function LocalCommandPanel() {
       onRetry={() => void load()}
       stats={kpis}
     >
-      {data?.sourceNote ? (
-        <p className="mb-3 text-[11px] text-muted-foreground">{t("sourceNote")}</p>
-      ) : null}
+      {data ? <DataTrustBanner kind="seed" className="mb-3" /> : null}
       <p className="mb-3 text-[11px] text-muted-foreground">{t("formula")}</p>
 
       <div className="mb-4 space-y-2 rounded-xl border border-border/50 bg-background/30 p-3">

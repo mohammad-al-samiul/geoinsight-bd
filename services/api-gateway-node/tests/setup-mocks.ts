@@ -15,6 +15,7 @@ const mockClient = () => ({
     updateMany: jest.fn(),
   },
   user: { findUnique: jest.fn(), create: jest.fn() },
+  $queryRaw: jest.fn().mockResolvedValue([{ version: "2026.08.15.p7", applied_at: new Date("2026-08-15T12:00:00Z") }]),
   $connect: jest.fn(),
   $disconnect: jest.fn(),
 });

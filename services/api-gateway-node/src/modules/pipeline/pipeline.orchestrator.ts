@@ -122,14 +122,21 @@ export class PipelineOrchestrator {
         stagger + 120_000,
       ),
       new IntervalWorker(
+        "pipeline:national-sectors",
+        log("national-sectors", () => pipelineService.syncNationalSectors()),
+        env.PIPELINE_SECTOR_INTERVAL_MS,
+        true,
+        20_000,
+      ),
+      new IntervalWorker(
         "pipeline:maintenance",
-        async () => {
+        log("maintenance", async () => {
           const { pruneIntelSnapshots } = await import("../intel/intel-snapshot.service");
           const { pruneAuditLogs } = await import("../intel/pipeline-run-log.service");
           const intel = await pruneIntelSnapshots();
           const audit = await pruneAuditLogs();
           return { intel, audit };
-        },
+        }),
         DAY_MS,
         true,
         stagger + 150_000,

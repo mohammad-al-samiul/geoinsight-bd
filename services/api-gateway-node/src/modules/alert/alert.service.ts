@@ -18,7 +18,7 @@ export class AlertService {
       });
     }
 
-    return prismaRead.redFlagAlert.findMany({
+    const rows = await prismaRead.redFlagAlert.findMany({
       where: {
         ...(query.unresolvedOnly && { resolvedAt: null }),
         ...(query.unitId && { project: projectUnitScopeWhere(query.unitId) }),
@@ -37,6 +37,14 @@ export class AlertService {
       orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
       take: query.limit,
     });
+
+    if (env.FABRIC_ENABLED) return rows;
+    return rows.map((row) => ({
+      ...row,
+      blockchainHash: null,
+      blockchainVerified: false,
+      project: { ...row.project, blockchainTx: null },
+    }));
   }
 
   async resolve(alertId: string, userId: string, ip?: string) {

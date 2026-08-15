@@ -30,6 +30,7 @@ export interface KpiRecord {
   status: string;
   verified: boolean;
   blockchainHash?: string | null;
+  provenance?: "LIVE" | "SEED" | "SYNTHETIC";
   kpiDef: { code: string; name: string; unit: string };
   representative: RepresentativeRef;
 }
@@ -43,6 +44,7 @@ export interface ProjectRow {
   contractorNid?: string | null;
   startDate: string;
   blockchainTx?: string | null;
+  provenance?: "LIVE" | "SEED" | "SYNTHETIC";
   adminUnitId: string;
   progressPct?: number;
   responsibleName?: string | null;

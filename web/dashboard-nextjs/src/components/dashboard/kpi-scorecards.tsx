@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { ScorecardSkeleton } from "@/components/ui/skeleton";
 import { CompletionAreaChart } from "@/components/dashboard/completion-area-chart";
@@ -66,6 +67,7 @@ function ScorecardShell({
 }
 
 export function KpiScorecards({ metrics, loading, pulseKeys }: KpiScorecardsProps) {
+  const t = useTranslations("modules.dashboard");
   if (loading || !metrics) {
     return (
       <div className="grid grid-cols-1 gap-5">
@@ -94,9 +96,9 @@ export function KpiScorecards({ metrics, loading, pulseKeys }: KpiScorecardsProp
   return (
     <div className="grid grid-cols-1 gap-5">
       <ScorecardShell
-        label="Project Completion Rate"
+        label={t("completionRate")}
         value={`${metrics.completionRate}%`}
-        sub="12-month rolling average"
+        sub={t("completionSub")}
         icon={Percent}
         pulseKey={pulseKeys.completion}
       >
@@ -107,12 +109,12 @@ export function KpiScorecards({ metrics, loading, pulseKeys }: KpiScorecardsProp
       </ScorecardShell>
 
       <ScorecardShell
-        label="Budget Variance"
+        label={t("budgetVariance")}
         value={varianceDisplay}
         sub={
           metrics.budgetVariance.length > 0
-            ? "Planned vs. actual spend"
-            : "Live budget signals syncing…"
+            ? t("budgetSub")
+            : t("budgetSyncing")
         }
         icon={Wallet}
         pulseKey={pulseKeys.budget}
@@ -124,12 +126,15 @@ export function KpiScorecards({ metrics, loading, pulseKeys }: KpiScorecardsProp
       </ScorecardShell>
 
       <ScorecardShell
-        label="Global Arbitrage Matrix"
+        label={t("arbitrage")}
         value={topArbitrage ? `${topArbitrage.marginPct}%` : "—"}
         sub={
           topArbitrage
-            ? `Peak: ${topArbitrage.commodity} → ${topArbitrage.market}`
-            : "195-country feed"
+            ? t("arbitragePeak", {
+                commodity: topArbitrage.commodity,
+                market: topArbitrage.market,
+              })
+            : t("arbitrageFeed")
         }
         icon={Globe2}
         pulseKey={pulseKeys.arbitrage}

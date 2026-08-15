@@ -62,7 +62,12 @@ function buildBriefingFallback(
   const completion = Number(payload.completion_rate ?? 0);
   const alerts = Number(payload.open_alerts ?? 0);
   const headlines = Array.isArray(payload.news_headlines)
-    ? (payload.news_headlines as Array<{ title: string; source: string; district?: string | null }>)
+    ? (payload.news_headlines as Array<{
+        title: string;
+        source: string;
+        district?: string | null;
+        url?: string | null;
+      }>)
     : [];
 
   const bullets = headlines.slice(0, 5).map((h, idx) => ({
@@ -71,6 +76,8 @@ function buildBriefingFallback(
       : `News (${h.source}): ${h.title.slice(0, 140)}${h.district ? ` — ${h.district}` : ""}`,
     category: "news",
     priority: idx === 0 ? 1 : 2,
+    source: h.source,
+    source_url: h.url ?? undefined,
   }));
 
   if (bullets.length === 0) {
@@ -80,6 +87,8 @@ function buildBriefingFallback(
         : `Scope ${scope}: completion ${completion.toFixed(1)}%, ${alerts} open alerts — live feed sync is active.`,
       category: "summary",
       priority: 5,
+      source: "GeoInsight",
+      source_url: undefined,
     });
   }
 
@@ -95,6 +104,32 @@ function buildBriefingFallback(
     voice_text: [header, ...bullets.map((b) => b.text)].join(" ").slice(0, 1200),
     llm_used: false,
   };
+}
+
+function enrichBriefingSources(briefing: Record<string, unknown>): Record<string, unknown> {
+  const headlines = Array.isArray(briefing.news_headlines)
+    ? (briefing.news_headlines as Array<{
+        title?: string;
+        source?: string;
+        url?: string;
+      }>)
+    : [];
+  const bullets = Array.isArray(briefing.bullets)
+    ? (briefing.bullets as Array<Record<string, unknown>>)
+    : [];
+  const next = bullets.map((b) => {
+    if (typeof b.source === "string" && b.source) return b;
+    const text = String(b.text ?? "");
+    const byTitle = headlines.find((h) => {
+      const title = h.title ?? "";
+      return title.length >= 12 && text.includes(title.slice(0, 40));
+    });
+    const hit =
+      byTitle ?? headlines.find((h) => Boolean(h.source && text.includes(String(h.source))));
+    if (!hit) return b;
+    return { ...b, source: hit.source, source_url: hit.url };
+  });
+  return { ...briefing, bullets: next };
 }
 
 function scopeUnitId(query: DashboardScopeQuery): string | undefined {
@@ -163,7 +198,7 @@ export class BriefingService {
     if (!data) {
       throw new Error("Briefing unavailable");
     }
-    return this.attachLocalDeskBullets(data, lang, scopeKey);
+    return enrichBriefingSources(await this.attachLocalDeskBullets(data, lang, scopeKey));
   }
 
   /** Fresh local-desk bullets — not stored in the 15m briefing snapshot. */
@@ -183,7 +218,13 @@ export class BriefingService {
           .getBoard({ role: UserRole.PMO, adminUnitId: null })
           .catch(() => null),
       ]);
-      const extras: Array<{ text: string; category: string; priority: number }> = [];
+      const extras: Array<{
+        text: string;
+        category: string;
+        priority: number;
+        source?: string;
+        source_url?: string;
+      }> = [];
       const bn = lang === "bn";
 
       if (
@@ -338,6 +379,8 @@ export class BriefingService {
       }
 
       if (!extras.length) return briefing;
+      const deskLabel = bn ? "লোকাল ডিএসএস" : "Local DSS";
+      const tagged = extras.map((e) => ({ ...e, source: e.source ?? deskLabel }));
       const existing = Array.isArray(briefing.bullets)
         ? (briefing.bullets as Array<{ text?: string; category?: string; priority?: number }>)
         : [];
@@ -362,7 +405,7 @@ export class BriefingService {
           !t.includes("লোকাল ইন্টিগ্রিটি")
         );
       });
-      return { ...briefing, bullets: [...extras, ...cleaned].slice(0, 10) };
+      return { ...briefing, bullets: [...tagged, ...cleaned].slice(0, 10) };
     } catch {
       return briefing;
     }

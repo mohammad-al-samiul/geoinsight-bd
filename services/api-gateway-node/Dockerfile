@@ -13,6 +13,7 @@ RUN npm ci --omit=dev && npm install --no-save prisma@^6.6.0
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN mkdir -p feeds
 RUN npx prisma generate
 RUN npm run build
 
@@ -22,6 +23,7 @@ ENV NODE_ENV=production
 COPY --from=deps-prod /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/feeds ./feeds
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY package.json ./
 EXPOSE 4000

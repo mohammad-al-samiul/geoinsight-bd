@@ -1056,7 +1056,7 @@ geoinsight-bd/
 │   ├── nginx/                  # Production edge
 │   ├── observability/          # Prometheus, Grafana
 │   ├── hyperledger/            # Fabric connection profile
-│   ├── scripts/seed/           # 01–24 national + local DSS seeds
+│   ├── scripts/seed/           # 00–25 national + local DSS seeds (CTG-11)
 │   └── security/               # Tier-4 sovereignty config
 ├── load-tests/                 # Locust scenarios
 ├── docker-compose.yml          # Infra

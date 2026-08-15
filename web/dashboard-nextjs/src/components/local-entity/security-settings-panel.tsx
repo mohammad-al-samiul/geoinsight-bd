@@ -27,6 +27,8 @@ interface Profile {
   phone: string | null;
   role: string;
   mfaEnabled: boolean;
+  mfaRequired?: boolean;
+  mfaEnforced?: boolean;
 }
 
 interface MfaSetup {
@@ -130,6 +132,9 @@ export function SecuritySettingsPanel() {
               label={t("mfaStatus")}
               value={profile.mfaEnabled ? t("enabled") : t("disabled")}
             />
+            {profile.mfaRequired && (
+              <StatCard label={t("policy")} value={t("required")} />
+            )}
             <StatCard label={t("account")} value={profile.email} />
             <StatCard label={t("phone")} value={profile.phone ?? "—"} />
           </StatGrid>
@@ -191,7 +196,11 @@ export function SecuritySettingsPanel() {
           </div>
         )}
 
-        {profile?.mfaEnabled && !setup && (
+        {profile?.mfaEnabled && !setup && profile.mfaEnforced && (
+          <p className="text-sm text-muted-foreground">{t("disableLocked")}</p>
+        )}
+
+        {profile?.mfaEnabled && !setup && !profile.mfaEnforced && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">{t("disableHelp")}</p>
             <input

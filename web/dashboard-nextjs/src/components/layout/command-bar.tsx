@@ -4,6 +4,7 @@ import { AdminCascadeFilter } from "@/components/filters/admin-cascade-filter";
 import { CommandSearch } from "@/components/layout/command-search";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { NotificationCenter } from "@/components/layout/notification-center";
+import { LocalNotificationCenter } from "@/components/layout/local-notification-center";
 import { useAuth, useAuthActions, useAuthContext } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -116,6 +117,7 @@ export function CommandBar({
             </Button>
           )}
           {showNationalChrome && <NotificationCenter />}
+          {localRole && <LocalNotificationCenter />}
           <Button
             variant="ghost"
             size="icon"

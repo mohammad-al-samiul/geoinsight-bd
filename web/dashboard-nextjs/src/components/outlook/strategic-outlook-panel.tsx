@@ -25,6 +25,7 @@ import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { chartTooltipProps } from "@/lib/chart-tooltip";
 import { chartLayout, RadarAngleTick } from "@/lib/chart-theme";
 import { cn } from "@/lib/utils";
+import { DataTrustBanner } from "@/components/ui/data-trust-banner";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function trajIcon(traj: string) {
@@ -640,7 +641,7 @@ export function StrategicOutlookPanel() {
   const bn = locale === "bn";
   const bp = useBreakpoint();
   const layout = chartLayout(bp);
-  const { data, loading, error, reload, refresh, refreshing } = useStrategicOutlook();
+  const { data, loading, error, usingMock, reload, refresh, refreshing } = useStrategicOutlook();
   const [activeTab, setActiveTab] = useState<"overview"|"politics"|"economy"|"sources">("overview");
   useRealtimeRefresh(reload);
 
@@ -706,6 +707,7 @@ export function StrategicOutlookPanel() {
         </StatGrid>
       ) : null}
     >
+      {usingMock ? <DataTrustBanner kind="mock" className="mb-4" /> : null}
       {data && (
         <div className="space-y-5">
           {/* ── Action bar ── */}

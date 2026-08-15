@@ -22,6 +22,9 @@ interface MeResponse {
     role: UserRole;
     adminUnitId: string | null;
     adminUnit: { id: string; name: string; type: string } | null;
+    mfaEnabled?: boolean;
+    mfaRequired?: boolean;
+    mfaEnforced?: boolean;
   };
 }
 
@@ -53,6 +56,9 @@ function mapProfile(data: MeResponse["data"]): AuthUser {
     role: data.role,
     adminUnitId: data.adminUnitId,
     adminUnitName: data.adminUnit?.name,
+    mfaEnabled: Boolean(data.mfaEnabled),
+    mfaRequired: Boolean(data.mfaRequired),
+    mfaEnforced: Boolean(data.mfaEnforced),
   };
 }
 

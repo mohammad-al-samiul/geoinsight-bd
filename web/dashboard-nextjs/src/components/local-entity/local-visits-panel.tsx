@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, CalendarPlus } from "lucide-react";
 import { DataTable, ModuleShell } from "@/components/modules/module-shell";
 import {
   LocalKpiSpark,
@@ -110,6 +110,41 @@ export function LocalVisitsPanel() {
     }
   };
 
+  const downloadIcs = (row: VisitFeed["items"][number]) => {
+    const start = new Date(row.scheduledAt);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    const stamp = (d: Date) =>
+      d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    const title = (isBn ? row.titleBn || row.title : row.title).replace(/[,\\;]/g, " ");
+    const location = row.ward
+      ? (isBn ? row.ward.nameBn || row.ward.name : row.ward.name).replace(/[,\\;]/g, " ")
+      : "";
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//GeoInsight BD//Visit Planner//BN",
+      "CALSCALE:GREGORIAN",
+      "BEGIN:VEVENT",
+      `UID:${row.id}@geoinsight.gov.bd`,
+      `DTSTAMP:${stamp(new Date())}`,
+      `DTSTART:${stamp(start)}`,
+      `DTEND:${stamp(end)}`,
+      `SUMMARY:${title}`,
+      location ? `LOCATION:${location}` : null,
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ]
+      .filter(Boolean)
+      .join("\r\n");
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `visit-${row.id.slice(0, 8)}.ics`;
+    a.click();
+    URL.revokeObjectURL(href);
+  };
+
   return (
     <ModuleShell
       title={t("title")}
@@ -189,20 +224,30 @@ export function LocalVisitsPanel() {
           {
             key: "id",
             label: t("colAction"),
-            render: (row) =>
-              row.status === "PLANNED" ? (
+            render: (row) => (
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant="outline"
                   className="h-7"
-                  disabled={busy === row.id}
-                  onClick={() => void markDone(row.id)}
+                  onClick={() => downloadIcs(row)}
                 >
-                  {t("markDone")}
+                  <CalendarPlus className="mr-1 h-3 w-3" />
+                  {t("exportIcs")}
                 </Button>
-              ) : (
-                "—"
-              ),
+                {row.status === "PLANNED" ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7"
+                    disabled={busy === row.id}
+                    onClick={() => void markDone(row.id)}
+                  >
+                    {t("markDone")}
+                  </Button>
+                ) : null}
+              </div>
+            ),
           },
         ]}
         rows={data?.items ?? []}

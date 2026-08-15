@@ -47,6 +47,23 @@ export function LocalPulsePanel() {
   const { data, error, loading, reload } = useLocalPulse(entityId);
   const [events, setEvents] = useState<PulseEventFeed | null>(null);
   const [eventBusy, setEventBusy] = useState<string | null>(null);
+  const [eventError, setEventError] = useState<string | null>(null);
+  const [markDoneError, setMarkDoneError] = useState<string | null>(null);
+
+  const kindLabel = (kind: string) => {
+    switch (kind) {
+      case "MEETING":
+        return t("kindMeeting");
+      case "RALLY":
+        return t("kindRally");
+      case "OUTREACH":
+        return t("kindOutreach");
+      case "FOLLOW_UP":
+        return t("kindFollowUp");
+      default:
+        return t("kindOther");
+    }
+  };
 
   const loadEvents = useCallback(async () => {
     const qs = entityId ? `?entityId=${entityId}` : "";
@@ -56,10 +73,12 @@ export function LocalPulsePanel() {
         { cache: "no-store" },
       );
       setEvents(res.data);
+      setEventError(null);
     } catch {
       setEvents(null);
+      setEventError(t("eventsLoadFailed"));
     }
-  }, [entityId]);
+  }, [entityId, t]);
 
   useEffect(() => {
     void loadEvents();
@@ -99,12 +118,15 @@ export function LocalPulsePanel() {
 
   const markEventDone = async (id: string) => {
     setEventBusy(id);
+    setMarkDoneError(null);
     try {
       await apiClient(`local-entity/pulse-events/${id}/done`, {
         method: "PATCH",
         body: JSON.stringify({ done: true }),
       });
       await loadEvents();
+    } catch {
+      setMarkDoneError(t("markDoneFailed"));
     } finally {
       setEventBusy(null);
     }
@@ -182,10 +204,23 @@ export function LocalPulsePanel() {
       </div>
 
       <section className="glass-panel mb-4 rounded-xl p-4 shadow-panel">
-        <div className="mb-3 flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-semibold">{t("calendarTitle")}</h2>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">{t("calendarTitle")}</h2>
+          </div>
+          {eventError ? (
+            <Button size="sm" variant="outline" className="h-7" onClick={() => void loadEvents()}>
+              {t("retryEvents")}
+            </Button>
+          ) : null}
         </div>
+        {eventError ? (
+          <p className="mb-3 text-xs text-destructive">{eventError}</p>
+        ) : null}
+        {markDoneError ? (
+          <p className="mb-3 text-xs text-destructive">{markDoneError}</p>
+        ) : null}
         <DataTable
           emptyMessage={t("emptyEvents")}
           columns={[
@@ -196,7 +231,7 @@ export function LocalPulsePanel() {
                 <div>
                   <p className="font-medium">{isBn ? row.titleBn || row.title : row.title}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {row.kind}
+                    {kindLabel(row.kind)}
                     {row.influencer
                       ? ` · ${isBn ? row.influencer.nameBn || row.influencer.name : row.influencer.name}`
                       : ""}

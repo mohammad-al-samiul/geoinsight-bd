@@ -39,13 +39,21 @@
     "localCommand": "Command room",
     "localSpecialty": "Role Specialty Pack",
     "localOutage": "Service Outage Board",
-    "localAlerts": "WhatsApp / Voice Alerts",
+    "localAlerts": "WhatsApp / SMS / Voice Alerts",
     "localSecurity": "Security & 2FA",
     "localBudget": "Budget / ADP Tracker",
     "localHeatmap": "Grievance Heatmap",
     "localVisits": "Visit Planner",
     "localScorecard": "Comparative Scorecard",
-    "localField": "Field Command"
+    "localField": "Field Command",
+    "tools": "PMO tools",
+    "sovereignAi": "Sovereign LLM",
+    "digitalTwin": "Digital Twin",
+    "sentiment": "Citizen Sentiment",
+    "simulator": "Impact Simulator",
+    "citizenChat": "Citizen Chat",
+    "proximity": "Proximity Alerts",
+    "ops": "Must-have ops"
   },
   "shell": {
     "brandSubtitle": "National Intelligence",
@@ -74,6 +82,9 @@
     "mfaCode": "Authenticator code",
     "mfaSubmit": "Verify & continue",
     "mfaBack": "Back to password",
+    "enrollSubtitle": "National desks must enroll an authenticator before the session starts",
+    "enrollSecret": "Add this secret to Google Authenticator or Authy, then enter a live 6-digit code",
+    "enrollSubmit": "Confirm 2FA & continue",
     "emailPlaceholder": "analyst@geoinsight.gov.bd",
     "submit": "Enter Command Center",
     "submitting": "Authenticating…",
@@ -138,6 +149,7 @@
     "placeholder": "Search KPIs, projects, representatives… (Ctrl+K)",
     "searching": "Searching…",
     "noResults": "No results for \"{query}\"",
+    "failed": "Search failed. This is not an empty result.",
     "types": {
       "page": "Page",
       "project": "Project",
@@ -148,9 +160,18 @@
   },
   "notifications": {
     "title": "Notifications",
+    "description": "Critical events, severity, and the latest alerts in one place.",
     "active": "{count} active",
     "empty": "No active red flags in current scope.",
-    "unread": "Notifications, {count} unread"
+    "unread": "Notifications, {count} unread",
+    "localTitle": "Local desk alerts",
+    "localEmpty": "No open red alerts, overdue SLA, or failed deliveries.",
+    "localViewAll": "Open complaints",
+    "kindRed": "Red alert",
+    "kindSla": "SLA overdue",
+    "kindOutage": "Restore overdue",
+    "kindDelivery": "Delivery failed",
+    "markRead": "Mark all read"
   },
   "ai": {
     "checking": "AI…",
@@ -179,15 +200,74 @@
     "apiUnreachable": "Cannot reach the API. Is the gateway running?"
   },
   "modules": {
+    "trust": {
+      "seedTitle": "Seed / demo snapshot",
+      "seedBody": "These figures are operational seed for the desk — not a live EMIS, DGHS, BBS, police, or SCADA feed.",
+      "mockTitle": "Development mock",
+      "mockBody": "The API failed. This narrative was generated locally so the layout can be inspected. Do not brief from it.",
+      "dryRunTitle": "Alerts are not being sent",
+      "dryRunBody": "Delivery mode is dry-run. WhatsApp and voice are logged only. Citizens will not receive this message.",
+      "demoTitle": "Demo face match",
+      "demoBody": "Every scan uses a demo fallback. This is not a live camera network and is not legal identification.",
+      "errorTitle": "Could not load live data",
+      "errorBody": "The API failed. Empty charts mean the feed is down — not that the country is quiet.",
+      "metricsFailed": "National dashboard metrics could not be loaded. Retry, or check that the gateway is running.",
+      "retry": "Try again",
+      "seedBadge": "Seed",
+      "mockBadge": "Mock",
+      "dryRunBadge": "Dry-run",
+      "demoBadge": "Demo",
+      "errorBadge": "Failed",
+      "liveTitle": "Live pipeline",
+      "liveBody": "This row came from the news or metric pipeline — not a seed snapshot.",
+      "liveBadge": "Live",
+      "syntheticTitle": "Synthetic pulse",
+      "syntheticBody": "Docker heartbeat or generated signal. Do not brief from it.",
+      "syntheticBadge": "Synthetic"
+    },
+    "tools": {
+      "title": "PMO tools",
+      "description": "National analysis tools. Simulations do not write operational records. Demo feeds stay labelled.",
+      "hintSovereign": "Bangla briefing chat against the sovereign model.",
+      "hintTwin": "Budget-shift what-if. Nothing is saved to the database.",
+      "hintSentiment": "333/999 and news grievance heatmap.",
+      "hintSimulator": "Cross-ministry impact sketch — advice only.",
+      "hintCitizen": "Operator view of the public 333/999 chatbot.",
+      "hintProximity": "Sensitive-zone proximity. Demo VIP tracks are off.",
+      "hintOps": "Seed workspace for complaints and dispatch. Not live 333."
+    },
+    "ops": {
+      "title": "Must-have ops workspace",
+      "description": "Seed complaints, approvals and dispatch rules. Nothing here is a live 333/999 feed.",
+      "complaints": {
+        "title": "Complaints",
+        "subtitle": "Seed queue for the desk demo",
+        "newComplaint": "New complaint",
+        "assign": "Assign",
+        "resolve": "Resolve"
+      },
+      "approvals": {
+        "title": "Approvals",
+        "subtitle": "Red-flag and budget sign-off (seed)",
+        "reject": "Reject",
+        "approve": "Approve"
+      },
+      "notifications": {
+        "broadcast": "Broadcast",
+        "targetRole": "Target role",
+        "sendBroadcast": "Send broadcast"
+      }
+    },
     "divisionalCrisis": {
       "title": "8 Divisions Crime & Resource Crisis Intelligence",
       "description": "Comprehensive visual analytics on crime distribution, percentages, gas, oil/fuel, power, and water scarcity across all 8 divisions of Bangladesh."
     },
     "nationalSectors": {
       "title": "National education, health & jobs",
-      "description": "All 8 divisions and 64 districts — not the five Local DSS seats. Seeded operational snapshot, not live EMIS / DGHS / BBS.",
+      "description": "All 8 divisions and 64 districts — not the Local DSS seats. Seeded operational snapshot, not live EMIS / DGHS / BBS.",
       "homeNote": "Bangladesh-wide sector pressure for PMO. Click a division to open the district table.",
       "sourceNote": "Demo / seed district snapshots — not a live EMIS, DGHS, or BBS labour feed. Abstracts only, not full papers.",
+      "csvPartial": "CSV ingest for {csv} districts; {seed} remain seed — not EMIS/DGHS/BBS.",
       "loading": "Loading national sectors…",
       "loadFailed": "Could not load national education / health / jobs",
       "empty": "No district sector snapshots seeded yet.",
@@ -219,6 +299,13 @@
       "jobFairGaps": "Job-fair gaps",
       "filterDivision": "Division",
       "allDivisions": "All 8 divisions",
+      "filterStatus": "Status",
+      "statusAll": "All",
+      "statusAlert": "Alert",
+      "statusWatch": "Watch",
+      "statusOk": "OK",
+      "exportCsv": "Download CSV",
+      "countryWide": "Nationwide",
       "doNow": "Do now:",
       "jobsHowTitle": "How to create employment",
       "jobsHowNote": "Same-week actions for high-unemployment districts. Nothing is written to the database.",
@@ -238,7 +325,7 @@
       "phase": "Build phase",
       "phaseHint": "Specialty packs + OSINT + Pulse + SLA + WPI",
       "role": "Role",
-      "gatewayTitle": "Super Admin · 5 local entities",
+      "gatewayTitle": "Super Admin · 6 local entities",
       "coreModules": "Universal core (all roles)",
       "specialtyModules": "Role specialty modules",
       "planned": "Planned",
@@ -369,10 +456,14 @@
     },
     "security": {
       "title": "Security & 2FA",
-      "description": "Enable TOTP authenticator for local DSS accounts (Google Authenticator / Authy).",
+      "description": "Enable TOTP authenticator (Google Authenticator / Authy). National PMO and minister desks follow MFA policy.",
       "mfaStatus": "2FA status",
       "enabled": "Enabled",
       "disabled": "Off",
+      "policy": "Policy",
+      "required": "Required for this role",
+      "enrollBanner": "This role should enable authenticator 2FA.",
+      "enrollBannerCta": "Open Security",
       "account": "Account",
       "phone": "Alert phone",
       "totpTitle": "Authenticator (TOTP)",
@@ -382,6 +473,7 @@
       "confirmEnable": "Confirm & enable",
       "cancel": "Cancel",
       "disableHelp": "Enter a current authenticator code to disable 2FA.",
+      "disableLocked": "This role cannot turn 2FA off while MFA enforcement is on.",
       "disable": "Disable 2FA",
       "refresh": "Refresh",
       "loadFailed": "Could not load security profile",
@@ -390,8 +482,8 @@
       "disableFailed": "Could not disable MFA"
     },
     "localAlerts": {
-      "title": "WhatsApp & Voice Alerts",
-      "description": "Crisis delivery log for red-alert complaints. Failed sends queue for automatic retry.",
+      "title": "WhatsApp, SMS & Voice Alerts",
+      "description": "Crisis delivery log for red-alert complaints — WhatsApp, SMS, and voice. Failed sends queue for automatic retry. Dry-run does not reach citizens.",
       "mode": "Delivery mode",
       "total": "Logged",
       "queued": "Queued",
@@ -457,7 +549,14 @@
       "etaOverdue": "ETA overdue",
       "etaLabel": "Restore ETA",
       "colEta": "ETA",
-      "opsNow": "Do now"
+      "opsNow": "Do now",
+      "resolveConfirm": "Mark this outage as restored?",
+      "etaLeft": "{span} left",
+      "etaOverdueLive": "{span} overdue",
+      "utilityPOWER": "DESCO / BPDB",
+      "utilityGAS": "Titas",
+      "utilityFUEL": "BPC",
+      "utilityWATER": "WASA"
     },
     "localSpecialty": {
       "title": "Role Specialty Pack",
@@ -497,7 +596,11 @@
       "colSentiment": "Sentiment",
       "colWhen": "When",
       "flagged": "FLAG",
-      "confidence": "{pct}% conf"
+      "confidence": "{pct}% conf",
+      "sentimentPositive": "Positive",
+      "sentimentNeutral": "Neutral",
+      "sentimentNegative": "Negative",
+      "openInShield": "Open in Narrative Shield"
     },
     "localPulse": {
       "title": "Pulse · unrest, voters, influencers",
@@ -526,7 +629,15 @@
       "colPlace": "Place",
       "colAction": "Action",
       "done": "Done",
-      "markDone": "Mark done"
+      "markDone": "Mark done",
+      "eventsLoadFailed": "Could not load the event calendar.",
+      "retryEvents": "Retry",
+      "markDoneFailed": "Could not mark the event done.",
+      "kindMeeting": "Meeting",
+      "kindRally": "Rally",
+      "kindOutreach": "Outreach",
+      "kindFollowUp": "Follow-up",
+      "kindOther": "Other"
     },
     "localUnrest": {
       "title": "Local unrest & protest pulse",
@@ -757,6 +868,12 @@
       "aiTriageHint": "AI triage applied — review before save",
       "slaHoursLabel": "SLA {hours}h",
       "photoQa": "Photo QA {status}",
+      "photoQaPending": "Photo on file — quality check runs when you resolve",
+      "photoPlaceholder": "https://… or upload from camera",
+      "photoImageOnly": "Choose an image file",
+      "photoUploadFailed": "Could not read the image",
+      "slaLive": "Time remaining",
+      "slaOverdueLive": "SLA overdue",
       "assistTitle": "Local AI assist",
       "assistPlaceholder": "Ask about open SLA / draft a complaint…",
       "assistSend": "Ask",
@@ -900,7 +1017,9 @@
       "completionRate": "Completion rate",
       "openRedFlags": "Open red flags",
       "projectsInScope": "Projects in scope",
-      "scope": "Scope"
+      "scope": "Scope",
+      "templateNotice": "This briefing is a template — the on-prem model was down. Sources below still come from live headlines.",
+      "sourceChip": "Source"
     },
     "sovereign": {
       "title": "Sovereign Bangla LLM",
@@ -977,7 +1096,11 @@
       "impactInjured": "Injured",
       "impactHomes": "Homes damaged",
       "impactDamageMentions": "Damage",
-      "districtCasualties": "Deaths {deaths} · Injured {injured}"
+      "districtCasualties": "Deaths {deaths} · Injured {injured}",
+      "submitReport": "Save pin",
+      "submitting": "Saving…",
+      "submitFailed": "Could not save the citizen report. Try again.",
+      "savedAsPin": "Saved on the server as a lower-confidence pin until verified. Refresh keeps it."
     },
     "simulator": {
       "title": "Cross-Ministry Impact Simulator",
@@ -1124,7 +1247,8 @@
       "crowdHint": "Upload a still to count faces (Haar). Density band for field ops.",
       "crowdEstimate": "Estimate crowd",
       "crowdBusy": "Counting…",
-      "crowdResult": "{count} faces · {band}"
+      "crowdResult": "{count} faces · {band}",
+      "cameraDenied": "Camera permission was denied. Allow the camera or upload a photo instead."
     },
     "hazards": {
       "title": "Flood & Cyclone Project Risk",
@@ -1168,7 +1292,9 @@
       "impactByEventHint": "Each bar = one district × day incident (max from headlines)",
       "impactDeathMentions": "Death mentions",
       "impactInjuryMentions": "Injury mentions",
-      "impactMethodHint": "Every place named in news — deaths, injuries, homes, livestock (max per day)"
+      "impactMethodHint": "Every place named in news — deaths, injuries, homes, livestock (max per day)",
+      "newsDerived": "News-derived",
+      "newsDerivedHint": "Headline counts, not an official FFWC / BMD / DDM tally."
     },
     "citizen": {
       "title": "Citizen Chatbot (333/999)",
@@ -1242,7 +1368,21 @@
       "colPrice": "Live price",
       "colUpdated": "Updated",
       "livePrices": "Live prices",
-      "emptyScope": "No agro markets in this scope."
+      "emptyScope": "No agro markets in this scope.",
+      "heroTitle": "Agri trade command",
+      "heroBody": "Domestic mandi prices and international corridors for import–export advice.",
+      "intlPriceBadge": "International price signals",
+      "decisionSupport": "Decision support",
+      "plannedBadge": "Planned — not live",
+      "plannedLandedTitle": "Landed cost calculator",
+      "plannedLandedBody": "Commodity price, freight, duty and FX to estimate true import cost.",
+      "plannedRouteTitle": "Route and port advice",
+      "plannedRouteBody": "Compare time and cost across Chattogram, Mongla and land ports.",
+      "plannedRiskTitle": "Trade risk alerts",
+      "plannedRiskBody": "Price spikes, export bans, currency and supply disruption signals.",
+      "mapDomestic": "Domestic markets",
+      "mapTrade": "International trade",
+      "mandi": "Mandi"
     },
     "representatives": {
       "title": "Representatives & KPIs",
@@ -1366,10 +1506,18 @@
       "national": "National",
       "connecting": "Connecting",
       "offline": "Offline",
-      "reconnecting": "Reconnecting"
+      "reconnecting": "Reconnecting",
+      "completionRate": "Project completion rate",
+      "completionSub": "12-month rolling average",
+      "budgetSub": "Planned vs actual spend",
+      "budgetSyncing": "Budget signals did not load",
+      "arbitragePeak": "Peak: {commodity} → {market}",
+      "arbitrageFeed": "Commodity matrix",
+      "countryWide": "Nationwide"
     },
     "pmoLocal": {
       "title": "Local DSS civic pressure",
+      "oversightTitle": "Local oversight · six seats",
       "description": "Outages, SLA, unrest, sector league, crime/corruption, command overlay, and crisis-matched research on MP and Mayor desks.",
       "sourceNote": "Roll-up of Local DSS desks — not a national SCADA, EMIS, DGHS, or police feed. Abstracts only, not full papers.",
       "active": "active",
@@ -1391,7 +1539,7 @@
       "trendStable": "Stable",
       "trendFalling": "Falling",
       "unrestHitsTitle": "Local DSS unrest hits",
-      "unrestHitsNote": "National pulse geo-filtered to the five MP/Mayor desks — not extra map pins.",
+      "unrestHitsNote": "National pulse geo-filtered to Local DSS seats — not extra map pins.",
       "clusters": "clusters",
       "evidenceHits": "Research",
       "evidenceTitle": "Crisis-matched research",
@@ -1430,7 +1578,7 @@
       "whatIfSeat": "Seat",
       "simulatedScore": "Simulated",
       "integrityHitsTitle": "Local DSS seats — crime & corruption",
-      "integrityHitsNote": "Five MP/Mayor desks, not a second 8-division layer. Division = Chattogram; seats = CCC / COCC / CTG-*."
+      "integrityHitsNote": "MP/Mayor desks, not a second 8-division layer. Division = Chattogram; seats = CCC / COCC / CTG-*."
     },
     "localFreshness": {
       "live": "Live pulse",
@@ -1488,7 +1636,8 @@
       "colStatus": "Status",
       "colWhen": "When",
       "colAction": "Action",
-      "markDone": "Mark done"
+      "markDone": "Mark done",
+      "exportIcs": "Calendar"
     },
     "localScorecard": {
       "title": "Comparative Scorecard",

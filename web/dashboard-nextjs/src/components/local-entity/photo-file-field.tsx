@@ -9,7 +9,7 @@ const MAX_BYTES = 450_000;
 
 async function fileToDataUrl(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {
-    throw new Error("Image only");
+    throw new Error("IMAGE_ONLY");
   }
   if (file.size > MAX_BYTES * 1.4) {
     // Compress via canvas for large camera photos.
@@ -38,11 +38,17 @@ export function PhotoFileField({
   value,
   onChange,
   className,
+  placeholder = "https://… or upload",
+  imageOnlyError = "Image only",
+  uploadFailedError = "Upload failed",
 }: {
   label: string;
   value: string;
   onChange: (url: string) => void;
   className?: string;
+  placeholder?: string;
+  imageOnlyError?: string;
+  uploadFailedError?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -56,7 +62,7 @@ export function PhotoFileField({
           value={value.startsWith("data:image/") ? "" : value}
           onChange={(e) => onChange(e.target.value)}
           className="h-10 min-w-0 flex-1 rounded-lg border border-input bg-secondary/40 px-3 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
-          placeholder="https://… or upload"
+          placeholder={placeholder}
         />
         <Button
           type="button"
@@ -94,7 +100,11 @@ export function PhotoFileField({
             void fileToDataUrl(file)
               .then(onChange)
               .catch((error) =>
-                setErr(error instanceof Error ? error.message : "Upload failed"),
+                setErr(
+                  error instanceof Error && error.message === "IMAGE_ONLY"
+                    ? imageOnlyError
+                    : uploadFailedError,
+                ),
               )
               .finally(() => setBusy(false));
           }}

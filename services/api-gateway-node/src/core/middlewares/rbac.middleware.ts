@@ -40,6 +40,12 @@ export class RbacMiddleware {
             next(ApiError.badRequest(`Missing ${unitIdKey}`));
             return;
           }
+          // Scoped roles (minister / DC / union / MP / mayor) must not read the
+          // whole country when the client omits unitId.
+          if (user.role !== UserRole.PMO && user.adminUnitId) {
+            const bag = req[source] as Record<string, unknown>;
+            bag[unitIdKey] = user.adminUnitId;
+          }
           next();
           return;
         }

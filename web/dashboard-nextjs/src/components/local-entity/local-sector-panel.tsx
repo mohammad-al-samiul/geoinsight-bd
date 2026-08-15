@@ -22,6 +22,7 @@ import { LocalMapLayerBar } from "@/components/local-entity/local-map-layer-bar"
 import { LocalSourceBadge } from "@/components/local-entity/local-source-badge";
 import { LocalEvidenceFeed } from "@/components/local-entity/local-evidence-feed";
 import { Button } from "@/components/ui/button";
+import { DataTrustBanner } from "@/components/ui/data-trust-banner";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useLocalEntityId } from "@/hooks/use-local-entity-id";
@@ -408,9 +409,7 @@ export function LocalSectorPanel({ sector }: { sector: SectorCode }) {
       onRetry={() => void load()}
       stats={kpis}
     >
-      {data?.sourceNote ? (
-        <p className="mb-3 text-[11px] text-muted-foreground">{t("sourceNote")}</p>
-      ) : null}
+      {data ? <DataTrustBanner kind="seed" className="mb-3" /> : null}
 
       <div className="mb-4 flex flex-wrap gap-2">
         {(["ALL", "ALERT", "WATCH", "OK"] as const).map((s) => (

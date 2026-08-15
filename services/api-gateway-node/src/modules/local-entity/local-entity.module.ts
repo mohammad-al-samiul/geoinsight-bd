@@ -40,6 +40,7 @@ import { localHeatmapService } from "./heatmap.service";
 import { localVisitService } from "./visit.service";
 import { localScorecardService } from "./scorecard.service";
 import { localPulseEventService } from "./pulse-event.service";
+import { deskAlertsService } from "./desk-alerts.service";
 import { alertDeliveryService } from "../alert-delivery/alert-delivery.service";
 import { resolveLocalEntityId } from "./local-entity.scope";
 
@@ -102,6 +103,11 @@ const noteComplaintSchema = z.object({
 
 const complaintIdParams = z.object({
   complaintId: z.string().uuid(),
+});
+
+const complaintPhotoParams = z.object({
+  complaintId: z.string().uuid(),
+  kind: z.enum(["before", "after"]),
 });
 
 const wpiQuery = z.object({
@@ -268,6 +274,21 @@ export class LocalEntityModule extends BaseModule {
     );
 
     router.get(
+      "/local-entity/desk-alerts",
+      authenticate(),
+      container.rbac.requireRoles(...LOCAL_ROLES),
+      validate(overviewQuery, "query"),
+      asyncHandler(async (req, res) => {
+        const { entityId } = req.query as { entityId?: string };
+        const data = await deskAlertsService.list(
+          { role: req.user!.role, adminUnitId: req.user!.adminUnitId },
+          { entityId },
+        );
+        sendSuccess(res, data);
+      }),
+    );
+
+    router.get(
       "/local-entity/complaints",
       authenticate(),
       container.rbac.requireRoles(...LOCAL_ROLES),
@@ -313,6 +334,28 @@ export class LocalEntityModule extends BaseModule {
       asyncHandler(async (req, res) => {
         const data = await complaintService.triageSuggest(req.body);
         sendSuccess(res, data);
+      }),
+    );
+
+    router.get(
+      "/local-entity/complaints/:complaintId/photo/:kind",
+      authenticate(),
+      container.rbac.requireRoles(...LOCAL_ROLES),
+      validate(complaintPhotoParams, "params"),
+      asyncHandler(async (req, res) => {
+        const { complaintId, kind } = req.params as {
+          complaintId: string;
+          kind: "before" | "after";
+        };
+        const photo = await complaintService.getPhotoBytes(
+          { role: req.user!.role, adminUnitId: req.user!.adminUnitId },
+          complaintId,
+          kind,
+        );
+        res.setHeader("Content-Type", photo.contentType);
+        res.setHeader("Cache-Control", "private, max-age=120");
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        res.status(200).send(photo.body);
       }),
     );
 

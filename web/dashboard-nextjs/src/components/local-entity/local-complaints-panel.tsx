@@ -52,6 +52,8 @@ import {
   wardCentroidIndex,
 } from "@/lib/local-ward-geo";
 import { cn } from "@/lib/utils";
+import { complaintPhotoSrc } from "@/lib/complaint-photo";
+import { remainingClock } from "@/lib/live-countdown";
 import { apiClient } from "@/lib/api-client";
 import type { LocalMapMarker } from "@/components/local-entity/local-ward-map-inner";
 import { useLayerFilterState } from "@/hooks/use-layer-filter-state";
@@ -160,6 +162,13 @@ function slaCountdown(
   };
 }
 
+function photoQaClass(status: string | null | undefined) {
+  if (status === "FAIL") return "border-destructive/40 bg-destructive/10 text-destructive";
+  if (status === "WARN") return "border-amber-500/40 bg-amber-500/10 text-amber-200";
+  if (status === "PASS") return "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
+  return "border-primary/25 bg-primary/5 text-primary";
+}
+
 export function LocalComplaintsPanel() {
   const t = useTranslations("modules.localComplaints");
   const tv = useTranslations("modules.localViz");
@@ -205,6 +214,12 @@ export function LocalComplaintsPanel() {
   const [assistReply, setAssistReply] = useState<string | null>(null);
   const [source, setSource] = useState<SignalSource>("CITIZEN");
   const layerState = useLayerFilterState();
+  const [, setNowTick] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick((n) => n + 1), 1_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const wards = overview?.wards ?? [];
   const selectedWard = wardId || wards[0]?.id || "";
@@ -805,6 +820,9 @@ export function LocalComplaintsPanel() {
               label={t("beforePhoto")}
               value={beforeUrl}
               onChange={setBeforeUrl}
+              placeholder={t("photoPlaceholder")}
+              imageOnlyError={t("photoImageOnly")}
+              uploadFailedError={t("photoUploadFailed")}
             />
           </div>
           <div className="flex items-end">
@@ -830,6 +848,9 @@ export function LocalComplaintsPanel() {
             label={t("afterPhoto")}
             value={resolveUrl}
             onChange={setResolveUrl}
+            placeholder={t("photoPlaceholder")}
+            imageOnlyError={t("photoImageOnly")}
+            uploadFailedError={t("photoUploadFailed")}
           />
           <input
             value={resolveNote}
@@ -899,18 +920,52 @@ export function LocalComplaintsPanel() {
                   {slaCountdown(selected.slaDeadline, selected.status, locale, slaUnits).text}
                 </span>
               </div>
+              {selected.status !== "RESOLVED" && (
+                <div
+                  className={cn(
+                    "rounded-xl border px-4 py-3",
+                    slaCountdown(selected.slaDeadline, selected.status, locale, slaUnits).breached
+                      ? "border-destructive/40 bg-destructive/10"
+                      : "border-primary/25 bg-primary/5",
+                  )}
+                >
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {slaCountdown(selected.slaDeadline, selected.status, locale, slaUnits).breached
+                      ? t("slaOverdueLive")
+                      : t("slaLive")}
+                  </p>
+                  <p
+                    className={cn(
+                      "mt-1 font-display text-3xl font-semibold tabular-nums tracking-tight",
+                      slaCountdown(selected.slaDeadline, selected.status, locale, slaUnits).tone,
+                    )}
+                  >
+                    {(() => {
+                      const clock = remainingClock(selected.slaDeadline);
+                      const hh = String(clock.hours).padStart(2, "0");
+                      const mm = String(clock.mins).padStart(2, "0");
+                      const ss = String(clock.secs).padStart(2, "0");
+                      return `${clock.breached ? "−" : ""}${hh}:${mm}:${ss}`;
+                    })()}
+                  </p>
+                </div>
+              )}
               {selected.resolutionNote && (
                 <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs leading-relaxed text-emerald-100">
                   <span className="font-medium text-emerald-200">{t("resolutionNote")}: </span>
                   {selected.resolutionNote}
                 </p>
               )}
-              {selected.photoQaStatus && (
-                <p className="rounded-xl border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-primary">
+              {selected.photoQaStatus ? (
+                <p className={cn("rounded-xl border px-3 py-2 text-xs", photoQaClass(selected.photoQaStatus))}>
                   {t("photoQa", { status: selected.photoQaStatus })}
                   {selected.photoQaNote ? ` — ${selected.photoQaNote}` : ""}
                 </p>
-              )}
+              ) : selected.beforePhotoUrl && selected.status !== "RESOLVED" ? (
+                <p className="rounded-xl border border-border/50 bg-secondary/20 px-3 py-2 text-xs text-muted-foreground">
+                  {t("photoQaPending")}
+                </p>
+              ) : null}
 
               <div className="rounded-xl border border-border/50 bg-secondary/20 p-3">
                 <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -1001,7 +1056,7 @@ export function LocalComplaintsPanel() {
                 {selected.beforePhotoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={selected.beforePhotoUrl}
+                    src={complaintPhotoSrc(selected.beforePhotoUrl) ?? undefined}
                     alt={t("beforePhoto")}
                     className="h-44 w-full object-cover"
                   />
@@ -1019,7 +1074,7 @@ export function LocalComplaintsPanel() {
                 {selected.afterPhotoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={selected.afterPhotoUrl}
+                    src={complaintPhotoSrc(selected.afterPhotoUrl) ?? undefined}
                     alt={t("afterPhoto")}
                     className="h-44 w-full object-cover"
                   />
@@ -1140,7 +1195,7 @@ export function LocalComplaintsPanel() {
                   <div className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={row.beforePhotoUrl}
+                      src={complaintPhotoSrc(row.beforePhotoUrl) ?? undefined}
                       alt={t("beforePhoto")}
                       className="h-10 w-14 rounded-md object-cover ring-1 ring-border/60"
                     />
@@ -1153,7 +1208,7 @@ export function LocalComplaintsPanel() {
                   <div className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={row.afterPhotoUrl}
+                      src={complaintPhotoSrc(row.afterPhotoUrl) ?? undefined}
                       alt={t("afterPhoto")}
                       className="h-10 w-14 rounded-md object-cover ring-1 ring-border/60"
                     />
@@ -1164,6 +1219,11 @@ export function LocalComplaintsPanel() {
                 )}
                 {!row.beforePhotoUrl && !row.afterPhotoUrl && (
                   <Camera className="h-4 w-4 text-muted-foreground" />
+                )}
+                {row.photoQaStatus && (
+                  <span className={cn("rounded-md border px-1.5 py-0.5 text-[9px]", photoQaClass(row.photoQaStatus))}>
+                    {row.photoQaStatus}
+                  </span>
                 )}
               </div>
             ),

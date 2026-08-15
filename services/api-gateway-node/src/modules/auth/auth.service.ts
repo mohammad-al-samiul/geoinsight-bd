@@ -16,13 +16,14 @@ import {
 } from "../../shared/security/totp";
 import { RegisterDto } from "./auth.validator";
 import { jwtSessionService } from "../../infrastructure/session/jwt-session.service";
+import { isMfaRequiredRole, mfaPolicyFor } from "./mfa.policy";
 
 const BCRYPT_ROUNDS = 12;
 const MFA_TOKEN_EXPIRES = "5m";
 
 interface MfaChallengePayload {
   sub: string;
-  purpose: "mfa";
+  purpose: "mfa" | "mfa-enroll";
 }
 
 function hashRefreshToken(token: string): string {
@@ -124,8 +125,8 @@ export class AuthService {
     });
   }
 
-  private issueMfaChallenge(userId: string): string {
-    const payload: MfaChallengePayload = { sub: userId, purpose: "mfa" };
+  private issueMfaChallenge(userId: string, purpose: MfaChallengePayload["purpose"] = "mfa"): string {
+    const payload: MfaChallengePayload = { sub: userId, purpose };
     return jwt.sign(payload, env.JWT_SECRET, {
       expiresIn: MFA_TOKEN_EXPIRES,
       jwtid: crypto.randomUUID(),
@@ -171,15 +172,35 @@ export class AuthService {
           id: user.id,
           email: user.email,
           role: user.role as UserRole,
+          ...mfaPolicyFor(user.role, true),
+        },
+      };
+    }
+
+    if (isMfaRequiredRole(user.role) && env.MFA_ENFORCE) {
+      const secret = generateTotpSecret();
+      return {
+        requiresMfa: false as const,
+        requiresMfaEnrollment: true as const,
+        enrollToken: this.issueMfaChallenge(user.id, "mfa-enroll"),
+        secret,
+        otpauthUrl: buildOtpAuthUrl({ secret, email: user.email }),
+        issuer: "GeoInsight BD",
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role as UserRole,
+          ...mfaPolicyFor(user.role, false),
         },
       };
     }
 
     const session = await this.issueSession(user);
+    const policy = mfaPolicyFor(user.role, false);
     return {
       requiresMfa: false as const,
       ...session,
-      user: { ...session.user, mfaEnabled: false },
+      user: { ...session.user, ...policy },
     };
   }
 
@@ -206,7 +227,39 @@ export class AuthService {
     return {
       requiresMfa: false as const,
       ...session,
-      user: { ...session.user, mfaEnabled: true },
+      user: { ...session.user, ...mfaPolicyFor(user.role, true) },
+    };
+  }
+
+  async enrollMfa(enrollToken: string, secret: string, code: string) {
+    let challenge: MfaChallengePayload;
+    try {
+      challenge = jwt.verify(enrollToken, env.JWT_SECRET) as MfaChallengePayload;
+    } catch {
+      throw ApiError.unauthorized("Invalid or expired MFA enrollment");
+    }
+    if (challenge.purpose !== "mfa-enroll" || !challenge.sub) {
+      throw ApiError.unauthorized("Invalid MFA enrollment");
+    }
+    if (!verifyTotp(secret, code)) {
+      throw ApiError.badRequest("Invalid authenticator code — check clock sync");
+    }
+
+    const user = await prismaRead.user.findUnique({ where: { id: challenge.sub } });
+    if (!user?.isActive) throw ApiError.unauthorized("MFA not available for this account");
+    if (user.mfaSecret) throw ApiError.conflict("MFA already enabled");
+
+    await prismaWrite.user.update({
+      where: { id: user.id },
+      data: { mfaSecret: secret },
+    });
+
+    const session = await this.issueSession(user);
+    return {
+      requiresMfa: false as const,
+      requiresMfaEnrollment: false as const,
+      ...session,
+      user: { ...session.user, ...mfaPolicyFor(user.role, true) },
     };
   }
 
@@ -249,9 +302,12 @@ export class AuthService {
   async disableMfa(userId: string, code: string) {
     const user = await prismaRead.user.findUnique({
       where: { id: userId },
-      select: { id: true, mfaSecret: true },
+      select: { id: true, role: true, mfaSecret: true },
     });
     if (!user) throw ApiError.notFound("User not found");
+    if (isMfaRequiredRole(user.role) && env.MFA_ENFORCE) {
+      throw ApiError.forbidden("MFA cannot be disabled for this role");
+    }
     if (!user.mfaSecret) throw ApiError.badRequest("MFA is not enabled");
     if (!verifyTotp(user.mfaSecret, code)) {
       throw ApiError.unauthorized("Invalid authenticator code");
@@ -344,6 +400,6 @@ export class AuthService {
     });
     if (!user) throw ApiError.notFound("User not found");
     const { mfaSecret, ...rest } = user;
-    return { ...rest, mfaEnabled: Boolean(mfaSecret) };
+    return { ...rest, ...mfaPolicyFor(user.role, Boolean(mfaSecret)) };
   }
 }

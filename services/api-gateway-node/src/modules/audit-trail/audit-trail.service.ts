@@ -1,13 +1,14 @@
 import { LiveSignalType } from "@prisma/client";
 import { env } from "../../core/config/env";
 import { prismaRead } from "../../core/database/prisma.client";
+import { notSyntheticLiveSignalWhere } from "../../shared/provenance";
 
 export class AuditTrailService {
   async listAiAuditTrail(limit = 50) {
     if (env.LIVE_DATA_ONLY) {
       const [signals, audits] = await Promise.all([
         prismaRead.liveSignal.findMany({
-          where: { signalType: LiveSignalType.ALERT },
+          where: { signalType: LiveSignalType.ALERT, ...notSyntheticLiveSignalWhere },
           orderBy: { createdAt: "desc" },
           take: limit,
         }),
@@ -101,9 +102,9 @@ export class AuditTrailService {
         flagType: a.flagType,
         severity: a.severity,
         aiExplanation: a.aiExplanation,
-        blockchainHash: a.blockchainHash,
-        blockchainVerified: a.blockchainVerified,
-        fabricTx: a.project.blockchainTx,
+        blockchainHash: env.FABRIC_ENABLED ? a.blockchainHash : null,
+        blockchainVerified: env.FABRIC_ENABLED ? a.blockchainVerified : false,
+        fabricTx: env.FABRIC_ENABLED ? a.project.blockchainTx : null,
         resolvedAt: a.resolvedAt?.toISOString() ?? null,
         resolvedBy: a.resolvedBy?.email ?? null,
       })),

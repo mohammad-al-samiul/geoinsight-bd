@@ -88,6 +88,7 @@ export interface SegmentedNewsImpact {
   by_district: DistrictImpactRow[];
   by_event: EventImpactRow[];
   evidence: string[];
+  tally_kind: "NEWS_DERIVED";
   disclaimer_bn: string;
   disclaimer_en: string;
 }
@@ -516,6 +517,7 @@ export function aggregateSegmentedImpact(
     by_district,
     by_event: by_event.slice(0, 48),
     evidence,
+    tally_kind: "NEWS_DERIVED",
     disclaimer_bn:
       disclaimers?.bn ??
       "আনুমানিক = একই উপজেলা/জেলা × দিনে খবরের সর্বোচ্চ (যোগ নয়)। নিহত, আহত, ঘর, গবাদি পশু — খবরে যে স্থান নাম আছে সেখানেই। অফিসিয়াল হিসাব নয়।",

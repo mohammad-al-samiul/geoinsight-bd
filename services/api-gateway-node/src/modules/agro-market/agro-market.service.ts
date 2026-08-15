@@ -5,7 +5,7 @@ import { ListAgroMarketsQuery } from "./agro-market.validator";
 
 export class AgroMarketService {
   async list(query: ListAgroMarketsQuery) {
-    return prismaRead.agroMarket.findMany({
+    const rows = await prismaRead.agroMarket.findMany({
       where: {
         ...(query.unitId && agroMarketUnitScopeWhere(query.unitId)),
       },
@@ -23,6 +23,7 @@ export class AgroMarketService {
       orderBy: { name: "asc" },
       take: 1000,
     });
+    return rows.map((row) => ({ ...row, provenance: "SEED" as const }));
   }
 }
 

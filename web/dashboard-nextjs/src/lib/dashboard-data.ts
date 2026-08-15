@@ -38,15 +38,9 @@ function filterQuery(filter: AdminFilterState): string {
   return qs ? `?${qs}` : "";
 }
 
-const EMPTY_METRICS: DashboardMetrics = {
-  completionRate: 0,
-  completionTrend: [],
-  budgetVariance: [],
-  arbitrageMatrix: [],
-  tradeFlows: [],
-  unitScores: [],
-  timestamp: new Date().toISOString(),
-};
+export type DashboardMetricsResult =
+  | { ok: true; metrics: DashboardMetrics }
+  | { ok: false; error: string };
 
 export async function fetchDashboardMetrics(
   filter: AdminFilterState,
@@ -67,13 +61,18 @@ export async function fetchDashboardMetrics(
   };
 }
 
+/** Never invents zeroed charts. Callers must show `error` instead of empty KPIs. */
 export async function fetchDashboardMetricsSafe(
   filter: AdminFilterState,
-): Promise<DashboardMetrics> {
+): Promise<DashboardMetricsResult> {
   try {
-    return await fetchDashboardMetrics(filter);
-  } catch {
-    return { ...EMPTY_METRICS, timestamp: new Date().toISOString() };
+    const metrics = await fetchDashboardMetrics(filter);
+    return { ok: true, metrics };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Live dashboard unavailable",
+    };
   }
 }
 

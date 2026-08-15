@@ -86,7 +86,18 @@ const envSchema = z.object({
   FABRIC_MAX_RETRIES: z.coerce.number().int().positive().default(5),
   FABRIC_RETRY_INTERVAL_MS: z.coerce.number().int().positive().default(30_000),
 
-  /** P4 — WhatsApp / voice alert delivery (dry_run = log only, no external call) */
+  /** Phase 6 — one district CSV for national education/health/jobs. Seed fills the rest. */
+  NATIONAL_SECTOR_CSV_PATH: z.string().default("./feeds/national-sectors.csv"),
+  PIPELINE_SECTOR_INTERVAL_MS: z.coerce.number().int().positive().default(21_600_000),
+
+  /** Phase 7 — TOTP policy for national desks. Enforce blocks login until enrolled. */
+  MFA_REQUIRED_ROLES: z.string().default("PMO,MINISTER"),
+  MFA_ENFORCE: z.string().default("false").transform((v) => v === "true"),
+
+  /** Informational — AI owns the real switch; gateway health surfaces this label. */
+  SENTIMENT_USE_MOCK: z.string().default("false").transform((v) => v === "true"),
+
+  /** P4 — WhatsApp / voice / SMS alert delivery (dry_run = log only, no external call) */
   ALERT_DELIVERY_MODE: z.enum(["dry_run", "meta", "twilio"]).default("dry_run"),
   WHATSAPP_API_URL: z.string().optional(),
   WHATSAPP_ACCESS_TOKEN: z.string().optional(),
@@ -95,7 +106,16 @@ const envSchema = z.object({
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_WHATSAPP_FROM: z.string().optional(),
   TWILIO_VOICE_FROM: z.string().optional(),
+  TWILIO_SMS_FROM: z.string().optional(),
   ALERT_VOICE_ENABLED: z.string().default("true").transform((v) => v === "true"),
+  ALERT_SMS_ENABLED: z.string().default("true").transform((v) => v === "true"),
+
+  /** Optional — complaint photos fall back to data URLs if unset */
+  MINIO_ENDPOINT: z.string().url().optional(),
+  MINIO_ROOT_USER: z.string().optional(),
+  MINIO_ROOT_PASSWORD: z.string().optional(),
+  MINIO_BUCKET_DOCS: z.string().default("national-intelligence-docs"),
+  MINIO_USE_SSL: z.string().default("false").transform((v) => v === "true"),
 });
 
 export type Env = z.infer<typeof envSchema>;

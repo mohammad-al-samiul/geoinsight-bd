@@ -9,6 +9,8 @@ export interface BriefingBullet {
   text: string;
   category: string;
   priority: number;
+  source?: string;
+  source_url?: string;
 }
 
 export interface MorningBriefing {
@@ -18,6 +20,7 @@ export interface MorningBriefing {
   bullets: BriefingBullet[];
   narrative: string;
   voice_text: string;
+  llm_used?: boolean;
   metrics_snapshot?: {
     completionRate: number;
     openAlerts: number;

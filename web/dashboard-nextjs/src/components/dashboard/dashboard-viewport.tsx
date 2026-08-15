@@ -15,14 +15,17 @@ import type { SocketConnectionStatus } from "@/hooks/use-socket";
 import { useTranslations } from "next-intl";
 import { Radio, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DataTrustBanner } from "@/components/ui/data-trust-banner";
+import { Button } from "@/components/ui/button";
 
 export function DashboardViewport() {
   const t = useTranslations("modules.dashboard");
   const tc = useTranslations("common");
+  const tt = useTranslations("modules.trust");
   const user = useAuth();
   const { filter, drillToUnit } = useAdminFilter();
 
-  const { metrics, markers, loading, socketStatus, pulseKeys } =
+  const { metrics, markers, loading, error, socketStatus, pulseKeys, refresh } =
     useDashboardData(filter);
 
   const breadcrumb = getBreadcrumb(filter);
@@ -100,6 +103,16 @@ export function DashboardViewport() {
         </Badge>
       </div>
 
+      {error ? (
+        <div className="space-y-2">
+          <DataTrustBanner kind="error" />
+          <p className="text-xs text-muted-foreground">{error}</p>
+          <Button size="sm" variant="outline" onClick={() => void refresh()}>
+            {tt("retry")}
+          </Button>
+        </div>
+      ) : null}
+
       <div className="min-w-0 space-y-5">
         <PmoNationalSectorStrip />
         <PmoLocalStrip />
@@ -112,11 +125,17 @@ export function DashboardViewport() {
           />
         </div>
         <div className="min-w-0">
-          <KpiScorecards
-            metrics={metrics}
-            loading={loading && !metrics}
-            pulseKeys={pulseKeys}
-          />
+          {error && !metrics ? (
+            <p className="rounded-xl border border-border/50 bg-secondary/20 p-6 text-sm text-muted-foreground">
+              {tt("metricsFailed")}
+            </p>
+          ) : (
+            <KpiScorecards
+              metrics={metrics}
+              loading={loading && !metrics}
+              pulseKeys={pulseKeys}
+            />
+          )}
         </div>
       </div>
     </div>

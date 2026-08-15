@@ -72,6 +72,7 @@ export interface FloodImpactWindow {
       url?: string | null;
     }>;
     evidence: string[];
+  tally_kind?: "NEWS_DERIVED";
   disclaimer_bn: string;
   disclaimer_en: string;
   window_days?: number;

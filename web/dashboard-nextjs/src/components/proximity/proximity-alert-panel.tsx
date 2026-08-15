@@ -16,6 +16,7 @@ import {
   type ProximityStatus,
 } from "@/hooks/use-proximity-live";
 import { cn } from "@/lib/utils";
+import { DataTrustBanner } from "@/components/ui/data-trust-banner";
 import {
   AlertTriangle,
   Crosshair,
@@ -91,6 +92,7 @@ export function ProximityAlertPanel() {
         )
       }
     >
+      <DataTrustBanner kind="demo" className="mb-4" />
       <IntelCard accent="info" padding="lg" hoverLift={false} className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight">

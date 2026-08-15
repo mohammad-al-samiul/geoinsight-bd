@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Flag, Newspaper, Radio } from "lucide-react";
+import { Flag, Newspaper, Radio, ShieldOff } from "lucide-react";
+import Link from "next/link";
 import {
   DataTable,
   ModuleShell,
@@ -23,6 +24,15 @@ function sentimentClass(s: string) {
   if (s === "POSITIVE") return "text-emerald-300";
   if (s === "NEGATIVE") return "text-destructive";
   return "text-muted-foreground";
+}
+
+function sentimentLabel(
+  s: string,
+  labels: { positive: string; neutral: string; negative: string },
+) {
+  if (s === "POSITIVE") return labels.positive;
+  if (s === "NEGATIVE") return labels.negative;
+  return labels.neutral;
 }
 
 export function LocalOsintPanel() {
@@ -138,12 +148,14 @@ export function LocalOsintPanel() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           {(data?.keywords ?? []).slice(0, 8).map((kw) => (
-            <span
+            <Link
               key={kw}
-              className="rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-[11px] text-muted-foreground"
+              href={`/narrative-shield?q=${encodeURIComponent(kw)}`}
+              className="rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              title={t("openInShield")}
             >
               {kw}
-            </span>
+            </Link>
           ))}
         </div>
         <div className="flex gap-2">
@@ -216,16 +228,30 @@ export function LocalOsintPanel() {
           {
             key: "keyword",
             label: t("colKeyword"),
-            render: (row) => (
-              <code className="text-[11px] text-primary">{row.matchedKeyword}</code>
-            ),
+            render: (row) =>
+              row.matchedKeyword ? (
+                <Link
+                  href={`/narrative-shield?q=${encodeURIComponent(row.matchedKeyword)}`}
+                  className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                  title={t("openInShield")}
+                >
+                  <code>{row.matchedKeyword}</code>
+                  <ShieldOff className="h-3 w-3" />
+                </Link>
+              ) : (
+                "—"
+              ),
           },
           {
             key: "sentiment",
             label: t("colSentiment"),
             render: (row) => (
               <span className={cn("text-xs font-medium", sentimentClass(row.sentiment))}>
-                {row.sentiment}
+                {sentimentLabel(row.sentiment, {
+                  positive: t("sentimentPositive"),
+                  neutral: t("sentimentNeutral"),
+                  negative: t("sentimentNegative"),
+                })}
               </span>
             ),
           },

@@ -10,6 +10,7 @@ import { PmoLocalCommandStrip } from "@/components/dashboard/pmo-local-command-s
 import { commandDanger, commandHot, integrityDanger, integrityHot, useNationalBoard, type UnrestTrend } from "@/hooks/use-national-board";
 import { LAYER_COLORS, type MapLayerId } from "@/lib/local-map-layers";
 import { cn } from "@/lib/utils";
+import { DataTrustBadge } from "@/components/ui/data-trust-banner";
 
 const CIVIC: Array<{ id: MapLayerId; Icon: typeof Bolt }> = [
   { id: "POWER", Icon: Bolt },
@@ -38,7 +39,10 @@ export function PmoLocalStrip() {
         <div>
           <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             <Zap className="h-3.5 w-3.5 text-amber-300" />
+            {t("oversightTitle")}
+            <span className="text-border">·</span>
             {t("title")}
+            <DataTrustBadge kind="seed" />
           </p>
           <p className="mt-1 text-xs text-muted-foreground">{t("description")}</p>
         </div>

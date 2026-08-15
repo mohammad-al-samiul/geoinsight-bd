@@ -95,12 +95,23 @@ services:
       PIPELINE_NARRATIVE_INTERVAL_MS: ${PIPELINE_NARRATIVE_INTERVAL_MS:-900000}
       PIPELINE_OUTLOOK_INTERVAL_MS: ${PIPELINE_OUTLOOK_INTERVAL_MS:-900000}
       PIPELINE_BRIEFING_INTERVAL_MS: ${PIPELINE_BRIEFING_INTERVAL_MS:-900000}
+      PIPELINE_SECTOR_INTERVAL_MS: ${PIPELINE_SECTOR_INTERVAL_MS:-21600000}
+      NATIONAL_SECTOR_CSV_PATH: ${NATIONAL_SECTOR_CSV_PATH:-./feeds/national-sectors.csv}
       PIPELINE_PULSE_INTERVAL_MS: ${PIPELINE_PULSE_INTERVAL_MS:-300000}
       PIPELINE_PULSE_RUN_ON_START: ${PIPELINE_PULSE_RUN_ON_START:-true}
       PIPELINE_PULSE_STARTUP_DELAY_MS: ${PIPELINE_PULSE_STARTUP_DELAY_MS:-30000}
       LIVE_DATA_ONLY: ${LIVE_DATA_ONLY:-true}
+      SENTIMENT_USE_MOCK: ${SENTIMENT_USE_MOCK:-true}
+      MFA_REQUIRED_ROLES: ${MFA_REQUIRED_ROLES:-PMO,MINISTER}
+      MFA_ENFORCE: ${MFA_ENFORCE:-false}
+      ALERT_SMS_ENABLED: ${ALERT_SMS_ENABLED:-true}
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-500}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_DOCS: ${MINIO_BUCKET_DOCS:-national-intelligence-docs}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
     depends_on:
       db-init:
         condition: service_completed_successfully
@@ -113,6 +124,10 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      minio:
+        condition: service_started
+    volumes:
+      - ./services/api-gateway-node/feeds:/app/feeds:ro
     networks:
       - geoinsight_net
     healthcheck:

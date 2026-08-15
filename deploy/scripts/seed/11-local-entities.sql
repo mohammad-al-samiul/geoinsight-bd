@@ -166,7 +166,7 @@ ON CONFLICT (type, code) DO UPDATE SET
   path = EXCLUDED.path,
   updated_at = NOW();
 
--- Representatives for the 5 local entities
+-- Representatives for the original 5 local entities (CTG-11 is in 25-local-ctg11.sql)
 INSERT INTO representatives (id, name, nid, role, party, tenure_start, tenure_end, admin_unit_id, created_at, updated_at)
 VALUES
   ('d4000001-0001-4001-8001-000000000101', 'MP — Chattogram-8 (Demo)', '2000000000101', 'MP', 'Local DSS', '2026-02-15', NULL, 'c8000001-0001-4001-8001-000000000008', NOW(), NOW()),

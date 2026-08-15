@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -27,6 +28,8 @@ import {
   type NarrativeCategory, type NarrativeFactCheckStatus, type NarrativeParty,
   type NarrativeSignal, type NarrativeSignalStatus, type NarrativeThreatLevel,
 } from "@/hooks/use-narrative-shield";
+import { useAuthContext } from "@/hooks/use-auth";
+import { isLocalEntityRole } from "@/types";
 
 // ── Colour maps ───────────────────────────────────────────────────────────────
 const THREAT_COLORS: Record<NarrativeThreatLevel, string> = {
@@ -394,12 +397,14 @@ function ThreatSummaryRow({ signals }: { signals: NarrativeSignal[] }) {
 
 function SignalCard({
   signal, selected, onSelect, onDebunk, onEscalate, onDismiss, pending, bn, locale, t, index,
+  readOnly = false,
 }: {
   signal: NarrativeSignal; selected: boolean; index: number;
   onSelect: (id: string) => void; onDebunk: (id: string) => void;
   onEscalate: (id: string) => void; onDismiss: (id: string) => void;
   pending: Record<string, boolean>; bn: boolean; locale: string;
   t: ReturnType<typeof useTranslations>;
+  readOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const isLoading = pending[signal.id] ?? false;
@@ -456,6 +461,7 @@ function SignalCard({
       )}
     >
       <div className="flex items-start gap-3">
+        {!readOnly && (
         <button type="button" onClick={() => onSelect(signal.id)}
           className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-primary"
           aria-label="Select">
@@ -463,6 +469,7 @@ function SignalCard({
             ? <SquareCheck className="h-4 w-4 text-primary" />
             : <Square className="h-4 w-4" />}
         </button>
+        )}
 
         <div className="min-w-0 flex-1 space-y-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -609,7 +616,7 @@ function SignalCard({
           )}
         </div>
 
-        {!isDone && (
+        {!isDone && !readOnly && (
           <div className="flex shrink-0 flex-col gap-1.5">
             <motion.button type="button" whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}
               onClick={() => onDebunk(signal.id)} disabled={isLoading}
@@ -650,11 +657,15 @@ export function NarrativeShieldPanel() {
   const t = useTranslations("modules.narrativeShield");
   const locale = useLocale();
   const bn = locale === "bn";
+  const searchParams = useSearchParams();
+  const { user } = useAuthContext();
+  const localDesk = Boolean(user && isLocalEntityRole(user.role));
+  const qFromUrl = searchParams.get("q")?.trim() ?? "";
 
   const [threatFilter, setThreatFilter] = useState<NarrativeThreatLevel | undefined>(undefined);
   const [catFilter, setCatFilter] = useState<NarrativeCategory | undefined>(undefined);
   const [partyFilter, setPartyFilter] = useState<NarrativeParty | undefined>(undefined);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(qFromUrl);
   const [showDebunked, setShowDebunked] = useState(false);
   const [showCharts, setShowCharts] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -674,11 +685,12 @@ export function NarrativeShieldPanel() {
   const ingesting = !!actions.pending["refresh"];
 
   useEffect(() => {
+    if (localDesk) return;
     if (!loading && !error && data && data.total === 0) {
       void actions.refresh(20).then(() => reload()).catch(() => null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, error, data?.total]);
+  }, [loading, error, data?.total, localDesk]);
 
   const signals = useMemo(() => {
     const all = data?.signals ?? [];
@@ -848,6 +860,7 @@ export function NarrativeShieldPanel() {
               />
             )}
           </div>
+          {!localDesk && (
           <Button size="sm" variant="outline" onClick={handleFetch}
             disabled={ingesting} className="h-9 gap-1.5 text-xs">
             {ingesting
@@ -855,21 +868,26 @@ export function NarrativeShieldPanel() {
               : <Zap className="h-3.5 w-3.5 text-amber-400" />}
             {ingesting ? t("fetching") : t("fetchNow")}
           </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={() => setShowDebunked((v) => !v)}
             className="h-9 gap-1.5 text-xs text-muted-foreground">
             {showDebunked ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             {showDebunked ? t("hideDebunked") : t("showDebunked")}
           </Button>
+          {!localDesk && (
           <Button size="sm" variant="ghost" onClick={handleDedup}
             className="h-9 gap-1.5 text-xs text-muted-foreground">
             <Database className="h-3.5 w-3.5" />
             {t("dedup")}
           </Button>
+          )}
+          {!localDesk && (
           <Button size="sm" variant="ghost" onClick={handleCsv} disabled={csvLoading}
             className="h-9 gap-1.5 text-xs text-muted-foreground">
             {csvLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
             {t("exportCsv")}
           </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={reload}
             className="h-9 gap-1.5 px-2 text-xs text-muted-foreground">
             <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
@@ -920,7 +938,7 @@ export function NarrativeShieldPanel() {
       </div>
 
       <AnimatePresence>
-        {selected.size > 0 && (
+        {selected.size > 0 && !localDesk && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -974,6 +992,7 @@ export function NarrativeShieldPanel() {
 
       {signals.length > 0 && (
         <div className="flex items-center gap-3 border-b border-border/30 pb-2 text-xs text-muted-foreground">
+          {!localDesk && (
           <button type="button" onClick={isAllSelected ? deselectAll : selectAll}
             className="flex items-center gap-1.5 transition-colors hover:text-foreground">
             {isAllSelected
@@ -981,7 +1000,8 @@ export function NarrativeShieldPanel() {
               : <Square className="h-3.5 w-3.5" />}
             {isAllSelected ? t("deselectAll") : t("selectAll")}
           </button>
-          <span className="ml-auto">{t("totalSignals", { total: data?.total ?? signals.length })}</span>
+          )}
+          <span className={cn(!localDesk && "ml-auto")}>{t("totalSignals", { total: data?.total ?? signals.length })}</span>
         </div>
       )}
 
@@ -1006,7 +1026,7 @@ export function NarrativeShieldPanel() {
               {bn ? "Google News থেকে নতুন ফিড আনতে বাটন চাপুন" : "Click below to ingest Google News signals"}
             </p>
           </div>
-          {!search && !threatFilter && !catFilter && !partyFilter && (
+          {!localDesk && !search && !threatFilter && !catFilter && !partyFilter && (
             <Button size="sm" variant="outline" onClick={handleFetch} className="gap-1.5 text-xs">
               <Zap className="h-3.5 w-3.5 text-amber-400" />{t("fetchNow")}
             </Button>
@@ -1028,6 +1048,7 @@ export function NarrativeShieldPanel() {
               bn={bn}
               locale={locale}
               t={t}
+              readOnly={localDesk}
             />
           ))}
         </div>

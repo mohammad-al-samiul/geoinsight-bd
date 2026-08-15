@@ -213,6 +213,7 @@ export class NarrativeShieldService {
         { titleBn: { contains: query.search, mode: "insensitive" } },
         { speakerName: { contains: query.search, mode: "insensitive" } },
         { district: { contains: query.search, mode: "insensitive" } },
+        { body: { contains: query.search, mode: "insensitive" } },
       ];
     }
 

@@ -38,6 +38,7 @@ import {
 } from "@/lib/local-map-layers";
 import type { LocalMapMarker } from "@/components/local-entity/local-ward-map-inner";
 import { cn } from "@/lib/utils";
+import { remainingClock } from "@/lib/live-countdown";
 
 interface ApiOk<T> {
   success: boolean;
@@ -142,6 +143,12 @@ export function LocalOutagePanel() {
   const [wardId, setWardId] = useState("");
   const [etaLocal, setEtaLocal] = useState("");
   const hasDataRef = useRef(false);
+  const [, setNowTick] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick((n) => n + 1), 15_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const load = useCallback(async () => {
     if (!hasDataRef.current) setLoading(true);
@@ -281,6 +288,7 @@ export function LocalOutagePanel() {
   };
 
   const resolve = async (id: string) => {
+    if (!window.confirm(t("resolveConfirm"))) return;
     setBusyId(id);
     try {
       await apiClient(`local-entity/outages/${id}/resolve`, { method: "PATCH" });
@@ -288,6 +296,14 @@ export function LocalOutagePanel() {
     } finally {
       setBusyId(null);
     }
+  };
+
+  const utilityLabel = (k: OutageKind) => {
+    if (k === "POWER") return t("utilityPOWER");
+    if (k === "GAS") return t("utilityGAS");
+    if (k === "FUEL") return t("utilityFUEL");
+    if (k === "WATER") return t("utilityWATER");
+    return null;
   };
 
   return (
@@ -468,10 +484,18 @@ export function LocalOutagePanel() {
             label: t("colKind"),
             render: (row) => {
               const Icon = KIND_ICON[row.kind] ?? Bolt;
+              const utility = utilityLabel(row.kind);
               return (
-                <span className="inline-flex items-center gap-1.5 text-xs">
-                  <Icon className="h-3.5 w-3.5" />
-                  {t(`kind${row.kind}` as "kindPOWER")}
+                <span className="inline-flex flex-col gap-0.5 text-xs">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon className="h-3.5 w-3.5" />
+                    {t(`kind${row.kind}` as "kindPOWER")}
+                  </span>
+                  {utility && (
+                    <span className="rounded-md border border-border/50 bg-secondary/40 px-1.5 py-0.5 text-[9px] text-muted-foreground">
+                      {utility}
+                    </span>
+                  )}
                 </span>
               );
             },
@@ -526,16 +550,23 @@ export function LocalOutagePanel() {
             label: t("colEta"),
             render: (row) => {
               if (!row.etaRestoreAt) return "—";
-              const overdue = new Date(row.etaRestoreAt).getTime() < Date.now() && row.status !== "RESOLVED";
+              const clock = remainingClock(row.etaRestoreAt);
+              const span = `${clock.hours}h ${String(clock.mins).padStart(2, "0")}m`;
+              const overdue = clock.breached && row.status !== "RESOLVED";
               return (
-                <span className={cn("text-xs", overdue && "text-destructive")}>
-                  {new Date(row.etaRestoreAt).toLocaleString(locale, {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hourCycle: "h23",
-                  })}
+                <span className={cn("flex flex-col text-xs tabular-nums", overdue && "text-destructive")}>
+                  <span>
+                    {overdue ? t("etaOverdueLive", { span }) : t("etaLeft", { span })}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(row.etaRestoreAt).toLocaleString(locale, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hourCycle: "h23",
+                    })}
+                  </span>
                 </span>
               );
             },

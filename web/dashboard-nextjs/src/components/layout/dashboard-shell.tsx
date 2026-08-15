@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Sidebar } from "@/components/layout/sidebar";
 import { CommandBar } from "@/components/layout/command-bar";
 import { AnomalyFeedPanel } from "@/components/alerts/anomaly-feed-panel";
@@ -17,8 +19,10 @@ import { NavPulseProvider } from "@/hooks/use-nav-pulse";
 export function DashboardShell({ children }: { children: ReactNode }) {
   const user = useAuth();
   const { isLoading: authLoading } = useAuthContext();
+  const tSec = useTranslations("modules.security");
   const authReady = !authLoading && user.id !== "loading";
   const localRole = authReady && isLocalEntityRole(user.role);
+  const showMfaBanner = authReady && user.mfaRequired && !user.mfaEnabled;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
@@ -76,6 +80,17 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         <div className="app-atmosphere relative flex min-h-0 flex-1 overflow-hidden">
           <DataFlowBackground className="absolute inset-0 z-0" intensity="ambient" />
           <main className="relative z-10 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-7">
+            {showMfaBanner && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+                <p>{tSec("enrollBanner")}</p>
+                <Link
+                  href={localRole ? "/local/security" : "/security"}
+                  className="font-semibold text-primary underline-offset-2 hover:underline"
+                >
+                  {tSec("enrollBannerCta")}
+                </Link>
+              </div>
+            )}
             {children}
           </main>
 

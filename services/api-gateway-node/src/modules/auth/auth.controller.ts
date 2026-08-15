@@ -6,6 +6,7 @@ import {
   LogoutDto,
   MfaDisableDto,
   MfaEnableDto,
+  MfaEnrollDto,
   MfaVerifyDto,
   RefreshDto,
   RegisterDto,
@@ -31,6 +32,11 @@ export class AuthController {
   verifyMfa = asyncHandler(async (req: Request, res: Response) => {
     const { mfaToken, code } = req.body as MfaVerifyDto;
     sendSuccess(res, await this.authService.verifyMfa(mfaToken, code));
+  });
+
+  enrollMfa = asyncHandler(async (req: Request, res: Response) => {
+    const { enrollToken, secret, code } = req.body as MfaEnrollDto;
+    sendSuccess(res, await this.authService.enrollMfa(enrollToken, secret, code));
   });
 
   setupMfa = asyncHandler(async (req: Request, res: Response) => {

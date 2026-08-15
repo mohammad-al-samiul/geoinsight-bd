@@ -815,7 +815,7 @@ model CitizenComplaint {
   lat            Float?
   lng            Float?
   locationLabel  String?           @map("location_label") @db.VarChar(255)
-  /// HTTPS or data-URL for before photo (P1; MinIO keys later)
+  /// minio:key, https, or legacy data-URL — list API returns a proxy path
   beforePhotoUrl String?           @map("before_photo_url") @db.Text
   afterPhotoUrl  String?           @map("after_photo_url") @db.Text
   /// Wave B photo QA: PASS | WARN | FAIL

@@ -25,7 +25,19 @@ export class DashboardModule extends BaseModule {
       container.rbac.requireRoles(UserRole.PMO, UserRole.MINISTER),
       validate(dashboardQuerySchema, "query"),
       asyncHandler(async (req, res) => {
-        const data = await dashboardService.getNationalMetrics(req.query as z.infer<typeof dashboardQuerySchema>);
+        const query = { ...(req.query as z.infer<typeof dashboardQuerySchema>) };
+        const user = req.user;
+        if (
+          user?.role === UserRole.MINISTER &&
+          user.adminUnitId &&
+          !query.divisionId &&
+          !query.districtId &&
+          !query.upazilaId &&
+          !query.unionId
+        ) {
+          query.divisionId = user.adminUnitId;
+        }
+        const data = await dashboardService.getNationalMetrics(query);
         sendSuccess(res, data);
       }),
     );

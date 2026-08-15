@@ -13,6 +13,16 @@ import { publishToGovQueue } from "../../infrastructure/messaging/gov-queue.publ
 import { alertDeliveryService } from "../alert-delivery/alert-delivery.service";
 import { AI_FETCH_LLM_MS, fetchAi } from "../../shared/http/fetch-ai";
 import {
+  getMinioObject,
+  isMinioConfigured,
+  isMinioRef,
+  minioKeyFromRef,
+  parseDataUrl,
+  putComplaintPhoto,
+  toDataUrl,
+  toMinioRef,
+} from "../../infrastructure/minio/minio.client";
+import {
   assertWardBelongsToEntity,
   resolveLocalEntityId,
 } from "./local-entity.scope";
@@ -66,6 +76,50 @@ function normalizePhotoUrl(url: string | undefined, label: string): string | und
     throw ApiError.badRequest(`${label} must be https or data:image URL`);
   }
   return trimmed;
+}
+
+function photoProxyPath(complaintId: string, kind: "before" | "after"): string {
+  return `/local-entity/complaints/${complaintId}/photo/${kind}`;
+}
+
+function presentComplaintPhotos<
+  T extends { id: string; beforePhotoUrl: string | null; afterPhotoUrl: string | null },
+>(row: T): T {
+  return {
+    ...row,
+    beforePhotoUrl: row.beforePhotoUrl ? photoProxyPath(row.id, "before") : null,
+    afterPhotoUrl: row.afterPhotoUrl ? photoProxyPath(row.id, "after") : null,
+  };
+}
+
+async function persistPhoto(
+  raw: string | undefined,
+  entityId: string,
+  kind: "before" | "after",
+  label: string,
+): Promise<string | undefined> {
+  const url = normalizePhotoUrl(raw, label);
+  if (!url) return undefined;
+  if (!url.startsWith("data:image/") || !isMinioConfigured()) return url;
+  try {
+    const key = await putComplaintPhoto(entityId, kind, url);
+    return toMinioRef(key);
+  } catch (err) {
+    console.error("[minio] complaint photo put failed; storing inline fallback", err);
+    return url;
+  }
+}
+
+async function materializeForAi(stored: string | null): Promise<string | null> {
+  if (!stored) return null;
+  if (stored.startsWith("data:image/") || stored.startsWith("http")) return stored;
+  if (!isMinioRef(stored) || !isMinioConfigured()) return stored;
+  try {
+    const obj = await getMinioObject(minioKeyFromRef(stored));
+    return toDataUrl(obj.contentType, obj.body);
+  } catch {
+    return null;
+  }
 }
 
 function withOperationalStatus<
@@ -139,7 +193,7 @@ export class ComplaintService {
       },
     });
 
-    const mapped = rows.map(withOperationalStatus);
+    const mapped = rows.map((row) => presentComplaintPhotos(withOperationalStatus(row)));
 
     const [open, inProgress, resolved, overdue, redAlerts] = await Promise.all([
       prismaRead.citizenComplaint.count({
@@ -216,9 +270,46 @@ export class ComplaintService {
     });
 
     return {
-      complaint: withOperationalStatus(existing),
+      complaint: presentComplaintPhotos(withOperationalStatus(existing)),
       events,
     };
+  }
+
+  async getPhotoBytes(
+    user: { role: UserRole; adminUnitId: string | null },
+    complaintId: string,
+    kind: "before" | "after",
+  ): Promise<{ body: Buffer; contentType: string }> {
+    const existing = await prismaRead.citizenComplaint.findUnique({
+      where: { id: complaintId },
+      select: { entityId: true, beforePhotoUrl: true, afterPhotoUrl: true },
+    });
+    if (!existing) throw ApiError.notFound("Complaint not found");
+    await resolveLocalEntityId(user, existing.entityId);
+
+    const stored = kind === "before" ? existing.beforePhotoUrl : existing.afterPhotoUrl;
+    if (!stored) throw ApiError.notFound("Photo not found");
+
+    if (isMinioRef(stored)) {
+      try {
+        return await getMinioObject(minioKeyFromRef(stored));
+      } catch {
+        throw ApiError.notFound("Photo object missing");
+      }
+    }
+
+    const data = parseDataUrl(stored);
+    if (data) return data;
+
+    if (stored.startsWith("http://") || stored.startsWith("https://")) {
+      const res = await fetch(stored);
+      if (!res.ok) throw ApiError.notFound("Photo fetch failed");
+      const body = Buffer.from(await res.arrayBuffer());
+      const contentType = res.headers.get("content-type") || "image/jpeg";
+      return { body, contentType };
+    }
+
+    throw ApiError.notFound("Photo not found");
   }
 
   async create(
@@ -239,7 +330,12 @@ export class ComplaintService {
         ? Math.max(6, Math.min(72, Math.round(input.slaHours)))
         : SLA_HOURS;
     const slaDeadline = new Date(Date.now() + slaHours * 60 * 60 * 1000);
-    const beforePhotoUrl = normalizePhotoUrl(input.beforePhotoUrl, "beforePhotoUrl");
+    const beforePhotoUrl = await persistPhoto(
+      input.beforePhotoUrl,
+      entityId,
+      "before",
+      "beforePhotoUrl",
+    );
 
     if (input.assigneeId) {
       const assignee = await prismaRead.user.findUnique({ where: { id: input.assigneeId } });
@@ -319,7 +415,7 @@ export class ComplaintService {
         .catch(() => undefined);
     }
 
-    return withOperationalStatus(row);
+    return presentComplaintPhotos(withOperationalStatus(row));
   }
 
   async assign(
@@ -360,7 +456,7 @@ export class ComplaintService {
       actorUserId: user.id,
     });
 
-    return withOperationalStatus(row);
+    return presentComplaintPhotos(withOperationalStatus(row));
   }
 
   async addNote(
@@ -421,7 +517,7 @@ export class ComplaintService {
       actorUserId: user.id ?? null,
     });
 
-    return withOperationalStatus(row);
+    return presentComplaintPhotos(withOperationalStatus(row));
   }
 
   async resolve(
@@ -439,8 +535,18 @@ export class ComplaintService {
       throw ApiError.badRequest("Complaint already resolved");
     }
 
-    const afterPhotoUrl = normalizePhotoUrl(input.afterPhotoUrl, "afterPhotoUrl");
+    const afterPhotoUrl = await persistPhoto(
+      input.afterPhotoUrl,
+      existing.entityId,
+      "after",
+      "afterPhotoUrl",
+    );
     if (!afterPhotoUrl) throw ApiError.badRequest("afterPhotoUrl required to close SLA");
+
+    const beforeForQa = await materializeForAi(existing.beforePhotoUrl);
+    const afterForQa =
+      (await materializeForAi(afterPhotoUrl)) ??
+      (input.afterPhotoUrl?.startsWith("data:image/") ? input.afterPhotoUrl : afterPhotoUrl);
 
     let photoQaStatus: string | null = null;
     let photoQaScore: number | null = null;
@@ -454,8 +560,8 @@ export class ComplaintService {
           body: JSON.stringify({
             title: existing.title,
             description: existing.description,
-            before_photo_url: existing.beforePhotoUrl,
-            after_photo_url: afterPhotoUrl,
+            before_photo_url: beforeForQa,
+            after_photo_url: afterForQa,
             resolution_note: input.resolutionNote ?? null,
           }),
         },
@@ -508,7 +614,7 @@ export class ComplaintService {
       actorUserId: user.id,
     });
 
-    return withOperationalStatus(row);
+    return presentComplaintPhotos(withOperationalStatus(row));
   }
 
   async triageSuggest(input: {

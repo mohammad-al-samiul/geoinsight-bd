@@ -75,6 +75,9 @@ export type NationalSectorEvidence = {
 export type NationalSectorBoard = {
   generatedAt: string;
   sourceNote: string;
+  provenance?: "SEED" | "LIVE" | "SYNTHETIC";
+  csvDistricts?: number;
+  seedDistricts?: number;
   summary: {
     districts: number;
     divisions: number;

@@ -58,6 +58,7 @@ export function useStrategicOutlook() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [usingMock, setUsingMock] = useState(false);
   const hasDataRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -69,9 +70,10 @@ export function useStrategicOutlook() {
         `outlook/strategic?lang=${lang}`,
       );
       setData(json.data);
+      setUsingMock(false);
       hasDataRef.current = true;
     } catch (err) {
-      // If backend is not available in local dev, provide a mock preview so UI can be inspected.
+      // Dev-only layout preview when the API is down — must stay labelled MOCK.
       if (process.env.NODE_ENV === "development") {
         const mock: StrategicOutlook = {
           challenges: [
@@ -96,8 +98,11 @@ export function useStrategicOutlook() {
           ],
         };
         setData(mock);
+        setUsingMock(true);
+        hasDataRef.current = true;
       } else {
         setData(null);
+        setUsingMock(false);
         setError(err instanceof Error ? err.message : "Outlook unavailable");
       }
     } finally {
@@ -123,5 +128,5 @@ export function useStrategicOutlook() {
 
   useRealtimeRefresh(load, true, true);
 
-  return { data, loading, error, reload: load, refresh, refreshing };
+  return { data, loading, error, usingMock, reload: load, refresh, refreshing };
 }

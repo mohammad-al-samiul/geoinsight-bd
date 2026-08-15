@@ -2,6 +2,7 @@ import { Router } from "express";
 import { BaseModule } from "../../core/module/app-module.interface";
 import {
   getLiveness,
+  getPlatformFeatures,
   getReadiness,
   readinessHttpStatus,
 } from "./health.service";
@@ -16,6 +17,10 @@ export class HealthModule extends BaseModule {
         success: report.status !== "unhealthy",
         ...report,
       });
+    });
+
+    router.get("/health/features", async (_req, res) => {
+      res.json({ success: true, data: getPlatformFeatures() });
     });
 
     router.get("/health/live", async (_req, res) => {

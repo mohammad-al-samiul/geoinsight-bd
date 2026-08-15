@@ -14,6 +14,7 @@ import { apiClient } from "@/lib/api-client";
 import type { AnomalyAlert, BlockchainVerificationStatus } from "@/types/alerts";
 import { cn } from "@/lib/utils";
 import { SourceLink } from "@/components/ui/source-link";
+import { usePlatformFeatures } from "@/hooks/use-platform-features";
 import {
   CheckCircle2,
   Clock,
@@ -66,6 +67,7 @@ export function AlertDetailModal({
   const [copied, setCopied] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
+  const { fabricEnabled } = usePlatformFeatures();
 
   if (!alert) return null;
 
@@ -133,6 +135,7 @@ export function AlertDetailModal({
             )}
           </div>
 
+          {(alert.live || fabricEnabled) && (
           <div className="rounded-lg border border-border/60 p-4">
             {alert.live ? (
               <>
@@ -218,6 +221,7 @@ export function AlertDetailModal({
               </>
             )}
           </div>
+          )}
 
           {resolveError && (
             <p className="text-sm text-destructive">{resolveError}</p>

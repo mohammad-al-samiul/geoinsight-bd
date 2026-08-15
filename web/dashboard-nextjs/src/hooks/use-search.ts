@@ -15,15 +15,18 @@ export function useGlobalSearch() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const search = useCallback(async (q: string) => {
     const trimmed = q.trim();
     if (trimmed.length < 2) {
       setResults([]);
+      setFailed(false);
       return;
     }
     setLoading(true);
+    setFailed(false);
     try {
       const json = await apiClient<{
         success: boolean;
@@ -32,6 +35,7 @@ export function useGlobalSearch() {
       setResults(json.data?.results ?? []);
     } catch {
       setResults([]);
+      setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -41,6 +45,7 @@ export function useGlobalSearch() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (query.trim().length < 2) {
       setResults([]);
+      setFailed(false);
       setLoading(false);
       return;
     }
@@ -52,5 +57,5 @@ export function useGlobalSearch() {
     };
   }, [query, search]);
 
-  return { query, setQuery, results, loading, clear: () => setQuery("") };
+  return { query, setQuery, results, loading, failed, clear: () => setQuery("") };
 }

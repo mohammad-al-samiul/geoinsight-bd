@@ -1,9 +1,9 @@
 /**
- * Static specialty catalog for the 5 local DSS entities.
+ * Static specialty catalog for Local DSS seats.
  * Admin units + users live in DB; niche modules are config-driven.
  */
 
-export type LocalEntityCode = "CTG-8" | "CTG-9" | "CTG-10" | "CCC" | "COCC";
+export type LocalEntityCode = "CTG-8" | "CTG-9" | "CTG-10" | "CTG-11" | "CCC" | "COCC";
 
 export interface LocalSpecialtyModule {
   id: string;
@@ -161,6 +161,34 @@ export const LOCAL_ENTITY_CATALOG: Record<LocalEntityCode, LocalEntityDefinition
         titleEn: "Railway colony & labour social services",
         titleBn: "রেলওয়ে কলোনি ও শ্রমিক সামাজিক সেবা",
         status: "active",
+      },
+    ],
+  },
+  "CTG-11": {
+    code: "CTG-11",
+    unitCode: "CTG-11",
+    role: "MP",
+    nameEn: "Chattogram-11",
+    nameBn: "চট্টগ্রাম-১১",
+    subtitleEn: "Patiya · Anowara · Chandanaish — empty desk",
+    subtitleBn: "পটিয়া · আনোয়ারা · চন্দনাইশ — খালি ডেস্ক",
+    focusAreasEn: ["Patiya", "Anowara", "Chandanaish"],
+    focusAreasBn: ["পটিয়া", "আনোয়ারা", "চন্দনাইশ"],
+    osintKeywords: [
+      "পটিয়া",
+      "patiya",
+      "আনোয়ারা",
+      "anowara",
+      "anwara",
+      "চন্দনাইশ",
+      "chandanaish",
+    ],
+    specialtyModules: [
+      {
+        id: "patiya-onboard",
+        titleEn: "Seat onboarded — specialty pack not filled yet",
+        titleBn: "আসন যুক্ত — স্পেশালিটি প্যাক এখনও খালি",
+        status: "planned",
       },
     ],
   },

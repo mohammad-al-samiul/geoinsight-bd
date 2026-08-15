@@ -55,7 +55,13 @@ export class NarrativeShieldModule extends BaseModule {
     router.get(
       "/narrative-shield/feed",
       authenticate(),
-      container.rbac.requireRoles(UserRole.PMO, UserRole.MINISTER, UserRole.DC),
+      container.rbac.requireRoles(
+        UserRole.PMO,
+        UserRole.MINISTER,
+        UserRole.DC,
+        UserRole.MP,
+        UserRole.MAYOR,
+      ),
       validate(feedQuerySchema, "query"),
       asyncHandler(async (req, res) => {
         const q = req.query as z.infer<typeof feedQuerySchema>;
@@ -68,7 +74,13 @@ export class NarrativeShieldModule extends BaseModule {
     router.get(
       "/narrative-shield/stats",
       authenticate(),
-      container.rbac.requireRoles(UserRole.PMO, UserRole.MINISTER, UserRole.DC),
+      container.rbac.requireRoles(
+        UserRole.PMO,
+        UserRole.MINISTER,
+        UserRole.DC,
+        UserRole.MP,
+        UserRole.MAYOR,
+      ),
       asyncHandler(async (_req, res) => {
         const data = await narrativeShieldService.getStats();
         sendSuccess(res, data);

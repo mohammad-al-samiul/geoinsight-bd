@@ -1,4 +1,5 @@
 import {
+  AdminUnitType,
   AlertDeliveryStatus,
   ComplaintStatus,
   IntelSnapshotKind,
@@ -19,6 +20,12 @@ import { prismaRead } from "../../core/database/prisma.client";
 import { ApiError } from "../../core/errors/api.error";
 import { isLocalEntityRole } from "../../core/constants/rbac";
 import { getRedisClient, isRedisEnabled } from "../../infrastructure/redis/redis.client";
+import {
+  adminUnitScopeWhere,
+  agroMarketUnitScopeWhere,
+  projectUnitScopeWhere,
+  representativeUnitScopeWhere,
+} from "../../shared/scope/admin-unit-filter";
 import { LOCAL_ENTITY_CODES } from "../local-entity/local-entity.catalog";
 
 const TTL_SEC = 20;
@@ -135,8 +142,29 @@ export class DeskService {
     };
   }
 
+  private async geoNames(unitId: string): Promise<{ division?: string; district?: string }> {
+    const unit = await prismaRead.adminUnit.findUnique({
+      where: { id: unitId },
+      select: {
+        name: true,
+        type: true,
+        parent: { select: { name: true, type: true } },
+      },
+    });
+    if (!unit) return {};
+    if (unit.type === AdminUnitType.DIVISION) return { division: unit.name };
+    if (unit.type === AdminUnitType.DISTRICT) {
+      return { district: unit.name, division: unit.parent?.name };
+    }
+    return { district: unit.parent?.name, division: unit.parent?.name };
+  }
+
   private async nationalPulse(user: UserScope): Promise<NavPulse> {
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const unitId = user.role === UserRole.PMO ? null : user.adminUnitId;
+    const unitScope = unitId ? adminUnitScopeWhere(unitId) : undefined;
+    const names = unitId ? await this.geoNames(unitId) : {};
+
     const [
       pipeline,
       openAlerts,
@@ -153,14 +181,33 @@ export class DeskService {
       localSeatIds,
     ] = await Promise.all([
       this.pipelineMeta(),
-      prismaRead.redFlagAlert.count({ where: { resolvedAt: null } }),
-      prismaRead.project.count({ where: { status: ProjectStatus.STALLED } }),
+      prismaRead.redFlagAlert.count({
+        where: {
+          resolvedAt: null,
+          ...(unitId && { project: projectUnitScopeWhere(unitId) }),
+        },
+      }),
+      prismaRead.project.count({
+        where: {
+          status: ProjectStatus.STALLED,
+          ...(unitId && projectUnitScopeWhere(unitId)),
+        },
+      }),
       prismaRead.nationalSectorSnapshot.groupBy({
         by: ["sector"],
-        where: { status: LocalSiteStatus.ALERT },
+        where: {
+          status: LocalSiteStatus.ALERT,
+          ...(unitScope && { adminUnit: unitScope }),
+        },
         _count: { id: true },
       }),
-      prismaRead.disasterAlert.count({ where: { isActive: true, severity: { gte: 3 } } }),
+      prismaRead.disasterAlert.count({
+        where: {
+          isActive: true,
+          severity: { gte: 3 },
+          ...(names.division && { division: names.division }),
+        },
+      }),
       prismaRead.narrativeSignal.count({
         where: {
           status: NarrativeSignalStatus.ACTIVE,
@@ -168,21 +215,40 @@ export class DeskService {
         },
       }),
       prismaRead.weatherObservation.count({
-        where: { recordedAt: { gte: since24h }, OR: [{ floodRisk: { gte: 60 } }, { cycloneRisk: { gte: 60 } }] },
+        where: {
+          recordedAt: { gte: since24h },
+          OR: [{ floodRisk: { gte: 60 } }, { cycloneRisk: { gte: 60 } }],
+          ...(names.district
+            ? { district: names.district }
+            : names.division
+              ? { division: names.division }
+              : {}),
+        },
       }),
-      prismaRead.kpiRecord.count({ where: { recordedAt: { gte: since24h } } }),
-      prismaRead.agroMarket.count(),
-      prismaRead.representative.count(),
+      prismaRead.kpiRecord.count({
+        where: {
+          recordedAt: { gte: since24h },
+          ...(unitScope && { representative: { adminUnit: unitScope } }),
+        },
+      }),
+      prismaRead.agroMarket.count({
+        where: unitId ? agroMarketUnitScopeWhere(unitId) : {},
+      }),
+      prismaRead.representative.count({
+        where: unitId ? representativeUnitScopeWhere(unitId) : {},
+      }),
       prismaRead.auditLog.count({ where: { createdAt: { gte: since24h } } }),
       prismaRead.intelAnalysisSnapshot.findFirst({
         where: { kind: IntelSnapshotKind.BRIEFING },
         orderBy: { generatedAt: "desc" },
         select: { generatedAt: true },
       }),
-      prismaRead.adminUnit.findMany({
-        where: { code: { in: [...LOCAL_ENTITY_CODES] } },
-        select: { id: true },
-      }),
+      user.role === UserRole.PMO
+        ? prismaRead.adminUnit.findMany({
+            where: { code: { in: [...LOCAL_ENTITY_CODES] } },
+            select: { id: true },
+          })
+        : Promise.resolve([] as Array<{ id: string }>),
     ]);
 
     const edu = sectorGroups.find((g) => g.sector === LocalSector.EDUCATION)?._count.id ?? 0;
@@ -213,7 +279,7 @@ export class DeskService {
     }
 
     const items: NavPulseItem[] = [
-      item("nationalOverview", "/", openAlerts, 8, 1, `${openAlerts} open national alerts`, `${openAlerts}টি খোলা জাতীয় সতর্কতা`),
+      item("nationalOverview", "/", openAlerts, 20, 5, `${openAlerts} open national alerts`, `${openAlerts}টি খোলা জাতীয় সতর্কতা`),
       liveItem(
         "briefing",
         "/briefing",
@@ -221,43 +287,43 @@ export class DeskService {
         "Morning briefing snapshot ready",
         "সকালের ব্রিফিং প্রস্তুত",
       ),
-      item("narrativeShield", "/narrative-shield", narrativeHot, 5, 1, `${narrativeHot} high-threat narratives`, `${narrativeHot}টি উচ্চ হুমকির বয়ান`),
+      item("narrativeShield", "/narrative-shield", narrativeHot, 10, 3, `${narrativeHot} high-threat narratives`, `${narrativeHot}টি উচ্চ হুমকির বয়ান`),
       liveItem("outlook", "/outlook", 1, "Strategic outlook on pipeline", "কৌশলগত আউটলুক পাইপলাইনে"),
-      item("unrest", "/unrest", openAlerts, 10, 2, `${openAlerts} unresolved pressure flags`, `${openAlerts}টি অমীমাংসিত চাপ`),
-      item("divisionalCrisis", "/divisional-crisis", disasters + weatherHot, 3, 1, `${disasters + weatherHot} hazard/crisis signals`, `${disasters + weatherHot}টি দুর্যোগ/সংকট সংকেত`),
+      item("unrest", "/unrest", openAlerts, 20, 5, `${openAlerts} unresolved pressure flags`, `${openAlerts}টি অমীমাংসিত চাপ`),
+      item("divisionalCrisis", "/divisional-crisis", disasters + weatherHot, 8, 3, `${disasters + weatherHot} hazard/crisis signals`, `${disasters + weatherHot}টি দুর্যোগ/সংকট সংকেত`),
       item(
         "nationalSectors",
         "/sectors",
         sectorAlerts,
+        24,
         8,
-        1,
         `Education ${edu} · health ${health} · jobs ${jobs} district alerts`,
         `শিক্ষা ${edu} · স্বাস্থ্য ${health} · কর্মসংস্থান ${jobs} জেলা সতর্কতা`,
       ),
       liveItem("antiPhishing", "/anti-phishing", 1, "Official-domain catalogue live", "সরকারি ডোমেইন তালিকা চালু"),
-      item("hazards", "/hazards", disasters + weatherHot, 3, 1, `${disasters} active disaster alerts`, `${disasters}টি সক্রিয় দুর্যোগ সতর্কতা`),
+      item("hazards", "/hazards", disasters + weatherHot, 8, 3, `${disasters} active disaster alerts`, `${disasters}টি সক্রিয় দুর্যোগ সতর্কতা`),
       liveItem("agro", "/agro", agroRows, `${agroRows} market rows`, `${agroRows}টি বাজার সারি`),
       liveItem("procurement", "/procurement", stalledProjects, `${stalledProjects} stalled projects`, `${stalledProjects}টি স্থবির প্রকল্প`),
       liveItem("kpis", "/kpis", kpiFresh, `${kpiFresh} KPI points in 24h`, `২৪ ঘণ্টায় ${kpiFresh}টি কেপিআই`),
-      item("projects", "/projects", stalledProjects, 4, 1, `${stalledProjects} stalled projects`, `${stalledProjects}টি স্থবির প্রকল্প`),
-      item("alerts", "/alerts", openAlerts, 8, 1, `${openAlerts} open alerts`, `${openAlerts}টি খোলা সতর্কতা`),
+      item("projects", "/projects", stalledProjects, 8, 3, `${stalledProjects} stalled projects`, `${stalledProjects}টি স্থবির প্রকল্প`),
+      item("alerts", "/alerts", openAlerts, 20, 5, `${openAlerts} open alerts`, `${openAlerts}টি খোলা সতর্কতা`),
       liveItem("documents", "/documents", 1, "Document desk ready", "নথি ডেস্ক প্রস্তুত"),
       liveItem("auditTrail", "/audit-trail", auditRecent, `${auditRecent} audit events in 24h`, `২৪ ঘণ্টায় ${auditRecent}টি অডিট`),
-      item("notifications", "/notifications", openAlerts, 8, 1, `${openAlerts} unread-capable alerts`, `${openAlerts}টি সতর্কতা`),
+      item("notifications", "/notifications", openAlerts, 20, 5, `${openAlerts} unread-capable alerts`, `${openAlerts}টি সতর্কতা`),
       liveItem("representatives", "/representatives", reps, `${reps} representatives`, `${reps} জন প্রতিনিধি`),
       liveItem("faceIntel", "/face-intel", 1, "Gallery endpoint live", "গ্যালারি এন্ডপয়েন্ট চালু"),
-      item("localEntity", "/local", localAlertSites, 6, 1, `${localAlertSites} Local DSS site alerts`, `${localAlertSites}টি লোকাল ডিএসএস সাইট সতর্কতা`),
+      item("localEntity", "/local", localAlertSites, 12, 4, `${localAlertSites} Local DSS site alerts`, `${localAlertSites}টি লোকাল ডিএসএস সাইট সতর্কতা`),
     ];
 
-    if (user.role !== UserRole.PMO && user.role !== UserRole.MINISTER) {
-      const hide = new Set(["nationalSectors", "localEntity", "faceIntel", "divisionalCrisis"]);
-      return {
-        generatedAt: new Date().toISOString(),
-        role: user.role,
-        ...pipeline,
-        dueActions,
-        items: items.filter((row) => !hide.has(row.key)),
-      };
+    const hide = new Set<string>();
+    if (user.role === UserRole.MINISTER) {
+      hide.add("localEntity");
+      hide.add("faceIntel");
+    } else if (user.role !== UserRole.PMO) {
+      hide.add("nationalSectors");
+      hide.add("localEntity");
+      hide.add("faceIntel");
+      hide.add("divisionalCrisis");
     }
 
     return {
@@ -265,7 +331,7 @@ export class DeskService {
       role: user.role,
       ...pipeline,
       dueActions,
-      items,
+      items: hide.size ? items.filter((row) => !hide.has(row.key)) : items,
     };
   }
 

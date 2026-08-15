@@ -54,6 +54,8 @@ const NATIONAL_PAGES: SearchResult[] = [
   { type: "page", id: "face-intel", title: "Face Intel / Ethical Card", href: "/face-intel" },
   { type: "page", id: "agro", title: "Agri Markets", href: "/agro" },
   { type: "page", id: "reps", title: "Representatives", href: "/representatives" },
+  { type: "page", id: "tools", title: "PMO tools", href: "/tools" },
+  { type: "page", id: "ops", title: "Must-have ops", href: "/ops" },
   { type: "page", id: "local-entity", title: "Local Entity DSS", href: "/local" },
 ];
 

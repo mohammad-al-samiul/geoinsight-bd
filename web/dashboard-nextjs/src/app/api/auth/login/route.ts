@@ -13,7 +13,11 @@ interface GatewayAuthResponse {
   success: boolean;
   data: {
     requiresMfa?: boolean;
+    requiresMfaEnrollment?: boolean;
     mfaToken?: string;
+    enrollToken?: string;
+    secret?: string;
+    otpauthUrl?: string;
     accessToken?: string;
     refreshToken?: string;
     user: {
@@ -67,6 +71,19 @@ export async function POST(request: NextRequest) {
         data: {
           requiresMfa: true,
           mfaToken: json.data.mfaToken,
+          user: json.data.user,
+        },
+      });
+    }
+
+    if (json.data.requiresMfaEnrollment && json.data.enrollToken) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          requiresMfaEnrollment: true,
+          enrollToken: json.data.enrollToken,
+          secret: json.data.secret,
+          otpauthUrl: json.data.otpauthUrl,
           user: json.data.user,
         },
       });

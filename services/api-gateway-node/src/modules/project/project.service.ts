@@ -106,7 +106,8 @@ export class ProjectService {
         status: r.status,
         contractorNid: r.contractorNid,
         startDate: r.startDate,
-        blockchainTx: r.blockchainTx,
+        blockchainTx: env.FABRIC_ENABLED ? r.blockchainTx : null,
+        provenance: "SEED" as const,
         adminUnitId: r.adminUnitId,
         adminUnit: r.adminUnit,
         progressPct: progressPct(allocated, spent, r.status),
@@ -184,6 +185,8 @@ export class ProjectService {
 
     return {
       ...project,
+      blockchainTx: env.FABRIC_ENABLED ? project.blockchainTx : null,
+      provenance: "SEED" as const,
       budgetAllocated: allocated,
       budgetSpent: spent,
       progressPct: progressPct(allocated, spent, project.status),
