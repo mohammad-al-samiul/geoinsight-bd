@@ -7,13 +7,20 @@ import { motion } from "framer-motion";
 import {
   Boxes,
   Building2,
+  Briefcase,
+  GraduationCap,
   Gauge,
+  HeartPulse,
   KeyRound,
+  Landmark,
   LayoutGrid,
+  Layers3,
   MapPinned,
   MessageSquare,
   Newspaper,
   Radio,
+  School,
+  ShieldAlert,
   Siren,
   Sparkles,
   Zap,
@@ -34,6 +41,8 @@ import {
 import { LocalWardMap } from "@/components/local-entity/local-ward-map";
 import { LocalMorningBriefPanel } from "@/components/local-entity/local-morning-brief";
 import { LocalFreshnessBadge } from "@/components/local-entity/local-freshness-badge";
+import { PmoLocalSectorLeagueSnippets } from "@/components/dashboard/pmo-local-sector-league";
+import { PmoLocalCommandSnippets } from "@/components/dashboard/pmo-local-command-strip";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocalComplaints, useLocalWpi } from "@/hooks/use-local-dss";
 import {
@@ -133,6 +142,7 @@ export function LocalEntityPanel() {
       { name: "P2", value: phaseNum >= 2 ? 70 : 30 },
       { name: "P3", value: phaseNum >= 3 ? 85 : 40 },
       { name: "P4", value: phaseNum >= 4 ? 96 : 50 },
+      { name: "P5", value: phaseNum >= 5 ? 100 : 60 },
     ];
   }, [data?.phase]);
 
@@ -147,6 +157,13 @@ export function LocalEntityPanel() {
         hint: tv("navSla"),
         icon: Siren,
         weight: isMayorHome ? 100 : 95,
+      },
+      {
+        href: withLocalEntityHref("/local/command", entityKey),
+        label: t("openCommand"),
+        hint: tv("navCommand"),
+        icon: Layers3,
+        weight: isMayorHome ? 94 : 88,
       },
       {
         href: withLocalEntityHref("/local/outage", entityKey),
@@ -168,6 +185,48 @@ export function LocalEntityPanel() {
         hint: tv("navPulse"),
         icon: Radio,
         weight: isMayorHome ? 50 : 90,
+      },
+      {
+        href: withLocalEntityHref("/local/evidence", entityKey),
+        label: t("openEvidence"),
+        hint: tv("navEvidence"),
+        icon: GraduationCap,
+        weight: isMayorHome ? 78 : 72,
+      },
+      {
+        href: withLocalEntityHref("/local/education", entityKey),
+        label: t("openEducation"),
+        hint: tv("navEducation"),
+        icon: School,
+        weight: isMayorHome ? 84 : 58,
+      },
+      {
+        href: withLocalEntityHref("/local/health", entityKey),
+        label: t("openHealth"),
+        hint: tv("navHealth"),
+        icon: HeartPulse,
+        weight: isMayorHome ? 86 : 56,
+      },
+      {
+        href: withLocalEntityHref("/local/jobs", entityKey),
+        label: t("openJobs"),
+        hint: tv("navJobs"),
+        icon: Briefcase,
+        weight: isMayorHome ? 82 : 54,
+      },
+      {
+        href: withLocalEntityHref("/local/crime", entityKey),
+        label: t("openCrime"),
+        hint: tv("navCrime"),
+        icon: ShieldAlert,
+        weight: isMayorHome ? 90 : 68,
+      },
+      {
+        href: withLocalEntityHref("/local/corruption", entityKey),
+        label: t("openCorruption"),
+        hint: tv("navCorruption"),
+        icon: Landmark,
+        weight: isMayorHome ? 88 : 66,
       },
       {
         href: withLocalEntityHref("/local/osint", entityKey),
@@ -347,6 +406,12 @@ export function LocalEntityPanel() {
                 </Link>
               );
             })}
+          </div>
+          <div className="mt-3">
+            <PmoLocalSectorLeagueSnippets framed={false} />
+          </div>
+          <div className="mt-3">
+            <PmoLocalCommandSnippets framed={false} />
           </div>
         </MotionSection>
       )}

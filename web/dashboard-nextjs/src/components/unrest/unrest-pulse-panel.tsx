@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { AppSelect } from "@/components/ui/app-select";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useUnrestPulse, type ProtestMovement } from "@/hooks/use-unrest-pulse";
+import { PmoLocalUnrestHits } from "@/components/unrest/pmo-local-unrest-hits";
 import { IntelCard } from "@/components/ui/intel-card";
 import { FloatCard } from "@/components/ui/module-motion";
 import { SourceLink } from "@/components/ui/source-link";
@@ -546,6 +547,7 @@ export function UnrestPulsePanel() {
         )
       }
     >
+      <PmoLocalUnrestHits />
       {data && (
         <div className="space-y-8">
           {/* Toolbar */}

@@ -31,6 +31,7 @@ interface LocalWardMapProps {
   className?: string;
   heightClassName?: string;
   title?: string;
+  metricLabel?: string;
 }
 
 export function LocalWardMap({
@@ -41,6 +42,7 @@ export function LocalWardMap({
   className,
   heightClassName = "min-h-[320px] h-[360px]",
   title,
+  metricLabel,
 }: LocalWardMapProps) {
   const t = useTranslations("modules.localViz");
   const locale = useLocale();
@@ -108,7 +110,7 @@ export function LocalWardMap({
             entityCode={entityCode}
             geo={geo}
             markers={markers}
-            metricLabel={t("wpiScore")}
+            metricLabel={metricLabel ?? t("wpiScore")}
             isBn={isBn}
           />
         )}

@@ -5,6 +5,7 @@ import { LOCAL_ENTITY_CODES, catalogByUnitCode } from "./local-entity.catalog";
 import { resolveLocalEntityId } from "./local-entity.scope";
 import { wpiService } from "./wpi.service";
 import { complaintService } from "./complaint.service";
+import { commandRoomService } from "./command-room.service";
 
 export class LocalScorecardService {
   async getScorecard(
@@ -37,9 +38,17 @@ export class LocalScorecardService {
             open: complaints?.summary.open ?? 0,
             overdue: complaints?.summary.overdue ?? 0,
             redAlerts: complaints?.summary.redAlerts ?? 0,
+            commandAverage: 0,
+            warningWards: 0,
           };
         }),
       );
+      const commandMap = await commandRoomService.nationalRollup(units.map((u) => u.id));
+      for (const row of rows) {
+        const cmd = commandMap.get(row.id);
+        row.commandAverage = cmd?.commandAverage ?? 0;
+        row.warningWards = cmd?.warningWards ?? 0;
+      }
       const sorted = rows.sort((a, b) => b.wpiAverage - a.wpiAverage);
       const aiComment = await this.polishComment({
         mode: "entities",

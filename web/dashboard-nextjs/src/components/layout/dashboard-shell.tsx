@@ -12,6 +12,7 @@ import { loadAdminHierarchy } from "@/lib/admin-hierarchy";
 import { fetchSocketToken } from "@/lib/socket-token";
 import { useAuth, useAuthContext } from "@/hooks/use-auth";
 import { isLocalEntityRole } from "@/types";
+import { NavPulseProvider } from "@/hooks/use-nav-pulse";
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const user = useAuth();
@@ -44,6 +45,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }, [authReady, localRole]);
 
   return (
+    <NavPulseProvider>
     <div className="flex h-[100dvh] overflow-hidden bg-background">
       <div className="hidden lg:flex">
         <Sidebar
@@ -124,5 +126,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         </div>
       </div>
     </div>
+    </NavPulseProvider>
   );
 }

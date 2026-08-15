@@ -11,7 +11,7 @@ FastAPI service for GeoInsight BD — Bangla NLP, Ollama LLM, commodity arbitrag
 | Concern | Detail |
 |---------|--------|
 | NLP | Bangla-BERT sentiment; narrative classify / fact-check |
-| LLM | Ollama client (`OLLAMA_URL`) for briefing, outlook, sovereign chat, debunk |
+| LLM | Ollama client (`OLLAMA_URL`) for briefing, outlook, sovereign chat, debunk, **local DSS** |
 | GIS / CV | Shapely proximity; OpenCV face intel; phishing HTML fingerprints |
 | Markets | Commodity scrape + Redis cache + Timescale-friendly payloads |
 | Feeds | RSS / Google News ingestion; Open-Meteo + GDACS weather |
@@ -58,6 +58,7 @@ OpenAPI: `http://localhost:8000/docs`
 | `predictive` / `risk` / `accountability` | Scoring helpers |
 | `documents` / `hazards` / `twin` / `simulator` / `citizen` | Domain DSS |
 | `phishing` / `proximity` / `face_intel` | Cyber / geo-fence / VIP CV |
+| `local_ai` | Morning brief, complaint triage, WPI explain, photo QA, citizen-assist |
 | `health` | Liveness |
 
 Routers wired in `app/api/router.py`.

@@ -15,7 +15,14 @@ export type ComplaintCategory =
   | "TRAFFIC"
   | "HILL_CUTTING"
   | "HERITAGE"
+  | "UTILITIES"
+  | "CRIME"
+  | "CORRUPTION"
+  | "EDUCATION"
+  | "HEALTH"
+  | "UNEMPLOYMENT"
   | "OTHER";
+export type SignalSource = "OFFICIAL" | "CITIZEN" | "NEWS" | "ACADEMIC";
 
 export interface CitizenComplaint {
   id: string;
@@ -23,6 +30,7 @@ export interface CitizenComplaint {
   titleBn: string | null;
   description: string | null;
   category: ComplaintCategory;
+  source?: SignalSource;
   severity: ComplaintSeverity;
   status: ComplaintStatus;
   operationalStatus: ComplaintOperationalStatus;
@@ -84,17 +92,26 @@ export interface MorningBriefResponse {
     wpiAverage: number;
     bottomWard: { id: string; name: string; score: number } | null;
     activeOutages?: number;
+    activeUnrest?: number;
+    unrestTrend?: "rising" | "stable" | "falling";
+    evidenceHits?: number;
   };
   bullets: Array<{ en: string; bn: string; tone: "danger" | "warn" | "ok" | "info" }>;
   actionQueue: Array<{
     id: string;
-    kind: "RED_ALERT" | "OVERDUE" | "WPI_DROP" | "OSINT" | "SPECIALTY" | "OUTAGE";
+    kind: "RED_ALERT" | "OVERDUE" | "WPI_DROP" | "OSINT" | "SPECIALTY" | "OUTAGE" | "UNREST" | "EVIDENCE" | "EDUCATION" | "HEALTH" | "JOBS" | "CRIME" | "CORRUPTION" | "COMMAND";
     priority: number;
     title: string;
     titleBn: string;
     detail: string;
     detailBn: string;
     href: string;
+    solutionEn?: string;
+    solutionBn?: string;
+    solutionWeekEn?: string;
+    solutionWeekBn?: string;
+    solution90En?: string;
+    solution90Bn?: string;
   }>;
   llmUsed?: boolean;
   narrativeEn?: string | null;
@@ -313,6 +330,7 @@ export function useLocalComplaints(
       titleBn?: string;
       description?: string;
       category?: ComplaintCategory;
+      source?: SignalSource;
       severity?: ComplaintSeverity;
       citizenName?: string;
       citizenPhone?: string;

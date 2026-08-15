@@ -41,7 +41,7 @@ function redirectToLogin() {
 /** In-flight GET dedupe + short TTL so parallel mounts share one network hop. */
 const getInflight = new Map<string, Promise<unknown>>();
 const getCache = new Map<string, { at: number; value: unknown }>();
-const GET_CACHE_TTL_MS = 8_000;
+const GET_CACHE_TTL_MS = 45_000;
 
 async function apiClientUncached<T = unknown>(
   path: string,
@@ -166,4 +166,13 @@ export async function authFetch<T = unknown>(
     );
   }
   return body as T;
+}
+
+/** Fire-and-forget GET so sidebar modules stay warm while the user is logged in. */
+export function warmApiGets(paths: string[]): void {
+  for (const path of paths) {
+    void apiClient(path).catch(() => {
+      /* 403/404 for out-of-role routes are expected */
+    });
+  }
 }

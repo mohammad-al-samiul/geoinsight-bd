@@ -16,6 +16,7 @@ import {
   LocalPulseRing,
   LocalVizCard,
 } from "@/components/local-entity/local-viz";
+import { LocalUnrestSection } from "@/components/local-entity/local-unrest-section";
 import { Button } from "@/components/ui/button";
 import { useLocalPulse } from "@/hooks/use-local-osint-pulse";
 import { useLocalEntityId } from "@/hooks/use-local-entity-id";
@@ -155,6 +156,8 @@ export function LocalPulsePanel() {
         )
       }
     >
+      <LocalUnrestSection />
+
       <div className="mb-4 grid gap-4 lg:grid-cols-3">
         <LocalVizCard title={tv("influenceLeaders")} icon={Users} delay={0.05}>
           <div className="flex flex-col items-center gap-3">

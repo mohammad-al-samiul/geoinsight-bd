@@ -59,6 +59,8 @@ type Scorecard =
         open: number;
         overdue: number;
         redAlerts: number;
+        commandAverage?: number;
+        warningWards?: number;
       }>;
       aiComment?: {
         narrativeEn: string;
@@ -223,6 +225,8 @@ export function LocalScorecardPanel() {
               render: (row) => (isBn ? row.nameBn || row.name : row.name),
             },
             { key: "wpiAverage", label: "WPI" },
+            { key: "commandAverage", label: t("colCommand") },
+            { key: "warningWards", label: t("colWarningWards") },
             { key: "open", label: t("open") },
             { key: "overdue", label: t("overdue") },
             { key: "redAlerts", label: t("red") },

@@ -13,6 +13,12 @@ ComplaintCategory = Literal[
     "TRAFFIC",
     "HILL_CUTTING",
     "HERITAGE",
+    "UTILITIES",
+    "CRIME",
+    "CORRUPTION",
+    "EDUCATION",
+    "HEALTH",
+    "UNEMPLOYMENT",
     "OTHER",
 ]
 ComplaintSeverity = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"]

@@ -9,11 +9,19 @@ import {
   Boxes,
   Clock3,
   Download,
+  GraduationCap,
   Gauge,
+  Megaphone,
   Newspaper,
+  School,
+  ShieldAlert,
+  Landmark,
   Siren,
   Sparkles,
   Zap,
+  HeartPulse,
+  Briefcase,
+  Layers3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocalMorningBrief } from "@/hooks/use-local-dss";
@@ -28,6 +36,14 @@ const KIND_ICON = {
   OSINT: Newspaper,
   SPECIALTY: Boxes,
   OUTAGE: Zap,
+  UNREST: Megaphone,
+  EVIDENCE: GraduationCap,
+  EDUCATION: School,
+  HEALTH: HeartPulse,
+  JOBS: Briefcase,
+  CRIME: ShieldAlert,
+  CORRUPTION: Landmark,
+  COMMAND: Layers3,
 } as const;
 
 const TONE = {
@@ -182,7 +198,7 @@ export function LocalMorningBriefPanel({
               <p className="text-sm text-muted-foreground">{t("queueEmpty")}</p>
             )}
             {data.actionQueue.map((item) => {
-              const Icon = KIND_ICON[item.kind];
+              const Icon = KIND_ICON[item.kind] ?? AlertTriangle;
               return (
                 <Link
                   key={item.id}
@@ -199,6 +215,21 @@ export function LocalMorningBriefPanel({
                     <span className="block truncate text-[11px] text-muted-foreground">
                       {isBn ? item.detailBn : item.detail}
                     </span>
+                    {(item.solutionBn || item.solutionEn) && (
+                      <span className="mt-0.5 block line-clamp-2 text-[10px] text-sky-200/90">
+                        {t("opsNow")}: {isBn ? item.solutionBn || item.solutionEn : item.solutionEn}
+                      </span>
+                    )}
+                    {(item.solutionWeekBn || item.solutionWeekEn) && (
+                      <span className="block line-clamp-1 text-[10px] text-amber-100/80">
+                        {t("horizonWeek")}: {isBn ? item.solutionWeekBn || item.solutionWeekEn : item.solutionWeekEn}
+                      </span>
+                    )}
+                    {(item.solution90Bn || item.solution90En) && (
+                      <span className="block line-clamp-1 text-[10px] text-emerald-200/80">
+                        {t("horizon90")}: {isBn ? item.solution90Bn || item.solution90En : item.solution90En}
+                      </span>
+                    )}
                   </span>
                   <ArrowRight className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
                 </Link>

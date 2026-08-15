@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useMorningBriefing, type BriefingBullet } from "@/hooks/use-briefing";
 import { VoiceBriefing } from "@/components/briefing/voice-briefing";
+import { PmoLocalEvidenceSnippets } from "@/components/dashboard/pmo-local-evidence";
 import { ModuleShell, StatCard, StatGrid } from "@/components/modules/module-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -317,6 +318,8 @@ export function BriefingCopilot() {
               </div>
             </div>
           </div>
+
+          <PmoLocalEvidenceSnippets />
 
           <div className="grid gap-6 xl:grid-cols-5">
             <div className="space-y-4 xl:col-span-3">

@@ -41,7 +41,7 @@ export interface LocalEntityOverview {
     titleBn: string;
     status: "planned" | "active";
   }>;
-  phase: "P0" | "P1" | "P2" | "P3" | "P4";
+  phase: "P0" | "P1" | "P2" | "P3" | "P4" | "P5";
   lastUpdatedAt: string | null;
   dataFreshness: "live" | "stale" | "unknown";
 }
@@ -211,7 +211,7 @@ export class LocalEntityService {
       wardCount: wards.length,
       wards,
       coreModules: CORE_MODULES,
-      phase: "P4",
+      phase: "P5",
       lastUpdatedAt,
       dataFreshness,
     };

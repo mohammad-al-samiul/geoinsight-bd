@@ -28,6 +28,8 @@ import { intelModule } from "./intel/intel.module";
 import { narrativeShieldModule } from "./narrative-shield/narrative-shield.module";
 import { outlookModule } from "./outlook/outlook.module";
 import { divisionalCrisisModule } from "./divisional-crisis/divisional-crisis.module";
+import { nationalSectorModule } from "./national-sector/national-sector.module";
+import { deskModule } from "./desk/desk.module";
 import { localEntityModule } from "./local-entity/local-entity.module";
 
 const modules: AppModule[] = [
@@ -52,6 +54,8 @@ const modules: AppModule[] = [
   narrativeShieldModule,
   outlookModule,
   divisionalCrisisModule,
+  nationalSectorModule,
+  deskModule,
   localEntityModule,
   simulatorModule,
   procurementModule,

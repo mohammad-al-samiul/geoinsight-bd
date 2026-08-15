@@ -11,6 +11,7 @@ import {
   ProjectStatus,
   ServiceOutageKind,
   ServiceOutageStatus,
+  SignalSource,
   UserRole,
 } from "@prisma/client";
 import { BaseModule } from "../../core/module/app-module.interface";
@@ -26,6 +27,12 @@ import { localPulseService } from "./pulse.service";
 import { specialtyService } from "./specialty.service";
 import { morningBriefService } from "./morning-brief.service";
 import { outageService } from "./outage.service";
+import { localUnrestService } from "./local-unrest.service";
+import { localEvidenceService, EVIDENCE_TOPICS } from "./evidence.service";
+import { localSectorService } from "./local-sector.service";
+import { localIntegrityService } from "./integrity.service";
+import { commandRoomService } from "./command-room.service";
+import { nationalBoardService } from "./national-board.service";
 import { localBudgetService } from "./budget.service";
 import { localCitizenAssistService } from "./citizen-assist.service";
 import { localFieldSummaryService } from "./field-summary.service";
@@ -60,6 +67,7 @@ const createComplaintSchema = z.object({
   titleBn: z.string().max(255).optional(),
   description: z.string().max(4000).optional(),
   category: z.nativeEnum(ComplaintCategory).optional(),
+  source: z.nativeEnum(SignalSource).optional(),
   severity: z.nativeEnum(ComplaintSeverity).optional(),
   citizenName: z.string().max(120).optional(),
   citizenPhone: z.string().max(20).optional(),
@@ -166,6 +174,19 @@ export class LocalEntityModule extends BaseModule {
       container.rbac.requireRoles(...LOCAL_ROLES),
       asyncHandler(async (req, res) => {
         const data = await localEntityService.listCatalog({
+          role: req.user!.role,
+          adminUnitId: req.user!.adminUnitId,
+        });
+        sendSuccess(res, data);
+      }),
+    );
+
+    router.get(
+      "/local-entity/national-board",
+      authenticate(),
+      container.rbac.requireRoles(UserRole.PMO, UserRole.MINISTER),
+      asyncHandler(async (req, res) => {
+        const data = await nationalBoardService.getBoard({
           role: req.user!.role,
           adminUnitId: req.user!.adminUnitId,
         });
@@ -516,6 +537,133 @@ export class LocalEntityModule extends BaseModule {
     );
 
     router.get(
+      "/local-entity/unrest",
+      authenticate(),
+      container.rbac.requireRoles(...LOCAL_ROLES),
+      validate(
+        z.object({ entityId: z.string().uuid().optional() }),
+        "query",
+      ),
+      asyncHandler(async (req, res) => {
+        const data = await localUnrestService.getDesk(
+          { role: req.user!.role, adminUnitId: req.user!.adminUnitId },
+          { entityId: (req.query as { entityId?: string }).entityId },
+        );
+        sendSuccess(res, data);
+      }),
+    );
+
+    router.get(
+      "/local-entity/sector",
+      authenticate(),
+      container.rbac.requireRoles(...LOCAL_ROLES),
+      validate(
+        z.object({
+          entityId: z.string().uuid().optional(),
+          sector: z.enum(["EDUCATION", "HEALTH", "EMPLOYMENT"]),
+        }),
+        "query",
+      ),
+      asyncHandler(async (req, res) => {
+        const q = req.query as {
+          entityId?: string;
+          sector: "EDUCATION" | "HEALTH" | "EMPLOYMENT";
+        };
+        const data = await localSectorService.getDesk(
+          { role: req.user!.role, adminUnitId: req.user!.adminUnitId },
+          { entityId: q.entityId, sector: q.sector },
+        );
+        sendSuccess(res, data);
+      }),
+    );
+
+    router.get(
+      "/local-entity/integrity",
+      authenticate(),
+      container.rbac.requireRoles(...LOCAL_ROLES),
+      validate(
+        z.object({
+          entityId: z.string().uuid().optional(),
+          domain: z.enum(["CRIME", "CORRUPTION"]),
+        }),
+        "query",
+      ),
+      asyncHandler(async (req, res) => {
+        const q = req.query as {
+          entityId?: string;
+          domain: "CRIME" | "CORRUPTION";
+        };
+        const data = await localIntegrityService.getDesk(
+          { role: req.user!.role, adminUnitId: req.user!.adminUnitId },
+          { entityId: q.entityId, domain: q.domain },
+        );
+        sendSuccess(res, data);
+      }),
+    );
+
+    router.get(
+      "/local-entity/command",
+      authenticate(),
+      container.rbac.requireRoles(...LOCAL_ROLES),
+      validate(
+        z.object({ entityId: z.string().uuid().optional() }),
+        "query",
+      ),
+      asyncHandler(async (req, res) => {
+        const data = await commandRoomService.getDesk(
+          { role: req.user!.role, adminUnitId: req.user!.adminUnitId },
+          { entityId: (req.query as { entityId?: string }).entityId },
+        );
+        sendSuccess(res, data);
+      }),
+    );
+
+    router.get(
+      "/local-entity/evidence",
+      authenticate(),
+      container.rbac.requireRoles(...LOCAL_ROLES),
+      validate(
+        z.object({
+          entityId: z.string().uuid().optional(),
+          topics: z.string().optional(),
+          kind: z.enum(["THESIS", "EXPERT", "POLICY_BRIEF"]).optional(),
+          year: z.coerce.number().int().min(1990).max(2100).optional(),
+          q: z.string().max(120).optional(),
+          limit: z.coerce.number().int().min(1).max(80).optional(),
+        }),
+        "query",
+      ),
+      asyncHandler(async (req, res) => {
+        const q = req.query as {
+          entityId?: string;
+          topics?: string;
+          kind?: "THESIS" | "EXPERT" | "POLICY_BRIEF";
+          year?: number;
+          q?: string;
+          limit?: number;
+        };
+        const topics = (q.topics ?? "")
+          .split(",")
+          .map((s) => s.trim().toUpperCase())
+          .filter((s) => (EVIDENCE_TOPICS as readonly string[]).includes(s)) as Array<
+          (typeof EVIDENCE_TOPICS)[number]
+        >;
+        const data = await localEvidenceService.list(
+          { role: req.user!.role, adminUnitId: req.user!.adminUnitId },
+          {
+            entityId: q.entityId,
+            topics: topics.length ? topics : undefined,
+            kind: q.kind,
+            year: q.year,
+            q: q.q,
+            limit: q.limit,
+          },
+        );
+        sendSuccess(res, data);
+      }),
+    );
+
+    router.get(
       "/local-entity/specialty",
       authenticate(),
       container.rbac.requireRoles(...LOCAL_ROLES),
@@ -630,6 +778,7 @@ export class LocalEntityModule extends BaseModule {
           entityId: z.string().uuid().optional(),
           status: z.enum(["ACTIVE", "WATCH", "RESOLVED", "ALL"]).optional(),
           kind: z.nativeEnum(ServiceOutageKind).optional(),
+          source: z.nativeEnum(SignalSource).optional(),
           limit: z.coerce.number().int().min(1).max(100).optional(),
         }),
         "query",
@@ -639,6 +788,7 @@ export class LocalEntityModule extends BaseModule {
           entityId?: string;
           status?: ServiceOutageStatus | "ALL";
           kind?: ServiceOutageKind;
+          source?: SignalSource;
           limit?: number;
         };
         const data = await outageService.list(
@@ -658,6 +808,7 @@ export class LocalEntityModule extends BaseModule {
           entityId: z.string().uuid().optional(),
           wardId: z.string().uuid().optional(),
           kind: z.nativeEnum(ServiceOutageKind).optional(),
+          source: z.nativeEnum(SignalSource).optional(),
           title: z.string().min(3).max(255),
           titleBn: z.string().max(255).optional(),
           detail: z.string().max(4000).optional(),

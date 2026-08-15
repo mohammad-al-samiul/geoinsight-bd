@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { UserProfile } from "@/components/layout/user-profile";
@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { isLocalEntityRole } from "@/types";
 import { withLocalEntityHref } from "@/hooks/use-local-entity-id";
+import { useNavPulse } from "@/hooks/use-nav-pulse";
 import {
   AlertTriangle,
   BarChart3,
@@ -23,6 +24,7 @@ import {
   CloudRain,
   FileText,
   Flame,
+  GraduationCap,
   Gauge,
   Globe2,
   Landmark,
@@ -33,6 +35,7 @@ import {
   Package,
   Radio,
   Scale,
+  School,
   ShieldAlert,
   ShieldCheck,
   ShieldOff,
@@ -44,6 +47,9 @@ import {
   Wallet,
   Zap,
   ScanFace,
+  HeartPulse,
+  Briefcase,
+  Layers3,
 } from "lucide-react";
 
 interface NavItem {
@@ -62,6 +68,7 @@ const NATIONAL_NAV: NavItem[] = [
   { href: "/outlook", key: "outlook", icon: LineChart, minTier: 1 },
   { href: "/unrest", key: "unrest", icon: Scale, minTier: 1 },
   { href: "/divisional-crisis", key: "divisionalCrisis", icon: Flame, minTier: 4 },
+  { href: "/sectors", key: "nationalSectors", icon: GraduationCap, minTier: 1, roles: ["PMO", "MINISTER"] },
   { href: "/anti-phishing", key: "antiPhishing", icon: ShieldAlert, minTier: 1 },
   { href: "/hazards", key: "hazards", icon: CloudRain, minTier: 2 },
   { href: "/agro", key: "agro", icon: Sprout, minTier: 3 },
@@ -89,6 +96,13 @@ const LOCAL_NAV: NavItem[] = [
   { href: "/local/budget", key: "localBudget", icon: Wallet, minTier: 5 },
   { href: "/local/osint", key: "localOsint", icon: Newspaper, minTier: 5 },
   { href: "/local/pulse", key: "localPulse", icon: Radio, minTier: 5 },
+  { href: "/local/evidence", key: "localEvidence", icon: GraduationCap, minTier: 5 },
+  { href: "/local/education", key: "localEducation", icon: School, minTier: 5 },
+  { href: "/local/health", key: "localHealth", icon: HeartPulse, minTier: 5 },
+  { href: "/local/jobs", key: "localJobs", icon: Briefcase, minTier: 5 },
+  { href: "/local/crime", key: "localCrime", icon: ShieldAlert, minTier: 5 },
+  { href: "/local/corruption", key: "localCorruption", icon: Landmark, minTier: 5 },
+  { href: "/local/command", key: "localCommand", icon: Layers3, minTier: 5 },
   { href: "/local/specialty", key: "localSpecialty", icon: Boxes, minTier: 5 },
   { href: "/local/outage", key: "localOutage", icon: Zap, minTier: 5 },
   { href: "/local/alerts", key: "localAlerts", icon: MessageSquare, minTier: 5 },
@@ -116,6 +130,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const user = useAuth();
   const t = useTranslations("nav");
   const ts = useTranslations("shell");
+  const isBn = useLocale().startsWith("bn");
+  const { byKey, pulse } = useNavPulse();
   const userTier = TIER[user.role] ?? 4;
   const localRole = isLocalEntityRole(user.role);
   const scopedEntityId =
@@ -182,10 +198,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 : pathname === item.href || pathname.startsWith(`${item.href}/`);
           const label = t(item.key);
           const Icon = item.icon;
+          const pulseItem = byKey[item.key];
+          const hot = pulseItem?.status === "ALERT";
+          const watch = pulseItem?.status === "WATCH";
+          const count = pulseItem?.count ?? 0;
+          const hint = pulseItem
+            ? isBn
+              ? pulseItem.headlineBn
+              : pulseItem.headline
+            : undefined;
           const link = (
             <Link
               href={href}
-              title={collapsed ? label : undefined}
+              title={collapsed ? (hint ? `${label} — ${hint}` : label) : hint}
               className={cn(
                 "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 active
@@ -197,13 +222,32 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               {active && (
                 <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
               )}
-              <Icon
-                className={cn(
-                  "h-4 w-4 shrink-0 transition-colors",
-                  active ? "text-primary" : "text-muted-foreground group-hover:text-foreground",
-                )}
-              />
-              {!collapsed && <span className="truncate">{label}</span>}
+              <span className="relative shrink-0">
+                <Icon
+                  className={cn(
+                    "h-4 w-4 shrink-0 transition-colors",
+                    active ? "text-primary" : "text-muted-foreground group-hover:text-foreground",
+                  )}
+                />
+                {hot ? (
+                  <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-destructive" />
+                ) : watch ? (
+                  <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
+                ) : pulseItem ? (
+                  <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400/80" />
+                ) : null}
+              </span>
+              {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
+              {!collapsed && count > 0 && (hot || watch) ? (
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+                    hot ? "bg-destructive/15 text-destructive" : "bg-amber-400/15 text-amber-300",
+                  )}
+                >
+                  {count > 99 ? "99+" : count}
+                </span>
+              ) : null}
             </Link>
           );
 
@@ -225,7 +269,16 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {!collapsed && (
         <div className="border-t border-sidebar-border/80 p-3.5 text-[10px] leading-relaxed tracking-wide text-muted-foreground">
-          {localRole ? ts("localFooter") : ts("classifiedFooter")}
+          <p className="mb-1 font-semibold uppercase tracking-[0.14em] text-emerald-400/90">
+            {ts("liveNav")}
+          </p>
+          <p>{ts("liveNavHint")}</p>
+          {pulse?.pipelineAt ? (
+            <p className="mt-1 text-muted-foreground/80">
+              {ts("pipelineAt")} {new Date(pulse.pipelineAt).toLocaleTimeString()}
+            </p>
+          ) : null}
+          <p className="mt-2">{localRole ? ts("localFooter") : ts("classifiedFooter")}</p>
         </div>
       )}
     </aside>

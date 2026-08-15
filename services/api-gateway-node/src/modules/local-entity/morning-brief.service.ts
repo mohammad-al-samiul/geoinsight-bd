@@ -8,16 +8,32 @@ import { wpiService } from "./wpi.service";
 import { localOsintService } from "./osint.service";
 import { specialtyService } from "./specialty.service";
 import { outageService } from "./outage.service";
+import { localUnrestService } from "./local-unrest.service";
+import { outageOpsHint, unrestOpsHint, sectorOpsHint, integrityOpsHint, commandOpsHint } from "./ops-solutions";
+import {
+  localEvidenceService,
+  outageKindToTopic,
+  unrestThemeToTopics,
+  type EvidenceTopic,
+} from "./evidence.service";
+import { localSectorService } from "./local-sector.service";
+import { localIntegrityService } from "./integrity.service";
 
 export type ActionQueueItem = {
   id: string;
-  kind: "RED_ALERT" | "OVERDUE" | "WPI_DROP" | "OSINT" | "SPECIALTY" | "OUTAGE";
+  kind: "RED_ALERT" | "OVERDUE" | "WPI_DROP" | "OSINT" | "SPECIALTY" | "OUTAGE" | "UNREST" | "EVIDENCE" | "EDUCATION" | "HEALTH" | "JOBS" | "CRIME" | "CORRUPTION" | "COMMAND";
   priority: number;
   title: string;
   titleBn: string;
   detail: string;
   detailBn: string;
   href: string;
+  solutionEn?: string;
+  solutionBn?: string;
+  solutionWeekEn?: string;
+  solutionWeekBn?: string;
+  solution90En?: string;
+  solution90Bn?: string;
   meta?: Record<string, unknown>;
 };
 
@@ -101,12 +117,15 @@ export class MorningBriefService {
       select: { id: true, code: true, name: true, nameBn: true },
     });
 
-    const [complaints, wpi, osint, specialty, outages] = await Promise.all([
+    const [complaints, wpi, osint, specialty, outages, unrest, sectorAlerts, integrityAlerts] = await Promise.all([
       complaintService.list(user, { entityId, limit: 40 }),
       wpiService.list(user, { entityId }),
       localOsintService.feed(user, { entityId, limit: 8 }).catch(() => null),
       specialtyService.getPack(user, { entityId }).catch(() => null),
       outageService.list(user, { entityId, status: "ACTIVE" }).catch(() => null),
+      localUnrestService.getDesk(user, { entityId }).catch(() => null),
+      localSectorService.listAlerts(user, { entityId, limit: 24 }).catch(() => [] as Awaited<ReturnType<typeof localSectorService.listAlerts>>),
+      localIntegrityService.listAlerts(user, { entityId, limit: 24 }).catch(() => [] as Awaited<ReturnType<typeof localIntegrityService.listAlerts>>),
     ]);
 
     const red = complaints.items.filter(
@@ -141,6 +160,53 @@ export class MorningBriefService {
         .slice(0, 3) ?? [];
 
     const activeOutages = outages?.items?.slice(0, 4) ?? [];
+    const unrestMoves = unrest?.movements?.filter((m) => m.status === "active").slice(0, 4) ?? [];
+
+    const wardTags = new Map<string, Set<string>>();
+    const wardNames = new Map<string, { name: string; nameBn: string | null }>();
+    const tagWard = (
+      wardId: string | null | undefined,
+      tag: string,
+      ward?: { id: string; name: string; nameBn: string | null } | null,
+    ) => {
+      if (!wardId) return;
+      const set = wardTags.get(wardId) ?? new Set<string>();
+      set.add(tag);
+      wardTags.set(wardId, set);
+      if (ward && !wardNames.has(wardId)) {
+        wardNames.set(wardId, { name: ward.name, nameBn: ward.nameBn });
+      }
+    };
+    for (const o of outages?.items ?? []) {
+      tagWard(o.wardId ?? o.ward?.id ?? null, "OUTAGE", o.ward);
+    }
+    for (const s of sectorAlerts) {
+      tagWard(s.ward?.id, s.actionKind, s.ward);
+    }
+    for (const s of integrityAlerts) {
+      tagWard(s.ward?.id, s.actionKind, s.ward);
+    }
+    const stackedWards = [...wardTags.entries()].filter(([, tags]) => tags.size >= 3);
+
+    const topicSet = new Set<EvidenceTopic>();
+    for (const o of activeOutages) topicSet.add(outageKindToTopic(String(o.kind)));
+    for (const m of unrestMoves) {
+      for (const t of unrestThemeToTopics(m.themeId)) topicSet.add(t);
+    }
+    for (const s of sectorAlerts) {
+      topicSet.add(s.evidenceTopic as EvidenceTopic);
+    }
+    for (const s of integrityAlerts) {
+      topicSet.add(s.evidenceTopic as EvidenceTopic);
+    }
+    if (!topicSet.size) {
+      topicSet.add("POWER");
+      topicSet.add("UNREST");
+      topicSet.add("DRAINAGE");
+    }
+    const evidence = await localEvidenceService
+      .forContext(user, { entityId, topics: [...topicSet], limit: 4 })
+      .catch(() => null);
 
     const bullets: BriefBullet[] = [];
     if (red.length) {
@@ -162,6 +228,41 @@ export class MorningBriefService {
         tone: "warn",
         en: `${activeOutages.length} active service outage${activeOutages.length > 1 ? "s" : ""} on the board.`,
         bn: `${activeOutages.length}টি সক্রিয় সেবা ব্যাঘাত বোর্ডে আছে।`,
+      });
+    }
+    if (unrestMoves.length) {
+      bullets.push({
+        tone: unrest?.summary.trend === "rising" ? "danger" : "warn",
+        en: `${unrestMoves.length} active protest cluster${unrestMoves.length > 1 ? "s" : ""} in this jurisdiction (${unrest?.summary.last24h ?? 0} signals / 24h).`,
+        bn: `এই এলাকায় ${unrestMoves.length}টি চলমান আন্দোলন ক্লাস্টার (২৪ ঘণ্টায় ${unrest?.summary.last24h ?? 0}টি সিগন্যাল)।`,
+      });
+    }
+    if (sectorAlerts.length) {
+      bullets.push({
+        tone: "warn",
+        en: `${sectorAlerts.length} education/health/jobs site${sectorAlerts.length > 1 ? "s" : ""} on ALERT.`,
+        bn: `শিক্ষা/স্বাস্থ্য/কর্মসংস্থানের ${sectorAlerts.length}টি সাইট অ্যালার্টে আছে।`,
+      });
+    }
+    if (integrityAlerts.length) {
+      bullets.push({
+        tone: "danger",
+        en: `${integrityAlerts.length} crime/corruption incident${integrityAlerts.length > 1 ? "s" : ""} need a same-day desk.`,
+        bn: `অপরাধ/দুর্নীতির ${integrityAlerts.length}টি ঘটনা আজই ডেস্কে নিতে হবে।`,
+      });
+    }
+    if (stackedWards.length) {
+      bullets.push({
+        tone: "danger",
+        en: `${stackedWards.length} ward${stackedWards.length > 1 ? "s" : ""} have 3+ hot layers — open the command room.`,
+        bn: `${stackedWards.length}টি ওয়ার্ডে ৩+ হট লেয়ার — কমান্ড রুম খুলুন।`,
+      });
+    }
+    if (evidence?.items.length) {
+      bullets.push({
+        tone: "info",
+        en: `${evidence.items.length} thesis/expert solution${evidence.items.length > 1 ? "s" : ""} matched today's crises.`,
+        bn: `আজকের সংকটে মিল আছে এমন ${evidence.items.length}টি থিসিস/বিশেষজ্ঞ সমাধান।`,
       });
     }
     if (unassigned.length) {
@@ -229,16 +330,104 @@ export class MorningBriefService {
       });
     }
     for (const o of activeOutages) {
+      const hint = o.opsHint ?? outageOpsHint(o.kind);
       actions.push({
         id: `out-${o.id}`,
         kind: "OUTAGE",
         priority: 85,
         title: o.title,
         titleBn: o.titleBn || o.title,
-        detail: `${o.kind} · ${o.ward?.name ?? "entity-wide"}`,
-        detailBn: `${o.kind} · ${o.ward?.nameBn || o.ward?.name || "সারা এলাকা"}`,
+        detail: `${o.kind} · ${o.ward?.name ?? "entity-wide"} · ${hint.en}`,
+        detailBn: `${o.kind} · ${o.ward?.nameBn || o.ward?.name || "সারা এলাকা"} · ${hint.bn}`,
         href: `/local/outage`,
-        meta: { outageId: o.id },
+        solutionEn: hint.en,
+        solutionBn: hint.bn,
+        meta: { outageId: o.id, kind: o.kind },
+      });
+    }
+    for (const m of unrestMoves) {
+      const hint = unrestOpsHint(m.themeId);
+      actions.push({
+        id: `unrest-${m.id}`,
+        kind: "UNREST",
+        priority: 88,
+        title: m.title,
+        titleBn: m.titleBn || m.title,
+        detail: `${m.theme} · ${m.place} · ${hint.en}`,
+        detailBn: `${m.themeBn} · ${m.placeBn || m.place} · ${hint.bn}`,
+        href: `/local/pulse`,
+        solutionEn: hint.en,
+        solutionBn: m.solutionBn || hint.bn,
+        meta: { themeId: m.themeId },
+      });
+    }
+    for (const s of sectorAlerts) {
+      const hint = s.opsHint ?? sectorOpsHint(s.sector, s.kind);
+      actions.push({
+        id: `sec-${s.id}`,
+        kind: s.actionKind,
+        priority: 80,
+        title: s.title,
+        titleBn: s.titleBn || s.title,
+        detail: `${s.kind} · ${s.ward?.name ?? "entity-wide"} · ${hint.en}`,
+        detailBn: `${s.kind} · ${s.ward?.nameBn || s.ward?.name || "সারা এলাকা"} · ${hint.bn}`,
+        href: s.href,
+        solutionEn: hint.en,
+        solutionBn: hint.bn,
+        meta: { sector: s.sector, siteId: s.id },
+      });
+    }
+    for (const s of integrityAlerts) {
+      const hint = s.opsHint ?? integrityOpsHint(s.domain, s.kind);
+      actions.push({
+        id: `int-${s.id}`,
+        kind: s.actionKind,
+        priority: 83,
+        title: s.title,
+        titleBn: s.titleBn || s.title,
+        detail: `${s.kind} · ${s.ward?.name ?? "entity-wide"} · ${hint.en}`,
+        detailBn: `${s.kind} · ${s.ward?.nameBn || s.ward?.name || "সারা এলাকা"} · ${hint.bn}`,
+        href: s.href,
+        solutionEn: hint.en,
+        solutionBn: hint.bn,
+        meta: { domain: s.domain, incidentId: s.id },
+      });
+    }
+    for (const [wardId, tags] of stackedWards.slice(0, 3)) {
+      const name = wardNames.get(wardId);
+      const hint = commandOpsHint([...tags]);
+      const tagList = [...tags].join(" + ");
+      actions.push({
+        id: `cmd-${wardId}`,
+        kind: "COMMAND",
+        priority: 92,
+        title: `${name?.name ?? "Ward"} — ${tags.size} layers hot`,
+        titleBn: `${name?.nameBn || name?.name || "ওয়ার্ড"} — ${tags.size}টি লেয়ার হট`,
+        detail: `${tagList} · ${hint.en}`,
+        detailBn: `${tagList} · ${hint.bn}`,
+        href: "/local/command",
+        solutionEn: hint.en,
+        solutionBn: hint.bn,
+        meta: { wardId, tags: [...tags] },
+      });
+    }
+    for (const e of evidence?.items.slice(0, 3) ?? []) {
+      actions.push({
+        id: `ev-${e.id}`,
+        kind: "EVIDENCE",
+        priority: 72,
+        title: e.title,
+        titleBn: e.titleBn || e.title,
+        detail: `${e.kind} · ${e.year} · ${e.sourceName}`,
+        detailBn: `${e.kind} · ${e.year} · ${e.sourceName}`,
+        href: `/local/evidence`,
+        solutionEn: e.solutions.now.en,
+        solutionBn: e.solutions.now.bn,
+        solutionWeekEn: e.solutions.week.en,
+        solutionWeekBn: e.solutions.week.bn,
+        solution90En: e.solutions.days90.en,
+        solution90Bn: e.solutions.days90.bn,
+        meta: { evidenceId: e.id, kind: e.kind },
       });
     }
     for (const w of weakWards) {
@@ -282,7 +471,28 @@ export class MorningBriefService {
     actions.sort((a, b) => b.priority - a.priority);
 
     const ruleBullets = bullets.slice(0, 5);
-    const actionQueue = actions.slice(0, 12);
+    const evidenceActions = actions.filter((a) => a.kind === "EVIDENCE");
+    const sectorActions = actions.filter(
+      (a) => a.kind === "EDUCATION" || a.kind === "HEALTH" || a.kind === "JOBS",
+    );
+    const integrityActions = actions.filter(
+      (a) => a.kind === "CRIME" || a.kind === "CORRUPTION",
+    );
+    const otherActions = actions.filter(
+      (a) =>
+        a.kind !== "EVIDENCE" &&
+        a.kind !== "EDUCATION" &&
+        a.kind !== "HEALTH" &&
+        a.kind !== "JOBS" &&
+        a.kind !== "CRIME" &&
+        a.kind !== "CORRUPTION",
+    );
+    const actionQueue = [
+      ...otherActions.slice(0, 6),
+      ...integrityActions.slice(0, 2),
+      ...sectorActions.slice(0, 2),
+      ...evidenceActions.slice(0, 2),
+    ].sort((a, b) => b.priority - a.priority);
     const summary = {
       open: complaints.summary.open,
       overdue: complaints.summary.overdue,
@@ -291,6 +501,11 @@ export class MorningBriefService {
       wpiAverage: avg,
       bottomWard: bottom,
       activeOutages: activeOutages.length,
+      activeUnrest: unrestMoves.length,
+      unrestTrend: unrest?.summary.trend ?? "stable",
+      evidenceHits: evidence?.items.length ?? 0,
+      sectorAlerts: sectorAlerts.length,
+      integrityAlerts: integrityAlerts.length,
     };
 
     const ai = await polishBriefWithAi({
@@ -317,6 +532,7 @@ export class MorningBriefService {
       llmUsed: Boolean(ai?.llmUsed),
       narrativeEn: ai?.narrativeEn ?? null,
       narrativeBn: ai?.narrativeBn ?? null,
+      evidence: evidence?.items ?? [],
     };
   }
 

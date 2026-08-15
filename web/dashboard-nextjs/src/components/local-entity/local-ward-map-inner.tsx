@@ -21,16 +21,25 @@ import {
   wpiFillColor,
   type LocalWardFeatureProps,
 } from "@/lib/local-ward-geo";
+import {
+  LAYER_COLORS,
+  SOURCE_COLORS,
+  type MapLayerId,
+  type MarkerSeverity,
+  type SignalSource,
+} from "@/lib/local-map-layers";
 
 export type LocalMapMarker = {
   id: string;
   lat: number;
   lng: number;
-  severity?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  severity?: MarkerSeverity;
   label?: string;
+  layer?: MapLayerId;
+  source?: SignalSource;
 };
 
-const SEVERITY_COLORS: Record<NonNullable<LocalMapMarker["severity"]>, string> = {
+const SEVERITY_COLORS: Record<MarkerSeverity, string> = {
   LOW: "#34d399",
   MEDIUM: "#fbbf24",
   HIGH: "#f97316",
@@ -347,25 +356,35 @@ export function LocalWardMapInner({
           }}
         />
 
-        {markers.map((m) => (
-          <CircleMarker
-            key={m.id}
-            center={[m.lat, m.lng]}
-            radius={m.severity === "CRITICAL" ? 9 : 7}
-            pathOptions={{
-              color: "#fff7ed",
-              fillColor: SEVERITY_COLORS[m.severity ?? "HIGH"],
-              fillOpacity: 0.92,
-              weight: 1.6,
-            }}
-          >
-            {m.label ? (
-              <Tooltip direction="top" offset={[0, -4]}>
-                {m.label}
-              </Tooltip>
-            ) : null}
-          </CircleMarker>
-        ))}
+        {markers.map((m) => {
+          const fill = m.layer
+            ? LAYER_COLORS[m.layer]
+            : SEVERITY_COLORS[m.severity ?? "HIGH"];
+          const ring = m.source ? SOURCE_COLORS[m.source] : "#fff7ed";
+          return (
+            <CircleMarker
+              key={m.id}
+              center={[m.lat, m.lng]}
+              radius={m.severity === "CRITICAL" ? 9 : 7}
+              pathOptions={{
+                color: ring,
+                fillColor: fill,
+                fillOpacity: 0.92,
+                weight: 1.8,
+              }}
+            >
+              {m.label ? (
+                <Tooltip direction="top" offset={[0, -4]}>
+                  <span>
+                    {m.label}
+                    {m.layer ? ` · ${m.layer}` : ""}
+                    {m.source ? ` · ${m.source}` : ""}
+                  </span>
+                </Tooltip>
+              ) : null}
+            </CircleMarker>
+          );
+        })}
       </MapContainer>
 
       <BdLocatorInset

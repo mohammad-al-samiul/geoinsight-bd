@@ -41,15 +41,21 @@ from app.modules.local_ai.schemas import (
 _JSON_BLOCK = re.compile(r"\{[\s\S]*\}|\[[\s\S]*\]")
 
 _CATEGORY_HINTS: list[tuple[str, re.Pattern[str]]] = [
+    ("UTILITIES", re.compile(r"gas|fuel|load.?shed|বিদ্যুৎ|গ্যাস|তেল|লোডশেড|power.?cut|electric", re.I)),
+    ("CRIME", re.compile(r"murder|theft|snatch|খুন|চুরি|ছিনতাই|ডাকাতি|হত্যা", re.I)),
+    ("CORRUPTION", re.compile(r"bribe|corrupt|ঘুষ|দুর্নীতি|টেন্ডার.?অনিয়ম", re.I)),
+    ("EDUCATION", re.compile(r"school|college|dropout|স্কুল|কলেজ|শিক্ষক", re.I)),
+    ("HEALTH", re.compile(r"hospital|dengue|clinic|হাসপাতাল|ডেঙ্গু|স্বাস্থ্য", re.I)),
+    ("UNEMPLOYMENT", re.compile(r"unemploy|jobless|বেকার", re.I)),
     ("DRAINAGE", re.compile(r"drain|nala|নালা|ড্রেন|জলাবদ্ধ|waterlog", re.I)),
     ("WASTE", re.compile(r"garbage|waste|trash|ময়লা|আবর্জনা|ডাস্টবিন", re.I)),
     ("TRAFFIC", re.compile(r"traffic|jam|road.?block|যানজট|ট্রাফিক", re.I)),
-    ("SAFETY", re.compile(r"crime|theft|assault|নিরাপত্তা|চুরি|ডাকাতি|হামলা", re.I)),
     ("HILL_CUTTING", re.compile(r"hill.?cut|পাহাড়.?কাট|ভূমিধস|landslide", re.I)),
     ("HERITAGE", re.compile(r"heritage|ঐতিহ্য|মসজিদ|মন্দির|পুরাকীর্তি", re.I)),
+    ("SAFETY", re.compile(r"assault|নিরাপত্তা|হামলা|eve.?teas|unsafe", re.I)),
     (
         "INFRASTRUCTURE",
-        re.compile(r"road|bridge|light|pipe|রাস্তা|সেতু|বিদ্যুৎ|পানি|pipe|street.?light", re.I),
+        re.compile(r"road|bridge|light|pipe|রাস্তা|সেতু|street.?light", re.I),
     ),
 ]
 
@@ -164,7 +170,7 @@ class LocalAiService:
         system = (
             "Classify a Bangladesh local-government citizen complaint. "
             "Return ONLY JSON: "
-            '{"category":"INFRASTRUCTURE|DRAINAGE|WASTE|SAFETY|TRAFFIC|HILL_CUTTING|HERITAGE|OTHER",'
+            '{"category":"INFRASTRUCTURE|DRAINAGE|WASTE|SAFETY|TRAFFIC|HILL_CUTTING|HERITAGE|UTILITIES|CRIME|CORRUPTION|EDUCATION|HEALTH|UNEMPLOYMENT|OTHER",'
             '"severity":"CRITICAL|HIGH|MEDIUM|LOW","sla_hours":12|24|48|72,'
             '"is_red_alert":true|false,"rationale_en":"...","rationale_bn":"...","confidence":0.0-1.0}. '
             "CRITICAL/HIGH usually is_red_alert true. Prefer 24h SLA unless critical (12) or low (48-72)."
@@ -185,6 +191,12 @@ class LocalAiService:
             "TRAFFIC",
             "HILL_CUTTING",
             "HERITAGE",
+            "UTILITIES",
+            "CRIME",
+            "CORRUPTION",
+            "EDUCATION",
+            "HEALTH",
+            "UNEMPLOYMENT",
             "OTHER",
         }
         sevs = {"CRITICAL", "HIGH", "MEDIUM", "LOW"}

@@ -406,7 +406,8 @@ export class UnrestService {
     };
   }
 
-  private async buildPulse(): Promise<UnrestPulse> {
+  /** Fresh national pulse from DB (skips Redis). Used by the local mayor desk. */
+  async buildPulse(): Promise<UnrestPulse> {
     const mandate = getCurrentMandate({
       CURRENT_GOVERNMENT_SINCE: env.CURRENT_GOVERNMENT_SINCE,
       CURRENT_GOVERNMENT_PARTY: env.CURRENT_GOVERNMENT_PARTY,

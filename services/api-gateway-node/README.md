@@ -10,7 +10,7 @@ Express + TypeScript gateway for GeoInsight BD — REST `/api/v1`, JWT/RBAC, Pri
 
 | Concern | Detail |
 |---------|--------|
-| Auth | Login / refresh / register; HTTP-only cookies set by Next.js BFF |
+| Auth | Login / refresh / register / **TOTP MFA**; HTTP-only cookies set by Next.js BFF |
 | Data | Prisma write + read clients via PgBouncer |
 | Real-time | Socket.io + Redis adapter; hierarchy rooms |
 | Async | RabbitMQ `gov_core_queue` consumer → dashboard broadcasts |
@@ -47,7 +47,8 @@ Registered in `src/modules/register-modules.ts`:
 | `kpi`, `project`, `alert`, `agro-market` | Core governance data |
 | `dashboard`, `briefing`, `search` | Aggregations & discovery |
 | `intelligence`, `sovereign`, `twin`, `simulator`, `procurement`, `citizen` | AI-backed DSS proxies |
-| `narrative-shield`, `unrest`, `outlook`, `divisional-crisis` | News / intel DSS |
+| `narrative-shield`, `unrest`, `outlook`, `divisional-crisis`, `national-sector` | News / intel / district sector board |
+| `local-entity` | MP/Mayor DSS — complaints, WPI, sectors, integrity, evidence, command, outages |
 | `weather`, `ingestion`, `pipeline`, `intel` | Feeds, cron orchestration, snapshots |
 | `blockchain`, `public-feed`, `audit-trail`, `health` | Ledger, 333/999, audit, probes |
 

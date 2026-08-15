@@ -1,4 +1,4 @@
-import { ProjectStatus } from "@prisma/client";
+import { ProjectStatus, UserRole } from "@prisma/client";
 import { env } from "../../core/config/env";
 import { prismaRead } from "../../core/database/prisma.client";
 import { liveDataService } from "../live-data/live-data.service";
@@ -19,6 +19,8 @@ import {
   isBangladeshRelevantArticle,
   looksLikeGovProject,
 } from "../../shared/geo/bangladesh-relevance";
+import { nationalBoardService } from "../local-entity/national-board.service";
+import { nationalSectorService } from "../national-sector/national-sector.service";
 
 export interface MorningBriefingQuery extends DashboardScopeQuery {
   lang?: "bn" | "en";
@@ -106,52 +108,264 @@ export class BriefingService {
     const scopeKey = unitId ?? "national";
     const cacheKey = `briefing:morning:${BRIEFING_CACHE_VER}:${lang}:${scopeKey}`;
 
+    let data: Record<string, unknown> | null = null;
+
     if (isRedisEnabled()) {
       const cached = await getRedisClient().get(cacheKey);
       if (cached) {
         const parsed = JSON.parse(cached) as Record<string, unknown>;
-        if (isUsableIntelPayload("BRIEFING", parsed)) return parsed;
+        if (isUsableIntelPayload("BRIEFING", parsed)) data = parsed;
       }
     }
 
-    const fromDb = await getLatestIntelSnapshot("BRIEFING", lang, scopeKey);
-    if (fromDb) {
-      if (isRedisEnabled()) {
-        await getRedisClient().setex(cacheKey, BRIEFING_TTL_SEC, JSON.stringify(fromDb));
+    if (!data) {
+      const fromDb = await getLatestIntelSnapshot("BRIEFING", lang, scopeKey);
+      if (fromDb) {
+        if (isRedisEnabled()) {
+          await getRedisClient().setex(cacheKey, BRIEFING_TTL_SEC, JSON.stringify(fromDb));
+        }
+        data = fromDb;
       }
-      return fromDb;
     }
 
-    const data = await this.buildMorningBriefing(query).catch(async (err) => {
-      console.warn(
-        "[briefing] build failed, trying DB stale fallback:",
-        err instanceof Error ? err.message : err,
-      );
-      const stale = await getStaleIntelFallback("BRIEFING", lang, scopeKey);
-      if (stale) return stale;
-      throw err;
-    });
-    try {
-      await saveIntelSnapshot({
-        kind: "BRIEFING",
-        lang,
-        scopeKey,
-        payload: data,
-        sourceCount: Array.isArray((data as { news_headlines?: unknown[] }).news_headlines)
-          ? ((data as { news_headlines: unknown[] }).news_headlines.length)
-          : 0,
-        llmUsed: Boolean((data as { llm_used?: boolean }).llm_used),
+    if (!data) {
+      data = await this.buildMorningBriefing(query).catch(async (err) => {
+        console.warn(
+          "[briefing] build failed, trying DB stale fallback:",
+          err instanceof Error ? err.message : err,
+        );
+        const stale = await getStaleIntelFallback("BRIEFING", lang, scopeKey);
+        if (stale) return stale;
+        throw err;
       });
-    } catch (err) {
-      console.warn(
-        "[briefing] snapshot persist failed:",
-        err instanceof Error ? err.message : err,
-      );
+      try {
+        await saveIntelSnapshot({
+          kind: "BRIEFING",
+          lang,
+          scopeKey,
+          payload: data,
+          sourceCount: Array.isArray((data as { news_headlines?: unknown[] }).news_headlines)
+            ? ((data as { news_headlines: unknown[] }).news_headlines.length)
+            : 0,
+          llmUsed: Boolean((data as { llm_used?: boolean }).llm_used),
+        });
+      } catch (err) {
+        console.warn(
+          "[briefing] snapshot persist failed:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+      if (isRedisEnabled()) {
+        await getRedisClient().setex(cacheKey, BRIEFING_TTL_SEC, JSON.stringify(data));
+      }
     }
-    if (isRedisEnabled()) {
-      await getRedisClient().setex(cacheKey, BRIEFING_TTL_SEC, JSON.stringify(data));
+
+    if (!data) {
+      throw new Error("Briefing unavailable");
     }
-    return data;
+    return this.attachLocalDeskBullets(data, lang, scopeKey);
+  }
+
+  /** Fresh local-desk bullets — not stored in the 15m briefing snapshot. */
+  private async attachLocalDeskBullets(
+    briefing: Record<string, unknown>,
+    lang: "bn" | "en",
+    scopeKey: string,
+  ): Promise<Record<string, unknown>> {
+    if (scopeKey !== "national") return briefing;
+    try {
+      const [board, national] = await Promise.all([
+        nationalBoardService.getBoard({
+          role: UserRole.PMO,
+          adminUnitId: null,
+        }),
+        nationalSectorService
+          .getBoard({ role: UserRole.PMO, adminUnitId: null })
+          .catch(() => null),
+      ]);
+      const extras: Array<{ text: string; category: string; priority: number }> = [];
+      const bn = lang === "bn";
+
+      if (
+        national &&
+        (national.summary.educationAlerts > 0 ||
+          national.summary.healthAlerts > 0 ||
+          national.summary.jobsAlerts > 0)
+      ) {
+        const hotEdu = [...national.divisions].sort(
+          (a, b) => b.education.alert - a.education.alert || b.education.teacherGap - a.education.teacherGap,
+        )[0];
+        const hotHealth = [...national.divisions].sort(
+          (a, b) => b.health.alert - a.health.alert || b.health.dengue7d - a.health.dengue7d,
+        )[0];
+        const hotJobs = [...national.divisions].sort(
+          (a, b) => b.jobs.alert - a.jobs.alert || b.jobs.unemploymentAvg - a.jobs.unemploymentAvg,
+        )[0];
+        extras.push({
+          text: bn
+            ? `জাতীয় সেক্টর (৮ বিভাগ): শিক্ষা অ্যালার্ট ${national.summary.educationAlerts}, ডেঙ্গু ৭দিন ${national.summary.dengue7d}, বেকারত্ব ${national.summary.unemploymentAvg}% — শিক্ষা ${hotEdu?.nameBn || hotEdu?.name}, স্বাস্থ্য ${hotHealth?.nameBn || hotHealth?.name}, কর্মসংস্থান ${hotJobs?.nameBn || hotJobs?.name}।`
+            : `National sectors (8 divisions): education alerts ${national.summary.educationAlerts}, dengue 7d ${national.summary.dengue7d}, unemployment ${national.summary.unemploymentAvg}% — hottest edu ${hotEdu?.name}, health ${hotHealth?.name}, jobs ${hotJobs?.name}.`,
+          category: "alert",
+          priority: 1,
+        });
+      }
+
+      if (board.summary.warningWards > 0 || board.summary.warningSeats > 0) {
+        const hot = [...board.seats]
+          .filter((s) => s.command.warningWards > 0)
+          .sort((a, b) => b.command.warningWards - a.command.warningWards)
+          .slice(0, 3);
+        extras.push({
+          text: bn
+            ? `লোকাল কমান্ড: ${board.summary.warningWards}টি ওয়ার্ডে ৩+ লেয়ার সতর্কতা, ${board.summary.warningSeats}টি সীট — ${hot.map((s) => `${s.nameBn || s.name} ${s.command.warningWards}টি (কমান্ড ${s.command.commandAverage})`).join("; ")}।`
+            : `Local DSS command: ${board.summary.warningWards} warning wards on ${board.summary.warningSeats} desks — ${hot.map((s) => `${s.code} ${s.command.warningWards} (command ${s.command.commandAverage})`).join("; ")}. 3+ layers stacked.`,
+          category: "alert",
+          priority: 1,
+        });
+      }
+
+      if (board.summary.activeOutages > 0) {
+        const hot = board.seats
+          .filter((s) => s.outages.active > 0)
+          .sort((a, b) => b.outages.gasFuel - a.outages.gasFuel || b.outages.active - a.outages.active)
+          .slice(0, 3);
+        const kindBits = (s: (typeof hot)[number]) =>
+          ["GAS", "FUEL", "POWER", "WATER"]
+            .filter((k) => (s.outages.byKind[k] ?? 0) > 0)
+            .map((k) => `${k.toLowerCase()} ${s.outages.byKind[k]}`)
+            .join(", ");
+        extras.push({
+          text: bn
+            ? `লোকাল ডিএসএস আউটজ: ${board.summary.hotSeats}টি সীটে ${board.summary.activeOutages}টি সক্রিয় — ${hot.map((s) => `${s.nameBn || s.name} ${s.outages.active}টি (${kindBits(s) || "মিশ্র"})`).join("; ")}।`
+            : `Local DSS outages: ${board.summary.activeOutages} active on ${board.summary.hotSeats} desks — ${hot.map((s) => `${s.code} ${s.outages.active} (${kindBits(s) || "mixed"})`).join("; ")}.`,
+          category: "alert",
+          priority: board.summary.gasFuel > 0 ? 1 : 2,
+        });
+      }
+
+      if (board.summary.unrestRising > 0 || board.summary.unrestActive > 0) {
+        const hot = board.seats
+          .filter((s) => s.unrest.trend === "rising" || s.unrest.active > 0)
+          .sort((a, b) => Number(b.unrest.trend === "rising") - Number(a.unrest.trend === "rising") || b.unrest.last24h - a.unrest.last24h)
+          .slice(0, 3);
+        extras.push({
+          text: bn
+            ? `লোকাল আন্দোলন: ${board.summary.unrestRising}টি সীটে ট্রেন্ড বাড়ছে, ${board.summary.unrestActive}টি সক্রিয় ক্লাস্টার — ${hot.map((s) => `${s.nameBn || s.name} ${s.unrest.trend} (${s.unrest.last24h}/২৪ঘ)`).join("; ")}।`
+            : `Local DSS unrest: ${board.summary.unrestRising} desks rising, ${board.summary.unrestActive} active clusters — ${hot.map((s) => `${s.code} ${s.unrest.trend} (${s.unrest.last24h}/24h)`).join("; ")}.`,
+          category: "alert",
+          priority: board.summary.unrestRising > 0 ? 1 : 2,
+        });
+      }
+
+      if (board.summary.overdue > 0 || board.summary.redAlerts > 0) {
+        const hot = board.seats
+          .filter((s) => s.sla.overdue > 0 || s.sla.redAlerts > 0)
+          .sort((a, b) => b.sla.redAlerts - a.sla.redAlerts || b.sla.overdue - a.sla.overdue)
+          .slice(0, 3);
+        extras.push({
+          text: bn
+            ? `লোকাল SLA: ${board.summary.overdue}টি সময়সীমা অতিক্রান্ত, ${board.summary.redAlerts}টি জরুরি — ${hot.map((s) => `${s.nameBn || s.name} overdue ${s.sla.overdue} / red ${s.sla.redAlerts}`).join("; ")}।`
+            : `Local DSS SLA: ${board.summary.overdue} overdue, ${board.summary.redAlerts} red alerts — ${hot.map((s) => `${s.code} overdue ${s.sla.overdue} / red ${s.sla.redAlerts}`).join("; ")}.`,
+          category: "alert",
+          priority: board.summary.redAlerts > 0 ? 1 : 2,
+        });
+      }
+
+      if (
+        board.summary.sectorAlerts > 0 ||
+        board.summary.dengue7d > 0 ||
+        board.summary.teacherGap > 0 ||
+        board.summary.jobFairGaps > 0
+      ) {
+        const pressure = (s: (typeof board.seats)[number]) =>
+          s.sectors.education.alert * 12 +
+          s.sectors.health.alert * 12 +
+          s.sectors.jobs.alert * 12 +
+          (s.sectors.health.dengue7d ?? 0) * 2 +
+          (s.sectors.education.teacherGap ?? 0) * 3 +
+          (s.sectors.jobs.jobFairGaps ?? 0) * 8;
+        const hot = [...board.seats]
+          .sort((a, b) => pressure(b) - pressure(a))
+          .slice(0, 2);
+        extras.push({
+          text: bn
+            ? `লোকাল সেক্টর: শিক্ষক গ্যাপ ${board.summary.teacherGap}, ডেঙ্গু ৭দিন ${board.summary.dengue7d}, জব-ফেয়ার গ্যাপ ${board.summary.jobFairGaps} — ${hot.map((s) => `${s.nameBn || s.name} শিক্ষা ${s.sectors.education.alert}/স্বাস্থ্য ${s.sectors.health.alert}/চাকরি ${s.sectors.jobs.alert}`).join("; ")}।`
+            : `Local DSS sectors: teacher gap ${board.summary.teacherGap}, dengue 7d ${board.summary.dengue7d}, job-fair gaps ${board.summary.jobFairGaps} — ${hot.map((s) => `${s.code} edu ${s.sectors.education.alert}/health ${s.sectors.health.alert}/jobs ${s.sectors.jobs.alert}`).join("; ")}.`,
+          category: "alert",
+          priority: board.summary.sectorAlerts > 0 ? 1 : 2,
+        });
+      }
+
+      if (
+        board.summary.crimeOpen > 0 ||
+        board.summary.corruptionOpen > 0 ||
+        board.summary.tenderFlags > 0 ||
+        board.summary.bribes > 0
+      ) {
+        const pressure = (s: (typeof board.seats)[number]) =>
+          s.integrity.crime.open * 10 +
+          s.integrity.corruption.open * 10 +
+          (s.integrity.corruption.tenderFlags ?? 0) * 14 +
+          (s.integrity.corruption.bribes ?? 0) * 12 +
+          ((s.integrity.crime.nightSharePct ?? 0) >= 60 ? 8 : 0);
+        const hot = [...board.seats]
+          .sort((a, b) => pressure(b) - pressure(a))
+          .slice(0, 2);
+        extras.push({
+          text: bn
+            ? `লোকাল ইন্টিগ্রিটি: অপরাধ খোলা ${board.summary.crimeOpen}, দুর্নীতি খোলা ${board.summary.corruptionOpen}, টেন্ডার ${board.summary.tenderFlags}, ঘুষ ${board.summary.bribes} — ${hot.map((s) => `${s.nameBn || s.name} crime ${s.integrity.crime.open} (night ${s.integrity.crime.nightSharePct ?? 0}%) / corr ${s.integrity.corruption.open}`).join("; ")}।`
+            : `Local DSS integrity: crime open ${board.summary.crimeOpen}, corruption open ${board.summary.corruptionOpen}, tender ${board.summary.tenderFlags}, bribes ${board.summary.bribes} — ${hot.map((s) => `${s.code} crime ${s.integrity.crime.open} (night ${s.integrity.crime.nightSharePct ?? 0}%) / corr ${s.integrity.corruption.open}`).join("; ")}.`,
+          category: "alert",
+          priority:
+            board.summary.tenderFlags > 0 || board.summary.bribes > 0 || board.summary.crimeOpen > 0
+              ? 1
+              : 2,
+        });
+      }
+
+      if (board.evidence.items.length) {
+        const topics = (board.summary.hotTopics ?? []).slice(0, 4).join(", ") || "mixed";
+        const titles = board.evidence.items
+          .slice(0, 3)
+          .map((it) => (bn ? it.titleBn || it.title : it.title));
+        extras.push({
+          text: bn
+            ? `লোকাল গবেষণা: ${board.evidence.items.length}টি সংকট-ম্যাচড অ্যাবস্ট্রাক্ট (${topics}) — ${titles.join("; ")}। পূর্ণ পেপার নয়।`
+            : `Local DSS research: ${board.evidence.items.length} crisis-matched abstracts (${topics}) — ${titles.join("; ")}. Abstracts only, not full papers.`,
+          category: "summary",
+          priority: 2,
+        });
+      }
+
+      if (!extras.length) return briefing;
+      const existing = Array.isArray(briefing.bullets)
+        ? (briefing.bullets as Array<{ text?: string; category?: string; priority?: number }>)
+        : [];
+      const cleaned = existing.filter((b) => {
+        const t = String(b.text ?? "");
+        return (
+          !t.includes("National sectors") &&
+          !t.includes("জাতীয় সেক্টর") &&
+          !t.includes("Local DSS command") &&
+          !t.includes("লোকাল কমান্ড") &&
+          !t.includes("Local DSS outages") &&
+          !t.includes("লোকাল ডিএসএস আউটজ") &&
+          !t.includes("Local DSS unrest") &&
+          !t.includes("লোকাল আন্দোলন") &&
+          !t.includes("Local DSS SLA") &&
+          !t.includes("লোকাল SLA") &&
+          !t.includes("Local DSS research") &&
+          !t.includes("লোকাল গবেষণা") &&
+          !t.includes("Local DSS sectors") &&
+          !t.includes("লোকাল সেক্টর") &&
+          !t.includes("Local DSS integrity") &&
+          !t.includes("লোকাল ইন্টিগ্রিটি")
+        );
+      });
+      return { ...briefing, bullets: [...extras, ...cleaned].slice(0, 10) };
+    } catch {
+      return briefing;
+    }
   }
 
   /** Force regenerate for pipeline cron */

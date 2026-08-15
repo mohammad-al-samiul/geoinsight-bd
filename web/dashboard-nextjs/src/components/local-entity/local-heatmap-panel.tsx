@@ -12,12 +12,22 @@ import {
 } from "@/components/local-entity/local-viz";
 import { LocalWardMap } from "@/components/local-entity/local-ward-map";
 import { LocalFreshnessBadge } from "@/components/local-entity/local-freshness-badge";
+import { LocalMapLayerBar } from "@/components/local-entity/local-map-layer-bar";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { useLocalEntityId } from "@/hooks/use-local-entity-id";
 import { useLocalEntityOverview } from "@/hooks/use-local-entity";
+import { useLayerFilterState } from "@/hooks/use-layer-filter-state";
 import type { LocalWardScore } from "@/lib/local-ward-geo";
 import type { LocalMapMarker } from "@/components/local-entity/local-ward-map-inner";
+import {
+  COMPLAINT_LAYERS,
+  complaintCategoryToLayer,
+  filterLayerEvents,
+  isSignalSource,
+  type LayerEvent,
+  type MarkerSeverity,
+} from "@/lib/local-map-layers";
 
 interface ApiOk<T> {
   success: boolean;
@@ -45,9 +55,12 @@ interface HeatFeed {
     id: string;
     lat: number;
     lng: number;
-    severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+    severity: MarkerSeverity;
     label: string;
     isRedAlert: boolean;
+    category?: string;
+    source?: string;
+    createdAt?: string;
   }>;
 }
 
@@ -57,6 +70,7 @@ export function LocalHeatmapPanel() {
   const isBn = locale.startsWith("bn");
   const entityId = useLocalEntityId();
   const { data: overview } = useLocalEntityOverview(entityId);
+  const layerState = useLayerFilterState();
   const [data, setData] = useState<HeatFeed | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,17 +107,28 @@ export function LocalHeatmapPanel() {
     [data?.wards],
   );
 
-  const markers: LocalMapMarker[] = useMemo(
-    () =>
-      (data?.markers ?? []).map((m) => ({
-        id: m.id,
-        lat: m.lat,
-        lng: m.lng,
-        severity: m.severity,
-        label: m.label,
-      })),
-    [data?.markers],
-  );
+  const markers: LocalMapMarker[] = useMemo(() => {
+    const events: LayerEvent[] = (data?.markers ?? []).map((m) => ({
+      id: m.id,
+      layer: complaintCategoryToLayer(m.category ?? "OTHER"),
+      lat: m.lat,
+      lng: m.lng,
+      severity: m.severity,
+      source: isSignalSource(m.source) ? m.source : "CITIZEN",
+      occurredAt: m.createdAt ?? new Date().toISOString(),
+      label: m.label,
+      kind: m.category,
+    }));
+    return filterLayerEvents(events, layerState.filter).map((e) => ({
+      id: e.id,
+      lat: e.lat,
+      lng: e.lng,
+      severity: e.severity,
+      label: e.label,
+      layer: e.layer,
+      source: e.source,
+    }));
+  }, [data?.markers, layerState.filter]);
 
   const trend = useMemo(
     () =>
@@ -138,6 +163,18 @@ export function LocalHeatmapPanel() {
 
       {overview && (
         <div className="mb-4">
+          <LocalMapLayerBar
+            filter={layerState.filter}
+            layers={COMPLAINT_LAYERS}
+            wards={overview.wards}
+            isBn={isBn}
+            onToggleLayer={layerState.toggleLayer}
+            onToggleSource={layerState.toggleSource}
+            onToggleSeverity={layerState.toggleSeverity}
+            onTimeRange={layerState.setTimeRange}
+            onWard={layerState.setWardId}
+            onReset={layerState.reset}
+          />
           <LocalWardMap
             entityCode={overview.entity.code}
             wards={overview.wards}

@@ -12,6 +12,7 @@ import { AlertTriangle, LogOut, Menu, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 import { isLocalEntityRole } from "@/types";
+import { useNavPulse } from "@/hooks/use-nav-pulse";
 
 interface CommandBarProps {
   onMenuClick: () => void;
@@ -30,6 +31,8 @@ export function CommandBar({
   const { isLoading: authLoading } = useAuthContext();
   const { logout } = useAuthActions();
   const t = useTranslations("shell");
+  const { pulse } = useNavPulse();
+  const liveOn = Boolean(pulse);
   const tr = useTranslations("roles");
   const pathname = usePathname();
   const authReady = !authLoading && user.id !== "loading";
@@ -80,6 +83,18 @@ export function CommandBar({
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
           <LocaleSwitcher />
+          <Badge
+            variant="outline"
+            className={cn(
+              "hidden text-[10px] font-semibold uppercase tracking-wider lg:inline-flex",
+              liveOn
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                : "border-muted-foreground/30 text-muted-foreground",
+            )}
+          >
+            <Radio className="mr-1 h-3 w-3" />
+            {t("liveNav")}
+          </Badge>
           <Badge
             variant="outline"
             className={cn(

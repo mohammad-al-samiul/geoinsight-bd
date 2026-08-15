@@ -150,7 +150,21 @@ enum ComplaintCategory {
   TRAFFIC
   HILL_CUTTING
   HERITAGE
+  UTILITIES
+  CRIME
+  CORRUPTION
+  EDUCATION
+  HEALTH
+  UNEMPLOYMENT
   OTHER
+}
+
+/// Provenance for local map pins / complaints / outages
+enum SignalSource {
+  OFFICIAL
+  CITIZEN
+  NEWS
+  ACADEMIC
 }
 
 enum ComplaintEventKind {
@@ -207,6 +221,12 @@ model AdminUnit {
   visitsAsEntity     LocalVisitPlan[]        @relation("VisitEntity")
   pulseEventsAsWard  LocalPulseEvent[]       @relation("PulseEventWard")
   pulseEventsAsEntity LocalPulseEvent[]      @relation("PulseEventEntity")
+  evidenceAsEntity   LocalEvidenceItem[]     @relation("EvidenceEntity")
+  sectorSitesAsWard  LocalSectorSite[]       @relation("SectorSiteWard")
+  sectorSitesAsEntity LocalSectorSite[]      @relation("SectorSiteEntity")
+  integrityAsWard    LocalIntegrityIncident[] @relation("IntegrityWard")
+  integrityAsEntity  LocalIntegrityIncident[] @relation("IntegrityEntity")
+  nationalSectorSnapshots NationalSectorSnapshot[]
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -787,6 +807,7 @@ model CitizenComplaint {
   titleBn        String?           @map("title_bn") @db.VarChar(255)
   description    String?           @db.Text
   category       ComplaintCategory @default(OTHER)
+  source         SignalSource      @default(CITIZEN)
   severity       ComplaintSeverity @default(MEDIUM)
   status         ComplaintStatus   @default(OPEN)
   citizenName    String?           @map("citizen_name") @db.VarChar(120)
@@ -824,6 +845,7 @@ model CitizenComplaint {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([entityId, status, createdAt(sort: Desc)])
+  @@index([entityId, source])
   @@index([wardId, status])
   @@index([isRedAlert, status, slaDeadline])
   @@index([severity, status])
@@ -1069,6 +1091,8 @@ model AlertDeliveryLog {
 
 enum ServiceOutageKind {
   POWER
+  GAS
+  FUEL
   WATER
   DRAINAGE
   ROAD
@@ -1086,6 +1110,7 @@ enum ServiceOutageStatus {
 model LocalServiceOutage {
   id          String              @id @default(uuid()) @db.Uuid
   kind        ServiceOutageKind   @default(OTHER)
+  source      SignalSource        @default(OFFICIAL)
   status      ServiceOutageStatus @default(ACTIVE)
   title       String              @db.VarChar(255)
   titleBn     String?             @map("title_bn") @db.VarChar(255)
@@ -1109,6 +1134,7 @@ model LocalServiceOutage {
 
   @@index([entityId, status, startedAt(sort: Desc)])
   @@index([entityId, kind, status])
+  @@index([entityId, source])
   @@index([wardId, status])
   @@map("local_service_outages")
 }
@@ -1191,4 +1217,191 @@ model LocalPulseEvent {
   @@index([influencerId, startsAt])
   @@index([wardId, startsAt])
   @@map("local_pulse_events")
+}
+
+enum EvidenceKind {
+  THESIS
+  EXPERT
+  POLICY_BRIEF
+}
+
+enum EvidenceGeoScope {
+  NATIONAL
+  DISTRICT
+  ENTITY
+}
+
+/// Curated thesis / newspaper expert / policy-brief knowledge for Local DSS.
+/// Abstracts + solutions only — not full papers (copyright).
+model LocalEvidenceItem {
+  id           String           @id @default(uuid()) @db.Uuid
+  kind         EvidenceKind
+  /// Map-layer style topics: POWER, GAS, FUEL, WATER, DRAINAGE, ROAD, UNREST, EDUCATION, HEALTH, UNEMPLOYMENT, CRIME, CORRUPTION, OTHER
+  topics       String[]
+  title        String           @db.VarChar(400)
+  titleBn      String?          @map("title_bn") @db.VarChar(400)
+  abstract     String           @db.Text
+  abstractBn   String?          @map("abstract_bn") @db.Text
+  author       String?          @db.VarChar(255)
+  institution  String?          @db.VarChar(255)
+  sourceName   String           @map("source_name") @db.VarChar(128)
+  url          String           @unique @db.VarChar(2048)
+  year         Int
+  publishedAt  DateTime?        @map("published_at") @db.Timestamptz
+  /// 1–5 peer-review / expert weight
+  strength     Int              @default(3)
+  geoScope     EvidenceGeoScope @default(NATIONAL) @map("geo_scope")
+  district     String?          @db.VarChar(64)
+  division     String?          @db.VarChar(64)
+  /// { now: {en,bn}, week: {en,bn}, days90: {en,bn} }
+  solutions    Json
+  entityId     String?          @map("entity_id") @db.Uuid
+  entity       AdminUnit?       @relation("EvidenceEntity", fields: [entityId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([kind, year(sort: Desc)])
+  @@index([geoScope, district])
+  @@index([entityId, year(sort: Desc)])
+  @@map("local_evidence_items")
+}
+
+enum LocalSector {
+  EDUCATION
+  HEALTH
+  EMPLOYMENT
+}
+
+enum LocalSiteKind {
+  PRIMARY_SCHOOL
+  SECONDARY_SCHOOL
+  COLLEGE
+  HOSPITAL
+  CLINIC
+  PHARMACY
+  TRAINING_CENTER
+  JOB_FAIR
+  EPZ_GATE
+}
+
+enum LocalSiteStatus {
+  OK
+  WATCH
+  ALERT
+}
+
+/// Education / health / employment sites for Local DSS (seed now, EMIS/DGHS/BBS later)
+model LocalSectorSite {
+  id         String          @id @default(uuid()) @db.Uuid
+  sector     LocalSector
+  kind       LocalSiteKind
+  status     LocalSiteStatus @default(WATCH)
+  source     SignalSource    @default(OFFICIAL)
+  title      String          @db.VarChar(255)
+  titleBn    String?         @map("title_bn") @db.VarChar(255)
+  detail     String?         @db.Text
+  detailBn   String?         @map("detail_bn") @db.Text
+  /// Sector metrics (attendance, beds, unemploymentPct, …)
+  metrics    Json
+  severity   Int             @default(3)
+  lat        Float?
+  lng        Float?
+  observedAt DateTime        @default(now()) @map("observed_at") @db.Timestamptz
+
+  wardId   String?    @map("ward_id") @db.Uuid
+  ward     AdminUnit? @relation("SectorSiteWard", fields: [wardId], references: [id], onDelete: SetNull)
+  entityId String     @map("entity_id") @db.Uuid
+  entity   AdminUnit  @relation("SectorSiteEntity", fields: [entityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([entityId, sector, status])
+  @@index([entityId, sector, observedAt(sort: Desc)])
+  @@index([wardId, sector])
+  @@map("local_sector_sites")
+}
+
+enum LocalIntegrityDomain {
+  CRIME
+  CORRUPTION
+}
+
+enum LocalIntegrityKind {
+  THEFT
+  SNATCH
+  MURDER
+  STREET_VIOLENCE
+  EVE_TEASING
+  NARCOTICS
+  CYBER
+  TRAFFIC_ACCIDENT
+  FIRE
+  BRIBE
+  HOLDING_TAX
+  TENDER
+  PROJECT_GHOST
+  LICENSE_DESK
+  RECRUITMENT
+}
+
+enum LocalIntegrityStatus {
+  OPEN
+  WATCH
+  CLOSED
+}
+
+/// Crime / corruption incidents for Local DSS (seed now, police/ACC later)
+model LocalIntegrityIncident {
+  id         String               @id @default(uuid()) @db.Uuid
+  domain     LocalIntegrityDomain
+  kind       LocalIntegrityKind
+  status     LocalIntegrityStatus @default(OPEN)
+  source     SignalSource         @default(OFFICIAL)
+  title      String               @db.VarChar(255)
+  titleBn    String?              @map("title_bn") @db.VarChar(255)
+  detail     String?              @db.Text
+  detailBn   String?              @map("detail_bn") @db.Text
+  /// Crime: count7d, nightSharePct, patrolGap, cctvCoverage. Corruption: extraFeeTk, tenderFlag, holdingTaxGapPct, sameContractorWins
+  metrics    Json
+  severity   Int                  @default(3)
+  lat        Float?
+  lng        Float?
+  occurredAt DateTime             @default(now()) @map("occurred_at") @db.Timestamptz
+
+  wardId   String?    @map("ward_id") @db.Uuid
+  ward     AdminUnit? @relation("IntegrityWard", fields: [wardId], references: [id], onDelete: SetNull)
+  entityId String     @map("entity_id") @db.Uuid
+  entity   AdminUnit  @relation("IntegrityEntity", fields: [entityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([entityId, domain, status])
+  @@index([entityId, domain, occurredAt(sort: Desc)])
+  @@index([wardId, domain])
+  @@map("local_integrity_incidents")
+}
+
+/// District-level education / health / employment snapshot for PMO (seed now, EMIS/DGHS/BBS later)
+model NationalSectorSnapshot {
+  id         String          @id @default(uuid()) @db.Uuid
+  sector     LocalSector
+  status     LocalSiteStatus @default(WATCH)
+  source     SignalSource    @default(OFFICIAL)
+  metrics    Json
+  severity   Int             @default(3)
+  observedAt DateTime        @default(now()) @map("observed_at") @db.Timestamptz
+
+  adminUnitId String    @map("admin_unit_id") @db.Uuid
+  adminUnit   AdminUnit @relation(fields: [adminUnitId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([adminUnitId, sector])
+  @@index([sector, status])
+  @@index([adminUnitId, sector])
+  @@map("national_sector_snapshots")
 }

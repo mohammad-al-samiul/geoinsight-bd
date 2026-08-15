@@ -10,11 +10,11 @@ National command UI for GeoInsight BD — App Router, Tailwind, Leaflet, Rechart
 
 | Concern | Detail |
 |---------|--------|
-| UI | PMO → Union Chairman hierarchical dashboards |
-| BFF | `/api/auth/*` + `/api/proxy/[...path]` → API Gateway |
+| UI | PMO → Union Chairman national dashboards; MP / Mayor Local DSS |
+| BFF | `/api/auth/*` (incl. MFA) + `/api/proxy/[...path]` → API Gateway |
 | Real-time | Socket.io client (`NEXT_PUBLIC_SOCKET_URL`) |
 | i18n | `next-intl` — বাংলা / English |
-| Maps | Leaflet choropleth / proximity / crisis overlays |
+| Maps | Leaflet choropleth / local ward layers / proximity overlays |
 
 Browser never stores access tokens in `localStorage`.
 
@@ -32,7 +32,8 @@ npm run dev    # :3000
 
 Docker full stack host URL is often **http://localhost:3600** (see root README).
 
-Default login (seeded): `pmo@geoinsight.gov.bd` / `ChangeMe@123`
+Default login (seeded): `pmo@geoinsight.gov.bd` / `ChangeMe@123`  
+Local desks: `mp.ctg8@geoinsight.gov.bd`, `mayor.ccc@geoinsight.gov.bd` (same password).
 
 ---
 
@@ -40,22 +41,24 @@ Default login (seeded): `pmo@geoinsight.gov.bd` / `ChangeMe@123`
 
 | Path | Feature |
 |------|---------|
-| `/` · `/dashboard` | National overview |
+| `/` | National overview (map lives here; `/dashboard` and `/map` redirect) |
 | `/briefing` | PM morning briefing |
 | `/narrative-shield` | Counter-disinfo feed |
 | `/outlook` | Strategic outlook |
 | `/unrest` | Protest / unrest pulse |
-| `/divisional-crisis` | Division risk pulse |
+| `/sectors` | Education · Health · Jobs (PMO, MINISTER) |
+| `/divisional-crisis` | 8-division risk pulse |
 | `/anti-phishing` | Phishing RED_FLAG scanner |
 | `/hazards` | Flood/cyclone + live weather |
 | `/agro` · `/procurement` | Markets & commodity advisor |
 | `/kpis` · `/projects` · `/alerts` | Governance ops |
 | `/documents` · `/audit-trail` | Docs + AI audit timeline |
 | `/notifications` | Notification center |
-| `/representatives` · `/map` | Directory + geo map |
-| `/login` | Auth |
+| `/representatives` · `/face-intel` | Directory + VIP ethical card |
+| `/local/*` | Local Entity DSS (21 desks — MP/Mayor + PMO oversight) |
+| `/login` | Auth + TOTP MFA step |
 
-Sidebar RBAC: `src/components/layout/sidebar.tsx` (`minTier` 1–4).
+Sidebar RBAC: `src/components/layout/sidebar.tsx` (`NATIONAL_NAV` + `LOCAL_NAV`). MP/MAYOR forced to `/local/*`.
 
 ---
 

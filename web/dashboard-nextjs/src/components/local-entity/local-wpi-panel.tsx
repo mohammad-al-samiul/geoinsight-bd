@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Gauge, Layers3, RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { DataTable, ModuleShell } from "@/components/modules/module-shell";
 import {
   LocalAreaTrend,
@@ -17,7 +18,7 @@ import { LocalWardMap } from "@/components/local-entity/local-ward-map";
 import { Button } from "@/components/ui/button";
 import { useLocalWpi, useLocalWpiExplain, useLocalWpiHistory } from "@/hooks/use-local-dss";
 import { useLocalEntityOverview } from "@/hooks/use-local-entity";
-import { useLocalEntityId } from "@/hooks/use-local-entity-id";
+import { useLocalEntityId, withLocalEntityHref } from "@/hooks/use-local-entity-id";
 import { cn } from "@/lib/utils";
 
 function scoreTone(score: number) {
@@ -154,10 +155,18 @@ export function LocalWpiPanel() {
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">{t("formula")}</p>
-        <Button size="sm" variant="outline" disabled={recomputing} onClick={() => void recompute()}>
-          <RefreshCw className={cn("mr-2 h-3.5 w-3.5", recomputing && "animate-spin")} />
-          {recomputing ? t("recomputing") : t("recompute")}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" asChild>
+            <Link href={withLocalEntityHref("/local/command", entityId)}>
+              <Layers3 className="mr-2 h-3.5 w-3.5" />
+              {t("commandRoom")}
+            </Link>
+          </Button>
+          <Button size="sm" variant="outline" disabled={recomputing} onClick={() => void recompute()}>
+            <RefreshCw className={cn("mr-2 h-3.5 w-3.5", recomputing && "animate-spin")} />
+            {recomputing ? t("recomputing") : t("recompute")}
+          </Button>
+        </div>
       </div>
 
       {(overview || data) && (

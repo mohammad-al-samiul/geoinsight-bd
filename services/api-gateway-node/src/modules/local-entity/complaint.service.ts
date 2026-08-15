@@ -4,6 +4,7 @@ import {
   ComplaintSeverity,
   ComplaintStatus,
   Prisma,
+  SignalSource,
   UserRole,
 } from "@prisma/client";
 import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
@@ -28,6 +29,7 @@ export interface CreateComplaintInput {
   titleBn?: string;
   description?: string;
   category?: ComplaintCategory;
+  source?: SignalSource;
   severity?: ComplaintSeverity;
   citizenName?: string;
   citizenPhone?: string;
@@ -250,6 +252,7 @@ export class ComplaintService {
         titleBn: input.titleBn?.trim() || null,
         description: input.description?.trim() || null,
         category: input.category ?? ComplaintCategory.OTHER,
+        source: input.source ?? SignalSource.CITIZEN,
         severity,
         status: ComplaintStatus.OPEN,
         citizenName: input.citizenName?.trim() || null,

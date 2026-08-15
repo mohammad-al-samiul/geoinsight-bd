@@ -29,6 +29,9 @@ import {
   LocalVizCard,
 } from "@/components/local-entity/local-viz";
 import { LocalWardMap } from "@/components/local-entity/local-ward-map";
+import { LocalMapLayerBar } from "@/components/local-entity/local-map-layer-bar";
+import { LocalSourceBadge } from "@/components/local-entity/local-source-badge";
+import { LocalEvidenceFeed } from "@/components/local-entity/local-evidence-feed";
 import { PhotoFileField } from "@/components/local-entity/photo-file-field";
 import { Button } from "@/components/ui/button";
 import { AppSelect } from "@/components/ui/app-select";
@@ -36,6 +39,7 @@ import {
   type CitizenComplaint,
   type ComplaintCategory,
   type ComplaintOperationalStatus,
+  type SignalSource,
   useComplaintAssignees,
   useComplaintTimeline,
   useLocalComplaints,
@@ -50,13 +54,27 @@ import {
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
 import type { LocalMapMarker } from "@/components/local-entity/local-ward-map-inner";
+import { useLayerFilterState } from "@/hooks/use-layer-filter-state";
+import {
+  COMPLAINT_LAYERS,
+  complaintCategoryToLayer,
+  filterLayerEvents,
+  isSignalSource,
+  type LayerEvent,
+} from "@/lib/local-map-layers";
 
 const CATEGORIES: ComplaintCategory[] = [
   "INFRASTRUCTURE",
+  "UTILITIES",
   "DRAINAGE",
   "WASTE",
   "SAFETY",
+  "CRIME",
+  "CORRUPTION",
   "TRAFFIC",
+  "EDUCATION",
+  "HEALTH",
+  "UNEMPLOYMENT",
   "HILL_CUTTING",
   "HERITAGE",
   "OTHER",
@@ -145,6 +163,7 @@ function slaCountdown(
 export function LocalComplaintsPanel() {
   const t = useTranslations("modules.localComplaints");
   const tv = useTranslations("modules.localViz");
+  const ts = useTranslations("modules.localMapLayers");
   const locale = useLocale();
   const isBn = locale.startsWith("bn");
   const entityId = useLocalEntityId();
@@ -184,6 +203,8 @@ export function LocalComplaintsPanel() {
   const [assistMsg, setAssistMsg] = useState("");
   const [assistBusy, setAssistBusy] = useState(false);
   const [assistReply, setAssistReply] = useState<string | null>(null);
+  const [source, setSource] = useState<SignalSource>("CITIZEN");
+  const layerState = useLayerFilterState();
 
   const wards = overview?.wards ?? [];
   const selectedWard = wardId || wards[0]?.id || "";
@@ -248,6 +269,12 @@ export function LocalComplaintsPanel() {
       TRAFFIC: t("catTraffic"),
       HILL_CUTTING: t("catHillCutting"),
       HERITAGE: t("catHeritage"),
+      UTILITIES: t("catUtilities"),
+      CRIME: t("catCrime"),
+      CORRUPTION: t("catCorruption"),
+      EDUCATION: t("catEducation"),
+      HEALTH: t("catHealth"),
+      UNEMPLOYMENT: t("catUnemployment"),
       OTHER: t("catOther"),
     };
     return map[c] ?? c;
@@ -342,20 +369,34 @@ export function LocalComplaintsPanel() {
       buildLocalWardGeoJson(code, wardList, wardScores),
     );
     const anchor = resolveEntityAnchor(code);
-    return (data?.items ?? [])
+    const events: LayerEvent[] = (data?.items ?? [])
       .filter((c) => c.status !== "RESOLVED")
-      .slice(0, 40)
+      .slice(0, 80)
       .map((c, i) => {
         const fromWard = centroids.get(c.wardId);
         return {
           id: c.id,
+          layer: complaintCategoryToLayer(c.category),
           lat: c.lat ?? fromWard?.lat ?? anchor.lat + Math.sin(i) * 0.01,
           lng: c.lng ?? fromWard?.lng ?? anchor.lng + Math.cos(i) * 0.012,
           severity: c.severity,
+          source: isSignalSource(c.source) ? c.source : "CITIZEN",
+          occurredAt: c.createdAt,
+          wardId: c.wardId,
           label: isBn ? c.titleBn || c.title : c.title,
+          kind: c.category,
         };
       });
-  }, [data?.items, overview?.entity.code, overview?.wards, wardScores, isBn]);
+    return filterLayerEvents(events, layerState.filter).map((e) => ({
+      id: e.id,
+      lat: e.lat,
+      lng: e.lng,
+      severity: e.severity,
+      label: e.label,
+      layer: e.layer,
+      source: e.source,
+    }));
+  }, [data?.items, overview?.entity.code, overview?.wards, wardScores, isBn, layerState.filter]);
 
   const selected: CitizenComplaint | null = useMemo(() => {
     if (!selectedId) return data?.items[0] ?? null;
@@ -381,6 +422,7 @@ export function LocalComplaintsPanel() {
         title: title.trim(),
         description: description.trim() || undefined,
         category,
+        source,
         severity: severity as "CRITICAL" | "HIGH" | "MEDIUM" | "LOW",
         citizenName: citizenName.trim() || undefined,
         citizenPhone: citizenPhone.trim() || undefined,
@@ -533,6 +575,18 @@ export function LocalComplaintsPanel() {
 
       {overview && (
         <div className="mb-4">
+          <LocalMapLayerBar
+            filter={layerState.filter}
+            layers={COMPLAINT_LAYERS}
+            wards={overview.wards}
+            isBn={isBn}
+            onToggleLayer={layerState.toggleLayer}
+            onToggleSource={layerState.toggleSource}
+            onToggleSeverity={layerState.toggleSeverity}
+            onTimeRange={layerState.setTimeRange}
+            onWard={layerState.setWardId}
+            onReset={layerState.reset}
+          />
           <LocalWardMap
             entityCode={overview.entity.code}
             wards={overview.wards}
@@ -660,6 +714,21 @@ export function LocalComplaintsPanel() {
               value={category}
               onValueChange={(v) => setCategory(v as ComplaintCategory)}
               options={CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c) }))}
+              size="default"
+              triggerClassName="h-10"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs text-muted-foreground">{t("sourceLabel")}</label>
+            <AppSelect
+              value={source}
+              onValueChange={(v) => setSource(v as SignalSource)}
+              options={[
+                { value: "CITIZEN", label: ts("sourceCitizen") },
+                { value: "OFFICIAL", label: ts("sourceOfficial") },
+                { value: "NEWS", label: ts("sourceNews") },
+                { value: "ACADEMIC", label: ts("sourceAcademic") },
+              ]}
               size="default"
               triggerClassName="h-10"
             />
@@ -1008,6 +1077,11 @@ export function LocalComplaintsPanel() {
             ),
           },
           {
+            key: "source",
+            label: t("colSource"),
+            render: (row) => <LocalSourceBadge source={row.source} />,
+          },
+          {
             key: "severity",
             label: t("colSeverity"),
             render: (row) => (
@@ -1127,6 +1201,12 @@ export function LocalComplaintsPanel() {
         ]}
         rows={data?.items ?? []}
       />
+      <div className="mt-4">
+        <LocalEvidenceFeed
+          compact
+          topics={["CRIME", "CORRUPTION", "EDUCATION", "HEALTH", "UNEMPLOYMENT", "DRAINAGE"]}
+        />
+      </div>
     </ModuleShell>
   );
 }

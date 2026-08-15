@@ -39,6 +39,8 @@ GeoInsight BD is a **monorepo** that gives the Government of Bangladesh a single
 
 - **National project tracking** — budget, completion, red flags by division → union
 - **Representative KPIs** — MPs, Ministers, DCs with verified metrics
+- **Education · Health · Jobs board** — 64-district sector snapshots (`/sectors`)
+- **Local Entity DSS** — MP / Mayor ward desks (CTG-8/9/10, CCC, COCC) + PMO oversight
 - **AI anomaly detection** — budget overrun, delay, contractor fraud patterns
 - **Narrative & unrest intel** — counter-disinfo shield, protest pulse, strategic outlook
 - **Citizen sentiment** — Bangla-BERT on news + 333/999-style grievance streams
@@ -47,6 +49,7 @@ GeoInsight BD is a **monorepo** that gives the Government of Bangladesh a single
 - **Sovereign Bangla LLM** — on-prem Ollama; verified DB context only
 - **Weather & crisis pulse** — Open-Meteo / GDACS + divisional risk overlay
 - **Blockchain audit trail** — Hyperledger Fabric milestone anchoring
+- **Optional TOTP MFA** — login step + `/local/security` setup
 
 | Service | Stack | Port (host) | Role |
 |---------|-------|-------------|------|
@@ -102,9 +105,17 @@ cp .env.example .env          # প্রথমবার — strong passwords + 
 | http://localhost:4800/api/v1/health | API Gateway (default host port) |
 | AI Analytics | Docker অভ্যন্তরে `ai-analytics:8000` (API দিয়ে proxy) |
 
-**Login:** `pmo@geoinsight.gov.bd` / `ChangeMe@123`
+**Login** (সব demo password `ChangeMe@123`):
 
-`db-init` automatically চলে — divisions, projects, KPIs, red flags seed হয়।
+| Role | Email |
+|------|-------|
+| PMO | `pmo@geoinsight.gov.bd` |
+| Minister | `minister@geoinsight.gov.bd` |
+| DC | `dc.dhaka@geoinsight.gov.bd` |
+| MP (CTG-8) | `mp.ctg8@geoinsight.gov.bd` |
+| Mayor (CCC) | `mayor.ccc@geoinsight.gov.bd` |
+
+`db-init` automatically চলে — national hierarchy + local entities (wards, complaints, sectors, integrity) seed হয়।
 
 বিস্তারিত architecture → [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) · deploy → [docs/DEPLOYMENT_AND_OPS.md](docs/DEPLOYMENT_AND_OPS.md)
 
@@ -175,78 +186,84 @@ docker compose -f docker-compose.yml -f docker-compose.apps.yml run --rm db-init
 
 ## Features
 
-### PMO Command (Tier 1)
+Sidebar: `web/dashboard-nextjs/src/components/layout/sidebar.tsx`. MP / MAYOR শুধু `/local/*` দেখে; PMO সব national + Local DSS oversight (`?entityId=`).
+
+### National command (PMO-heavy)
 
 | Page | Path | Description |
 |------|------|-------------|
-| National Overview | `/` | Choropleth map, live KPI scorecards, red flag markers |
-| Command Dashboard | `/dashboard` | Same national command viewport |
-| PM Briefing Copilot | `/briefing` | AI morning bullets, narrative, voice TTS |
-| Narrative Shield | `/narrative-shield` | Counter-disinfo: classify, fact-check, RAG debunk, escalate |
+| National Overview | `/` | Choropleth, live KPIs, PMO local-desk strip, national sector strip |
+| PM Briefing Copilot | `/briefing` | AI morning bullets, voice TTS, local evidence snippets |
+| Narrative Shield | `/narrative-shield` | Counter-disinfo: classify, fact-check, RAG debunk, escalate, CSV |
 | Strategic Outlook | `/outlook` | Politics / economy themes, direction, scenarios (Ollama) |
-| Unrest Pulse | `/unrest` | Protest / grievance pulse from ingested BD news |
-| Anti-Phishing Shield | `/anti-phishing` | Official site fingerprints vs lookalike URLs (`RED_FLAG`) |
+| Unrest Pulse | `/unrest` | National protest / grievance pulse from ingested BD news |
+| Education · Health · Jobs | `/sectors` | 64-district sector board (PMO, MINISTER) |
+| Anti-Phishing Shield | `/anti-phishing` | Official `.gov.bd` fingerprints vs lookalike URLs (`RED_FLAG`) |
 | Procurement Advisor | `/procurement` | Commodity landed cost + lead time |
 | Notifications | `/notifications` | Live red-flag / anomaly notification center |
 
-### Governance & Operations (Tier 2)
+`/dashboard` এবং `/map` → `/` redirect।
 
-| Page | Path | Description |
+### Governance & field
+
+| Page | Path | Typical nav |
 |------|------|-------------|
-| Flood & Cyclone Risk | `/hazards` | Hazard overlay + live weather (Open-Meteo / GDACS) |
-| Representative KPIs | `/kpis` | MP / Minister / DC performance metrics |
+| Flood & Cyclone Risk | `/hazards` | PMO, MINISTER, DC |
+| Representative KPIs | `/kpis` | PMO, MINISTER, DC |
 | Project Tracker | `/projects` | Budget, status, red flags, blockchain |
 | Red Flag Alerts | `/alerts` | Predictive scan + live anomaly feed |
 | Document Intelligence | `/documents` | Tender / contract anomaly detection |
 | AI Audit Trail | `/audit-trail` | Red flag → AI → action timeline |
-
-### Field & Local (Tier 3–4)
-
-| Page | Path | Description |
-|------|------|-------------|
-| Agri Markets | `/agro` | Mandi, haat, retail market registry |
-| Divisional Crisis | `/divisional-crisis` | Division risk pulse (alerts + grievance + weather) |
-| Geo Spatial Map | `/map` | Full command map viewport |
+| Agri Markets | `/agro` | Mandi, haat, retail |
+| Divisional Crisis | `/divisional-crisis` | 8-division risk + PMO integrity hits |
 | Representatives | `/representatives` | Directory + Accountability AI scores |
 | Face Intel | `/face-intel` | OpenCV VIP match + 6-month ethical card |
-| Local DSS (PMO oversight) | `/local` | MP/Mayor command surface (CTG-8/9/10, CCC, COCC) |
+| Local DSS (PMO) | `/local` | Oversight into CTG-8/9/10, CCC, COCC |
 
-### Local Entity DSS (Tier 5 — MP / Mayor)
+### Local Entity DSS (MP / Mayor + PMO)
 
-Constituency ও City Corporation desk — national choropleth নয়, ward-level action।
+Ward-level action — catalog: **CTG-8, CTG-9, CTG-10, CCC, COCC**. Gateway: `/local-entity/*`. AI: `/local-ai/*`.
 
 | Page | Path | Description |
 |------|------|-------------|
-| Overview / morning brief | `/local` | Entity catalog, brief, CSV/digest |
-| Field snapshot | `/local/field` | Phone-first field summary |
-| Complaints & SLA | `/local/complaints` | Triage, assign, before/after photo, red alert |
-| Heatmap | `/local/heatmap` | Ward risk board |
-| Visits | `/local/visits` | Field visit planner |
+| Overview / morning brief | `/local` | Catalog, brief, CSV / WhatsApp digest |
+| Field snapshot | `/local/field` | Phone-first queue + offline field brief |
+| Complaints & SLA | `/local/complaints` | 24h SLA, AI triage, before/after photo |
+| Heatmap | `/local/heatmap` | Aggregated map layers (complaints, outages, sites) |
+| Visits | `/local/visits` | WPI / red-alert visit planner + AI top-3 |
 | WPI | `/local/wpi` | Ward Performance Index + AI explain |
-| Scorecard | `/local/scorecard` | Compare wards / entities |
-| Budget | `/local/budget` | Local project spend |
-| OSINT | `/local/osint` | Keyword-scoped news + propaganda flag |
-| Pulse | `/local/pulse` | Influencers, polling, events |
-| Specialty | `/local/specialty` | Entity packs (bridge, hill-cut, canals, dighi…) |
-| Outages | `/local/outage` | Service outage track |
-| Alert delivery | `/local/alerts` | Crisis notify + retry / voice test |
-| Security | `/local/security` | TOTP MFA for the desk |
+| Scorecard | `/local/scorecard` | Ward / seat comparison |
+| Budget | `/local/budget` | Entity ADP burn + stall risk |
+| OSINT | `/local/osint` | Keyword news + propaganda flag |
+| Pulse | `/local/pulse` | Influencers, polling, events + **local unrest** |
+| Evidence | `/local/evidence` | Thesis / expert / policy abstracts |
+| Education | `/local/education` | School pressure (attendance, dropout, teachers) |
+| Health | `/local/health` | Clinic load, dengue, stockouts |
+| Jobs | `/local/jobs` | Unemployment heat, training seats |
+| Crime | `/local/crime` | Theft / snatch / night-hour desk |
+| Corruption | `/local/corruption` | Tender flags, holding-tax, bribe reports |
+| Command room | `/local/command` | Multi-layer overlay + what-if (not persisted) |
+| Specialty | `/local/specialty` | Entity packs + AI anomaly scan |
+| Outages | `/local/outage` | Power / gas / fuel / water / drainage / road / internet |
+| Alert delivery | `/local/alerts` | WhatsApp / voice crisis log + retry |
+| Security | `/local/security` | TOTP MFA setup |
 
-### Backend / AI modules (API-backed; UI via command search or panels)
+### Search-indexed panels (no dedicated nav page)
 
-| Capability | Paths / APIs | Notes |
-|------------|--------------|-------|
-| Sovereign Bangla LLM | Gateway `/sovereign-llm/*` · AI `/sovereign-llm/chat` | On-prem Ollama; verified DB context |
-| Digital Twin | Gateway `/twin/*` | Budget reallocation simulation |
-| Sentiment heatmap | Gateway `/intelligence/sentiment/*` | Bangla-BERT on 333/999 + news |
-| Impact Simulator | Gateway `/simulator/*` | Geopolitical shock scenarios |
-| Citizen Chatbot | Gateway `/citizen/*` | 333/999 routing |
-| Proximity geo-fence | Gateway `/intelligence/proximity/*` | Shapely polygons (PMO / VIP) |
-| Face Intel | Gateway `/intelligence/face-intel/*` | OpenCV VIP match + ethical card |
-| News ingestion | Gateway `/ingestion/*` · AI `/ingestion/fetch` | RSS + Google News → `external_articles` |
-| Pipeline orchestrator | Gateway `/pipeline/*` | Cron sync: news, weather, unrest, outlook, … |
-| Intel store | Gateway `/intel/*` | Snapshots + pipeline/ingestion run history |
-| Live weather | Gateway `/weather/live` · AI `/weather/fetch` | Feeds hazards + divisional crisis |
+Ctrl+K থেকে খোলা যায়; backend আছে, sidebar-এ আলাদা route নেই।
+
+| Capability | Gateway | Notes |
+|------------|---------|-------|
+| Sovereign Bangla LLM | `/sovereign-llm/*` | On-prem Ollama; verified DB context |
+| Digital Twin | `/twin/*` | Budget reallocation simulation |
+| Sentiment heatmap | `/intelligence/sentiment/*` | Bangla-BERT on 333/999 + news |
+| Impact Simulator | `/simulator/*` | Geopolitical shock scenarios |
+| Citizen Chatbot | `/citizen/*` | 333/999 routing (also public) |
+| Proximity geo-fence | `/intelligence/proximity/*` | Shapely polygons (PMO / VIP) |
+| News ingestion | `/ingestion/*` | RSS + Google News → `external_articles` |
+| Pipeline orchestrator | `/pipeline/*` | Cron: news, weather, unrest, outlook, … |
+| Intel store | `/intel/*` | Snapshots + pipeline / ingestion history |
+| Live weather | `/weather/live` | Feeds `/hazards` + divisional crisis |
 
 ### Global UI
 
@@ -255,6 +272,7 @@ Constituency ও City Corporation desk — national choropleth নয়, ward-l
 - **Notification Center** — `/notifications` + live red flag bell
 - **AI Anomaly Feed** — right panel, Socket.io live
 - **Locale Switcher** — বাংলা / English
+- **PMO local roll-up** — national home + divisional-crisis integrity hits
 
 ---
 
@@ -264,7 +282,8 @@ Constituency ও City Corporation desk — national choropleth নয়, ward-l
 
 | Browser path | Purpose |
 |--------------|---------|
-| `POST /api/auth/login` | Login → sets `gi_access_token`, `gi_refresh_token` cookies |
+| `POST /api/auth/login` | Login → cookies, or MFA challenge (`requiresMfa`) |
+| `POST /api/auth/mfa/verify` | TOTP complete login → cookies |
 | `POST /api/auth/refresh` | Silent token refresh |
 | `GET /api/auth/me` | Current user profile |
 | `POST /api/auth/logout` | Clears cookies + revokes refresh |
@@ -352,25 +371,28 @@ Base path: `/api/v1`
 
 | Module | Key endpoints | Roles (typical) |
 |--------|---------------|-----------------|
-| `auth` | `POST /auth/login`, `/register`, `/refresh` | Public / PMO |
+| `auth` | `POST /auth/login`, `/refresh`, `/mfa/*` | Public login; MFA setup = authenticated |
 | `dashboard` | `GET /dashboard/national` | PMO, MINISTER |
-| `briefing` | `GET /briefing/morning?lang=bn` | PMO |
+| `briefing` | `GET /briefing/morning?lang=bn` | PMO, MINISTER |
 | `narrative-shield` | `/narrative-shield/feed`, `/debunk`, `/escalate`, … | PMO, MINISTER (, DC read) |
 | `outlook` | `GET /outlook/strategic`, `POST /outlook/refresh` | PMO, MINISTER (, DC read) |
 | `unrest` | `GET /unrest/pulse`, `POST /unrest/refresh` | PMO, MINISTER (, DC read) |
+| `national-sector` | `GET /national-sector/board` | PMO, MINISTER |
 | `divisional-crisis` | `GET /divisional-crisis/pulse` | PMO, MINISTER, DC |
+| `local-entity` | `/local-entity/overview`, `/complaints`, `/wpi`, `/sector`, `/integrity`, `/evidence`, `/command`, … | PMO, MP, MAYOR |
 | `weather` | `GET /weather/live` | PMO, MINISTER, DC |
 | `ingestion` | `/ingestion/sync`, `/articles`, `/stats` | PMO, MINISTER |
 | `pipeline` | `/pipeline/status`, `/pipeline/sync/:job` | PMO, MINISTER |
 | `intel` | `/intel/stats`, `/snapshots/history`, run history | PMO, MINISTER |
 | `sovereign` | `POST /sovereign-llm/chat` | PMO, MINISTER |
-| `twin` | `POST /twin/simulate` | PMO |
-| `intelligence` | sentiment, predictive, phishing, proximity, face-intel, … | PMO, MINISTER |
-| `simulator` | `POST /simulator/run` | PMO |
-| `procurement` | `POST /procurement/advise` | PMO |
+| `twin` | `POST /twin/simulate` | PMO, MINISTER |
+| `intelligence` | sentiment, predictive, phishing, proximity, face-intel, … | PMO, MINISTER (, DC) |
+| `simulator` | `POST /simulator/run` | PMO, MINISTER |
+| `procurement` | `POST /procurement/advise` | PMO, MINISTER |
 | `projects` / `kpis` / `alerts` | CRUD-style scoped routes | Scoped |
-| `search` | `GET /search?q=` | Authenticated |
+| `search` | `GET /search?q=` | All authenticated roles |
 | `public-feed` | `/public/feeds/333\|999/stream` | Rate-limited |
+| `citizen` | `POST /citizen/chat` | Public (rate-limited) |
 
 Full register list: `services/api-gateway-node/src/modules/register-modules.ts`
 
@@ -389,36 +411,38 @@ Full register list: `services/api-gateway-node/src/modules/register-modules.ts`
 | `arbitrage` | `/arbitrage/*` | Commodity price engine |
 | `procurement` | `/procurement/advise` | Landed cost ranking |
 | `phishing` / `proximity` / `face_intel` | DSS modules | Cyber / GIS / CV |
+| `local_ai` | `/local-ai/morning-brief`, `/complaint-triage`, `/wpi-explain`, … | Local DSS LLM + photo QA |
 | `documents` / `hazards` / `twin` / `simulator` / `citizen` | module paths | Intelligence APIs |
 
 ---
 
 ## Dashboard Pages & RBAC
 
-Sidebar filter: `minTier >= userTier` (PMO=`1` … UNION_CHAIRMAN=`4`); **PMO always sees everything**.
+Sidebar: `minTier` + optional `roles[]`. **PMO** always sees national nav. **MP / MAYOR** are forced onto `/local/*` (`role-route-guard.tsx`).
 
-| Tier | Role | Sidebar visibility (approx.) |
-|------|------|------------------------------|
-| 1 | PMO | All pages |
-| 2 | MINISTER | Hazards, KPIs, Projects, Alerts, Documents, Audit Trail (+ shared) |
-| 3 | DC | Agro (+ Divisional Crisis, Representatives) |
-| 4 | UNION_CHAIRMAN | Divisional Crisis, Representatives, Face Intel |
-| 5 | MP / MAYOR | Local DSS tree (`/local/*`) only |
+| Tier | Role | Scope | What they see |
+|------|------|-------|----------------|
+| 1 | PMO | National | All national pages + `/local` oversight (`?entityId=`) |
+| 2 | MINISTER | Division | Hazards, KPIs, projects, alerts, docs, audit, **`/sectors`**, shared |
+| 3 | DC | District | Agro + divisional-crisis, representatives, face-intel |
+| 4 | UNION_CHAIRMAN | Union | Divisional crisis, representatives, face-intel |
+| 5 | MP | Constituency | Local DSS tree only |
+| 5 | MAYOR | City Corporation | Local DSS tree only |
 
-Gateway `requireRoles` is often **wider** than sidebar (e.g. DC can call unrest/outlook APIs even if nav is PMO-only). See [System Design](docs/SYSTEM_DESIGN.md) §২.১৫–২.২০.
+Gateway `requireRoles` is often **wider** than sidebar (e.g. DC can call unrest/outlook APIs even if nav is PMO-only). See [System Design](docs/SYSTEM_DESIGN.md) §২.১৫–২.২২.
 
 ---
 
 ## Data Seeding
 
-Automatic via `deploy/scripts/docker-db-init.sh`:
+Automatic via `deploy/scripts/docker-db-init.sh` — core `seed-national-data.sql` তারপর `deploy/scripts/seed/01-*.sql` … `24-*.sql` (idempotent `ON CONFLICT`).
 
-| Script | Contents |
-|--------|----------|
-| `seed-national-data.sql` | Divisions, KPI defs, sample projects / representatives |
-| `seed-admin-upazila-union.sql` | Upazilas and unions |
-| `fix-admin-unit-bn.sql` | Bengali name repair |
-| `bootstrap-pmo.sql` | PMO password hash update |
+| Scripts | Contents |
+|---------|----------|
+| `01`–`10` | Districts, upazilas, reps, projects, agro, KPIs, red flags, commodities, demo users, extra national |
+| `11`–`18` | Local entities (CTG-8/9/10, CCC, COCC + 68 wards), complaints/WPI, OSINT/pulse, specialty, alerts, outages, visits |
+| `19`–`24` | Map-layer topics, local unrest, evidence, sector sites, integrity incidents, **national sector snapshots** |
+| `fix-admin-unit-bn.sql` / `bootstrap-pmo.sql` | Bengali labels + PMO password |
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.apps.yml run --rm db-init
@@ -436,7 +460,7 @@ Headlines from major BD outlets + Google News topics (government, development, a
 | **Store** | Gateway upserts `external_articles` |
 | **Analyze** | Bangla-BERT sentiment + geo-match |
 | **Auto sync** | Gateway `pipeline` / ingestion worker (`INGESTION_INTERVAL_MS`) |
-| **Consumers** | Unrest pulse, Narrative Shield, Outlook, Briefing, Sentiment |
+| **Consumers** | Unrest pulse, Narrative Shield, Outlook, Briefing, Sentiment, **local OSINT / unrest** |
 
 Manual: `POST /api/v1/ingestion/sync` or `POST /api/v1/pipeline/sync/news` (PMO / MINISTER).
 

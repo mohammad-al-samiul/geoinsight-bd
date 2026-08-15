@@ -5,7 +5,7 @@
 
 | Document | Audience | কী আছে |
 |----------|----------|--------|
-| **[SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md)** | Architect / reviewer | SRS, HLD, LLD, ERD, NFR, Local DSS, cost/TCO, security, ADR |
+| **[SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md)** | Architect / reviewer | SRS, HLD, LLD, ERD, NFR, Local DSS, national sectors, cost/TCO, security, ADR |
 | **[DEPLOYMENT_AND_OPS.md](./DEPLOYMENT_AND_OPS.md)** | DevOps / operator | CI/CD (`deploy-vps.yml`), Hostinger VPS, slim compose, performance, day-to-day ops |
 | **[OLLAMA_PRODUCTION.md](./OLLAMA_PRODUCTION.md)** | AI ops | আলাদা AI server, `OLLAMA_URL`, GPU optional, local Windows tip |
 
@@ -17,20 +17,21 @@
 | AI Analytics | [`services/ai-analytics-python/README.md`](../services/ai-analytics-python/README.md) |
 | Dashboard | [`web/dashboard-nextjs/README.md`](../web/dashboard-nextjs/README.md) |
 
-### DSS & intel modules (see System Design §২.১২–২.২০)
+### DSS & intel modules (see System Design §২.১২–২.২২)
 
 | Module | Dashboard | AI prefix | Gateway |
 |--------|-----------|-----------|---------|
 | Anti-Phishing | `/anti-phishing` | `/api/v1/phishing` | `/intelligence/phishing/*` |
-| Proximity Map | (panel / API) | `/api/v1/proximity` | `/intelligence/proximity/*` |
-| Face Intel | (panel / API) | `/api/v1/face-intel` | `/intelligence/face-intel/*` |
+| Proximity Map | command search / API | `/api/v1/proximity` | `/intelligence/proximity/*` |
+| Face Intel | `/face-intel` | `/api/v1/face-intel` | `/intelligence/face-intel/*` |
 | Narrative Shield | `/narrative-shield` | `/api/v1/narrative-shield` | `/narrative-shield/*` |
 | Unrest Pulse | `/unrest` | — (gateway analytics) | `/unrest/*` |
 | Strategic Outlook | `/outlook` | `/api/v1/outlook` | `/outlook/*` |
+| National Sectors | `/sectors` | — | `/national-sector/board` (PMO, MINISTER) |
 | Divisional Crisis | `/divisional-crisis` | — | `/divisional-crisis/*` |
 | Weather | embedded in `/hazards` | `/api/v1/weather` | `/weather/*` |
 | Ingestion / Pipeline / Intel | ops APIs | `/api/v1/ingestion` | `/ingestion/*`, `/pipeline/*`, `/intel/*` |
-| Local Entity DSS | `/local/*` | `/api/v1` local_ai | `/local-entity/*` (PMO, MP, MAYOR) |
+| Local Entity DSS | `/local/*` (21 desks) | `/api/v1/local-ai` | `/local-entity/*` (PMO, MP, MAYOR) |
 
 ### দ্রুত নেভিগেশন
 

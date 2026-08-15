@@ -71,6 +71,7 @@ import { Button } from "@/components/ui/button";
 import { AppSelect } from "@/components/ui/app-select";
 import { IntelCard } from "@/components/ui/intel-card";
 import { DivisionalMap } from "@/components/divisional-crisis/divisional-map";
+import { PmoLocalIntegrityHits } from "@/components/divisional-crisis/pmo-local-integrity-hits";
 import {
   useDivisionalCrisis,
   SortOption,
@@ -311,6 +312,8 @@ export function DivisionalCrisisPanel() {
             </Button>
           </div>
         </div>
+
+        <PmoLocalIntegrityHits />
 
         {/* Automated Emergency Email/SMS Notification Dispatch Drawer */}
         <AnimatePresence>

@@ -1,10 +1,7 @@
-import {
-  ServiceOutageKind,
-  ServiceOutageStatus,
-  UserRole,
-} from "@prisma/client";
+import { AdminUnitType, ServiceOutageKind, ServiceOutageStatus, SignalSource, UserRole } from "@prisma/client";
 import { prismaRead, prismaWrite } from "../../core/database/prisma.client";
 import { ApiError } from "../../core/errors/api.error";
+import { outageOpsHint } from "./ops-solutions";
 import {
   assertWardBelongsToEntity,
   resolveLocalEntityId,
@@ -17,6 +14,7 @@ export class OutageService {
       entityId?: string;
       status?: ServiceOutageStatus | "ALL";
       kind?: ServiceOutageKind;
+      source?: SignalSource;
       limit?: number;
     } = {},
   ) {
@@ -26,6 +24,7 @@ export class OutageService {
       entityId,
       ...(opts.status && opts.status !== "ALL" ? { status: opts.status } : {}),
       ...(opts.kind ? { kind: opts.kind } : {}),
+      ...(opts.source ? { source: opts.source } : {}),
     };
 
     const items = await prismaRead.localServiceOutage.findMany({
@@ -55,18 +54,59 @@ export class OutageService {
       return acc;
     }, {});
 
+    const openItems = items.filter((i) => i.status !== ServiceOutageStatus.RESOLVED);
+    const pressureOf = (row: (typeof items)[number]) => {
+      const statusBoost =
+        row.status === ServiceOutageStatus.ACTIVE
+          ? 16
+          : row.status === ServiceOutageStatus.WATCH
+            ? 8
+            : 0;
+      return row.severity * 12 + Math.min(24, Math.round(row.affectedCount / 50)) + statusBoost;
+    };
+
+    const wards = await prismaRead.adminUnit.findMany({
+      where: { parentId: entityId, type: AdminUnitType.WARD },
+      select: { id: true, code: true, name: true, nameBn: true },
+      orderBy: { code: "asc" },
+    });
+
+    const heat = wards.map((w) => {
+      const rows = openItems.filter((i) => i.wardId === w.id);
+      const pressure = Math.min(100, rows.reduce((s, r) => s + pressureOf(r), 0));
+      const worst = rows.reduce((m, r) => Math.max(m, r.severity), 0);
+      return {
+        wardId: w.id,
+        code: w.code,
+        name: w.name,
+        nameBn: w.nameBn,
+        open: rows.length,
+        pressure,
+        score: Math.max(8, 100 - pressure),
+        worstSeverity: worst,
+      };
+    });
+
     return {
       entityId,
+      generatedAt: new Date().toISOString(),
       summary: {
         active,
         watch,
         resolved,
-        affectedPeople: items
-          .filter((i) => i.status !== ServiceOutageStatus.RESOLVED)
-          .reduce((s, i) => s + i.affectedCount, 0),
+        affectedPeople: openItems.reduce((s, i) => s + i.affectedCount, 0),
         byKind,
+        hotWards: heat.filter((h) => h.pressure >= 28).length,
+        overdueEta: openItems.filter(
+          (i) => i.etaRestoreAt && i.etaRestoreAt.getTime() < Date.now(),
+        ).length,
       },
-      items,
+      heat,
+      items: items.map((row) => ({
+        ...row,
+        pressure: pressureOf(row),
+        opsHint: outageOpsHint(row.kind),
+      })),
     };
   }
 
@@ -76,6 +116,7 @@ export class OutageService {
       entityId?: string;
       wardId?: string;
       kind?: ServiceOutageKind;
+      source?: SignalSource;
       title: string;
       titleBn?: string;
       detail?: string;
@@ -94,6 +135,7 @@ export class OutageService {
         entityId,
         wardId: input.wardId ?? null,
         kind: input.kind ?? ServiceOutageKind.OTHER,
+        source: input.source ?? SignalSource.OFFICIAL,
         status: ServiceOutageStatus.ACTIVE,
         title: input.title.trim(),
         titleBn: input.titleBn?.trim() || null,

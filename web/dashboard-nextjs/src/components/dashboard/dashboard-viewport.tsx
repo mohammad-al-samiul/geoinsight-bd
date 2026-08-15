@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { getBreadcrumb } from "@/lib/admin-units";
 import { BangladeshChoroplethMap } from "@/components/dashboard/bangladesh-choropleth-map";
 import { KpiScorecards } from "@/components/dashboard/kpi-scorecards";
+import { PmoLocalStrip } from "@/components/dashboard/pmo-local-strip";
+import { PmoNationalSectorStrip } from "@/components/dashboard/pmo-national-sector-strip";
 import { Badge } from "@/components/ui/badge";
 import type { GeoFeatureProperties } from "@/types/dashboard";
 import type { SocketConnectionStatus } from "@/hooks/use-socket";
@@ -99,6 +101,8 @@ export function DashboardViewport() {
       </div>
 
       <div className="min-w-0 space-y-5">
+        <PmoNationalSectorStrip />
+        <PmoLocalStrip />
         <div className="min-w-0 h-[260px] sm:h-[360px] lg:h-[480px]">
           <BangladeshChoroplethMap
             filter={filter}

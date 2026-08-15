@@ -1,7 +1,7 @@
 # GeoInsight BD — System Design Documentation
 
 **GeoInsight BD** হলো বাংলাদেশের জন্য তৈরি একটি **National Governance Intelligence Platform**।  
-Division → District → Upazila → Union hierarchy ধরে KPI, project tracking, red-flag alerts, agro-market data আর AI analytics এক জায়গায় আনা হয়েছে।
+Division → District → Upazila → Union hierarchy ধরে KPI, project tracking, red-flag alerts, agro-market data আর AI analytics এক জায়গায় আনা হয়েছে। পাশাপাশি **MP / Mayor Local Entity DSS** (ward-level) এবং **national education / health / jobs** board আছে।
 
 এই ডকুমেন্টে আছে: **HLD**, **LLD**, functional/non-functional requirements, **ERD**, tech stack rationale — সব একসাথে।
 
@@ -33,8 +33,8 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 | বিষয় | বিবরণ |
 |--------|--------|
 | **Name** | GeoInsight BD |
-| **Goal** | Division → District → Upazila → Union hierarchy অনুযায়ী KPI, project, alert, agro market আর AI analytics এক platform-এ দেখানো |
-| **Users** | **PMO** (national), **Minister** (division), **DC** (district), **Union Chairman** |
+| **Goal** | National hierarchy (Division → Union) + Local DSS (Constituency / City Corporation → Ward) অনুযায়ী KPI, project, alert, sector, agro market আর AI analytics এক platform-এ দেখানো |
+| **Users** | **PMO** (national), **Minister** (division), **DC** (district), **Union Chairman**, **MP** (constituency), **Mayor** (city corporation) |
 | **Architecture style** | Monorepo microservices — ৩টা app service + shared infrastructure |
 
 ---
@@ -54,7 +54,7 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 ### ২.২ Administrative Hierarchy
 
 - Bangladesh admin structure: `DIVISION → DISTRICT → UPAZILA → UNION`
-- Local DSS units: `CONSTITUENCY` (MP), `CITY_CORPORATION` (Mayor)
+- Local DSS units: `CONSTITUENCY` (MP), `CITY_CORPORATION` (Mayor), `WARD`
 - **GeoJSON** boundary সহ admin unit management
 - Hierarchy-based filtering (denormalized `division_id`, `district_id`, `upazila_id`)
 
@@ -108,6 +108,7 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 | **Outlook** | Strategic politics & economy outlook from news + unrest |
 | **Weather** | Open-Meteo + GDACS/ReliefWeb → flood/cyclone/heat stress |
 | **Ingestion** | BD RSS + Google News fetch, geo-match, Bangla sentiment |
+| **Local AI** | Morning brief, complaint triage, WPI explain, photo QA, propaganda classify, citizen-assist (`/local-ai/*`) |
 
 ### ২.৮ Public Feeds (Unauthenticated)
 
@@ -153,7 +154,7 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 | **Fallback** | Pure-Python ray-casting if Shapely/GEOS unavailable (dev Windows) |
 | **Live feed** | `GET/POST /api/v1/proximity/live` — open-track / ADS-B-style demo VIP orbits (replaceable with public GPS APIs) |
 | **Gateway** | `/intelligence/proximity/live` · `/check` · `/zones` |
-| **UI** | `/proximity` — Leaflet (CARTO dark) polygons + track markers; map click = analyst pin |
+| **UI** | Command search panel (no sidebar route) — Leaflet polygons + track markers; map click = analyst pin |
 
 ### ২.১৪ Face Intel — VIP Ethical Report Card (CV + DSS)
 
@@ -232,18 +233,34 @@ Division → District → Upazila → Union hierarchy ধরে KPI, project tra
 
 ### ২.২১ Local Entity DSS (MP / Mayor)
 
-Ward-level command surface — PMO oversight + MP/Mayor desks. Catalog: **CTG-8, CTG-9, CTG-10, CCC, COCC**.
+Ward-level command surface — PMO oversight (`?entityId=`) + MP/Mayor desks. Catalog: **CTG-8, CTG-9, CTG-10, CCC, COCC** (`local-entity.catalog.ts`). Roles: `PMO`, `MP`, `MAYOR`. Gateway: `local-entity`. AI: `local_ai`.
 
 | Capability | Path / API | Notes |
 |------------|------------|-------|
-| Overview + morning brief | `/local` · `/local-entity/overview`, `/morning-brief` | CSV export + digest |
-| Complaints SLA | `/local/complaints` | Triage (fast LLM), assign, before/after photo, OVERDUE |
-| WPI / heatmap / scorecard | `/local/wpi`, `/heatmap`, `/scorecard` | Ward scores + Ollama explain |
-| OSINT / pulse / specialty | `/local/osint`, `/pulse`, `/specialty` | Entity keywords + niche packs |
-| Outages, visits, alerts | `/local/outage`, `/visits`, `/alerts` | Alert delivery retry / voice test |
+| Overview + morning brief | `/local` · `/local-entity/overview`, `/morning-brief` | CSV export + WhatsApp digest; PMO `scope=all` |
+| Field queue | `/local/field` · `/field-summary` | Phone-first overdue / unassigned |
+| Complaints SLA | `/local/complaints` | 24h Instant Action; triage (fast LLM); assign; before/after photo QA |
+| WPI / heatmap / scorecard | `/local/wpi`, `/heatmap`, `/scorecard` | Ward scores + Ollama explain; heatmap aggregates layers (no `MapLayer` table) |
+| Budget / visits | `/local/budget`, `/visits` | Entity ADP + AI visit recommend |
+| OSINT / pulse / unrest | `/local/osint`, `/pulse` · `/local-entity/unrest` | Keywords, propaganda flag; unrest embedded in pulse |
+| Evidence | `/local/evidence` | Thesis / expert / policy abstracts (`LocalEvidenceItem`) |
+| Sectors | `/local/education`, `/health`, `/jobs` · `/local-entity/sector` | School / clinic / employment site pins |
+| Integrity | `/local/crime`, `/corruption` · `/local-entity/integrity` | Crime + corruption desks (`LocalIntegrityIncident`) |
+| Command room | `/local/command` | Multi-layer overlay + what-if (not persisted) |
+| Specialty / outages / alerts | `/local/specialty`, `/outage`, `/alerts` | Role packs, service outages, WhatsApp/voice retry |
 | MFA | `/local/security` | Same TOTP as national auth |
+| National board | `/local-entity/national-board` | PMO / MINISTER cross-entity scoreboard |
 
-Roles: `PMO`, `MP`, `MAYOR`. Gateway module: `local-entity`.
+### ২.২২ National Sectors (Education · Health · Jobs)
+
+**Goal:** District-level EDUCATION / HEALTH / EMPLOYMENT snapshots for PMO and Ministers — not the local ward desk.
+
+| Layer | Behavior |
+|-------|----------|
+| **Store** | Prisma `NationalSectorSnapshot` (64 districts) |
+| **Gateway** | `GET /national-sector/board` — PMO, MINISTER |
+| **UI** | `/sectors` + home `pmo-national-sector-strip` |
+| **Seed** | `deploy/scripts/seed/24-national-sectors.sql` |
 
 ---
 
@@ -276,6 +293,8 @@ flowchart TB
         MIN[Minister / Division]
         DC[DC / District]
         UC[Union Chairman]
+        MP[MP / Constituency]
+        MY[Mayor / City Corp]
         PUB[Public Citizen]
     end
 
@@ -294,6 +313,7 @@ flowchart TB
     end
 
     PMO & MIN & DC & UC --> WEB
+    MP & MY -->|Local DSS /local| WEB
     PUB -->|333/999 feeds| GW
     WEB -->|BFF proxy| GW
     WEB -->|WebSocket| GW
@@ -401,6 +421,8 @@ services/api-gateway-node/src/
 │   ├── ingestion/         # news sync + article queries
 │   ├── pipeline/          # cron + manual sync jobs
 │   ├── intel/             # snapshot & run history APIs
+│   ├── national-sector/   # education / health / jobs board
+│   ├── local-entity/      # MP/Mayor DSS (complaints, WPI, sectors, integrity…)
 │   ├── sovereign/         # sovereign LLM proxy
 │   ├── blockchain/        # Fabric client + retry worker
 │   ├── public-feed/       # 333/999 streams
@@ -435,13 +457,14 @@ services/ai-analytics-python/app/
 │   ├── phishing/          # Anti-Phishing Shield
 │   ├── proximity/         # Shapely geo-fence + live VIP tracks
 │   ├── face_intel/        # OpenCV face match + VIP gallery
+│   ├── local_ai/          # local DSS briefs, triage, WPI, photo QA
 │   └── ...
 ├── ml/ollama_client.py    # local LLM calls
 └── infrastructure/messaging/consumer.py  # RabbitMQ worker
 ```
 
-**Primary dashboard routes:** `/`, `/briefing`, `/narrative-shield`, `/outlook`, `/unrest`, `/divisional-crisis`, `/anti-phishing`, `/hazards`, `/agro`, `/procurement`, `/kpis`, `/projects`, `/alerts`, `/documents`, `/audit-trail`, `/notifications`, `/representatives`, `/map`  
-**Gateway proxies (examples):** `intelligence/*`, `narrative-shield/*`, `outlook/*`, `unrest/*`, `weather/*`, `ingestion/*`, `pipeline/*`
+**Primary dashboard routes:** `/`, `/briefing`, `/narrative-shield`, `/outlook`, `/unrest`, `/sectors`, `/divisional-crisis`, `/anti-phishing`, `/hazards`, `/agro`, `/procurement`, `/kpis`, `/projects`, `/alerts`, `/documents`, `/audit-trail`, `/notifications`, `/representatives`, `/face-intel`, `/local/*`  
+**Gateway proxies (examples):** `intelligence/*`, `narrative-shield/*`, `outlook/*`, `unrest/*`, `national-sector/*`, `local-entity/*`, `weather/*`, `ingestion/*`, `pipeline/*`
 
 ### ৫.৩ Database Read/Write Split
 
@@ -461,8 +484,12 @@ prismaRead   → analytics, dashboards, heavy SELECT
 ```
 1. POST /api/auth/login (Next.js)
    → POST /api/v1/auth/login (Gateway)
-   → bcrypt verify → issue accessToken + refreshToken
-   → Set HTTP-only cookies: gi_access_token, gi_refresh_token
+   → bcrypt verify
+   → if User.mfaSecret set: return { requiresMfa, mfaToken } (no cookies yet)
+   → else issue accessToken + refreshToken → HTTP-only cookies
+
+1b. POST /api/auth/mfa/verify (when MFA on)
+   → TOTP (RFC 6238) → then cookies as above
 
 2. GET /api/proxy/kpis/definitions (Next.js)
    → Read cookie → Authorization: Bearer <token>
@@ -475,6 +502,8 @@ prismaRead   → analytics, dashboards, heavy SELECT
 4. Logout / Revoke
    → JWT jti → Redis denylist
    → refresh_tokens.revoked_at = now()
+
+5. MFA lifecycle (authenticated): /auth/mfa/setup | enable | disable
 ```
 
 **BFF routes:** `web/dashboard-nextjs/src/app/api/auth/`, `web/dashboard-nextjs/src/app/api/proxy/`
@@ -486,8 +515,9 @@ PMO            → admin_unit_id = NULL → সব unit access
 MINISTER       → DIVISION level unit
 DC             → DISTRICT level unit
 UNION_CHAIRMAN → UNION level unit
-MP             → CONSTITUENCY → Local DSS `/local`
+MP             → CONSTITUENCY → Local DSS `/local` (wards under seat)
 MAYOR          → CITY_CORPORATION → Local DSS `/local`
+PMO            → `/local?entityId=` oversight of catalog seats
 
 authorize(targetAdminUnitId):
   userScopeChain = Redis cache (admin hierarchy)
@@ -512,7 +542,8 @@ authorize(targetAdminUnitId):
 
 | Route | Purpose |
 |-------|---------|
-| `/api/auth/login` | Gateway auth |
+| `/api/auth/login` | Gateway auth (may return MFA challenge) |
+| `/api/auth/mfa/verify` | Complete login with TOTP |
 | `/api/auth/refresh` | Token rotation |
 | `/api/auth/logout` | Revoke + clear cookies |
 | `/api/auth/socket-token` | WebSocket JWT |
@@ -710,6 +741,28 @@ erDiagram
 - `RolePermission`: static **RBAC** matrix (role × resource × action)
 - `RefreshToken`: hashed token storage, rotation support
 - Intel / narrative / weather models support pipeline-driven DSS (unrest, outlook, narrative-shield, hazards)
+- `User.mfaSecret` — optional TOTP
+- Local DSS models (below) sit on `AdminUnit` (`CONSTITUENCY` / `CITY_CORPORATION` / `WARD`)
+- Map “layers” are **computed** in `/local-entity/heatmap` — no `MapLayer` table
+
+```mermaid
+erDiagram
+    AdminUnit ||--o{ CitizenComplaint : "desk"
+    AdminUnit ||--o{ WardPerformanceScore : "scores"
+    AdminUnit ||--o{ LocalOsintHit : "hits"
+    AdminUnit ||--o{ LocalEvidenceItem : "briefs"
+    AdminUnit ||--o{ LocalSectorSite : "sites"
+    AdminUnit ||--o{ LocalIntegrityIncident : "incidents"
+    AdminUnit ||--o{ LocalServiceOutage : "outages"
+    AdminUnit ||--o{ LocalVisitPlan : "visits"
+    CitizenComplaint ||--o{ ComplaintStatusEvent : "timeline"
+    NationalSectorSnapshot {
+        uuid id PK
+        enum sector
+        uuid district_id FK
+        jsonb payload
+    }
+```
 
 **Source of truth:** `services/api-gateway-node/prisma/schema.prisma`
 
@@ -853,6 +906,7 @@ flowchart LR
     subgraph App["Application Security"]
         BFF[Next.js BFF — no token in browser]
         JWT[JWT 15min + Refresh 7d]
+        MFA[Optional TOTP MFA]
         RBAC[Role + Admin Unit Scope]
         AUDIT[Audit Log]
     end
@@ -864,7 +918,7 @@ flowchart LR
         SOV[Ollama on-prem — no external AI]
     end
 
-    NGINX --> BFF --> JWT --> RBAC --> AUDIT
+    NGINX --> BFF --> JWT --> MFA --> RBAC --> AUDIT
     JWT --> REDIS_DENY
     BFF --> BCRYPT
     RBAC --> MINIO_PRIV
@@ -958,6 +1012,16 @@ docker compose -f docker-compose.observability.yml up -d
 4. Morning briefing can consume recent intel snapshots + KPI / alert context
 ```
 
+### ১০.৭ Local complaint (24h SLA)
+
+```
+1. MP/Mayor (or PMO with entityId) POST /local-entity/complaints
+2. Optional POST /complaints/triage → AI local_ai/complaint-triage (fast model)
+3. Assign / start / notes → ComplaintStatusEvent timeline
+4. Resolve with before/after photos → AI photo-qa
+5. OVERDUE + WPI recompute; heatmap aggregates pins; morning-brief includes SLA
+```
+
 ---
 
 ## ১১. Monorepo Structure
@@ -976,21 +1040,23 @@ geoinsight-bd/
 │       ├── outlook/
 │       ├── unrest/
 │       ├── divisional-crisis/
+│       ├── sectors/
 │       ├── anti-phishing/
-│       └── ...
+│       ├── face-intel/
+│       └── local/              # MP/Mayor DSS (21 desks)
 ├── services/
 │   ├── api-gateway-node/       # Core API + DB + Socket.io
 │   │   └── README.md
 │   ├── ai-analytics-python/    # ML / NLP / LLM / CV / GIS
 │   │   ├── README.md
-│   │   └── app/modules/{narrative_shield,outlook,weather,ingestion,...}/
+│   │   └── app/modules/{narrative_shield,outlook,weather,ingestion,local_ai,...}/
 │   └── postgres/
 ├── deploy/
 │   ├── init/                   # Postgres, RabbitMQ, MinIO init
 │   ├── nginx/                  # Production edge
 │   ├── observability/          # Prometheus, Grafana
 │   ├── hyperledger/            # Fabric connection profile
-│   ├── scripts/seed/           # National BD data seeds
+│   ├── scripts/seed/           # 01–24 national + local DSS seeds
 │   └── security/               # Tier-4 sovereignty config
 ├── load-tests/                 # Locust scenarios
 ├── docker-compose.yml          # Infra
@@ -1046,6 +1112,9 @@ Windows Hyper-V frequently blocks `5432`, `4000`, `8000`, `9000` — তাই l
 | Narrative/Unrest on news corpus | Manual intel desk only | Scales open-source BD news into PMO DSS with audit trail |
 | Pipeline orchestrator in Gateway | Separate Temporal/Airflow | Same deploy unit as RBAC + Prisma; enough for VPS-scale cron |
 | Weather via Open-Meteo | Paid weather API | Sovereignty-friendly, no vendor lock for flood/heat stress |
+| **Local DSS in same gateway** | Separate local-gov product | Same RBAC + Prisma; PMO can oversee seats without a second stack |
+| **NationalSectorSnapshot** | Live ministry APIs only | Seeded district board now; swap-in real feeds later without UI rewrite |
+| **Heatmap = aggregated queries** | Dedicated MapLayer table | Layers stay consistent with complaints/outages/sites; less dual-write |
 
 ---
 

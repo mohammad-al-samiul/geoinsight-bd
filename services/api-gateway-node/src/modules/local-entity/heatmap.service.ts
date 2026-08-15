@@ -32,6 +32,8 @@ export class LocalHeatmapService {
           wardId: true,
           status: true,
           severity: true,
+          category: true,
+          source: true,
           isRedAlert: true,
           lat: true,
           lng: true,
@@ -108,6 +110,9 @@ export class LocalHeatmapService {
         severity: c.severity,
         label: c.titleBn || c.title,
         isRedAlert: c.isRedAlert,
+        category: c.category,
+        source: c.source,
+        createdAt: c.createdAt.toISOString(),
       }));
 
     const weekSeries = [...weekly.entries()]
