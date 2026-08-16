@@ -12,6 +12,7 @@ export const PIPELINE_JOB_IDS = [
   "briefing",
   "signals",
   "national-sectors",
+  "local-desk",
   "continuous-pulse",
   "alert-retry",
   "maintenance",

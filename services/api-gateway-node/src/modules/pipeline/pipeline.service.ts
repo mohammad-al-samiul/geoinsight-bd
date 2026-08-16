@@ -93,6 +93,7 @@ export class PipelineService {
       briefing: () => this.refreshMorningBriefing(),
       signals: () => this.extractLiveSignals(),
       "national-sectors": () => this.syncNationalSectors(),
+      "local-desk": () => this.syncLocalDesk(),
       "continuous-pulse": async () => {
         const { continuousPulseService } = await import("./continuous-pulse.service");
         return continuousPulseService.run();
@@ -151,6 +152,13 @@ export class PipelineService {
     return { jobs, completed_at: new Date().toISOString() };
   }
 
+  async syncLocalDesk(): Promise<Record<string, unknown>> {
+    const { localDeskFanoutService } = await import("../local-entity/local-desk-fanout.service");
+    const result = await localDeskFanoutService.sync();
+    await broadcastDashboardRefresh("pipeline:local-desk");
+    return result;
+  }
+
   async syncNationalSectors(): Promise<Record<string, unknown>> {
     const { nationalSectorService } = await import("../national-sector/national-sector.service");
     const result = await nationalSectorService.ingestCsv();
@@ -163,6 +171,12 @@ export class PipelineService {
     // Keep the dashboard fed with fresher, lighter batches instead of timing out.
     const result = await ingestionService.syncFromAi(6, 240_000);
     await broadcastDashboardRefresh("pipeline:news");
+    void this.syncLocalDesk().catch((err) => {
+      console.warn(
+        "[pipeline:news] local-desk fanout failed:",
+        err instanceof Error ? err.message : err,
+      );
+    });
     void this.refreshIntelAfterNews().catch((err) => {
       console.warn(
         "[pipeline:news] post-news intel refresh failed:",

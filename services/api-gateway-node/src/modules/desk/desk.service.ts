@@ -61,7 +61,7 @@ type UserScope = { role: UserRole; adminUnitId: string | null };
 let mem: { key: string; exp: number; data: NavPulse } | null = null;
 
 function cacheKey(user: UserScope): string {
-  return `desk:nav-pulse:v1:${user.role}:${user.adminUnitId ?? "national"}`;
+  return `desk:nav-pulse:v2:${user.role}:${user.adminUnitId ?? "national"}`;
 }
 
 async function readCache(key: string): Promise<NavPulse | null> {
@@ -440,27 +440,27 @@ export class DeskService {
     const fieldHeat = openComplaints + outages + redAlerts;
 
     const items: NavPulseItem[] = [
-      item("localEntity", "/local", fieldHeat, 8, 1, `${openComplaints} open complaints · ${outages} outages`, `${openComplaints}টি খোলা অভিযোগ · ${outages}টি বিঘ্ন`),
-      item("localField", "/local/field", fieldHeat, 8, 1, `${fieldHeat} field pressure points`, `${fieldHeat}টি ফিল্ড চাপ`),
-      item("localComplaints", "/local/complaints", overdue + redAlerts, 3, 1, `${overdue} overdue · ${redAlerts} red`, `${overdue}টি ওভারডিউ · ${redAlerts}টি রেড`),
-      item("localHeatmap", "/local/heatmap", fieldHeat + osintHot, 10, 2, `${fieldHeat} ops + ${osintHot} OSINT flags`, `${fieldHeat} অপস + ${osintHot} ওএসআইএনটি`),
-      item("localVisits", "/local/visits", visits, 4, 1, `${visits} planned visits`, `${visits}টি পরিকল্পিত সফর`),
-      item("localWpi", "/local/wpi", wpiLow, 2, 1, `${wpiLow} wards below WPI 55`, `ডব্লিউপিআই ৫৫-এর নিচে ${wpiLow}টি ওয়ার্ড`),
-      item("localScorecard", "/local/scorecard", wpiLow, 2, 1, `${wpiLow} weak scorecard wards`, `${wpiLow}টি দুর্বল স্কোরকার্ড ওয়ার্ড`),
-      liveItem("localBudget", "/local/budget", budgetProjects, `${budgetProjects} active local projects`, `${budgetProjects}টি চলমান স্থানীয় প্রকল্প`),
-      item("localOsint", "/local/osint", osintHot, 6, 1, `${osintHot} negative/propaganda hits`, `${osintHot}টি নেতিবাচক/প্রোপাগান্ডা`),
-      item("localPulse", "/local/pulse", pulseOpen, 4, 1, `${pulseOpen} open pulse events`, `${pulseOpen}টি খোলা পালস ইভেন্ট`),
-      liveItem("localEvidence", "/local/evidence", evidence, `${evidence} evidence abstracts`, `${evidence}টি প্রমাণ সারাংশ`),
-      item("localEducation", "/local/education", eduAlert, 2, 1, `${eduAlert} school-site alerts`, `${eduAlert}টি স্কুল সাইট সতর্কতা`),
-      item("localHealth", "/local/health", healthAlert, 2, 1, `${healthAlert} clinic-site alerts`, `${healthAlert}টি ক্লিনিক সাইট সতর্কতা`),
-      item("localJobs", "/local/jobs", jobsAlert, 2, 1, `${jobsAlert} employment-site alerts`, `${jobsAlert}টি কর্মসংস্থান সাইট সতর্কতা`),
-      item("localCrime", "/local/crime", crimeOpen, 3, 1, `${crimeOpen} open crime incidents`, `${crimeOpen}টি খোলা অপরাধ ঘটনা`),
-      item("localCorruption", "/local/corruption", corrOpen, 2, 1, `${corrOpen} open integrity flags`, `${corrOpen}টি খোলা অখণ্ডতা ফ্ল্যাগ`),
-      item("localCommand", "/local/command", commandHeat, 8, 2, `${commandHeat} command-room pressure`, `${commandHeat}টি কমান্ড-রুম চাপ`),
-      item("localSpecialty", "/local/specialty", specialtyAlert, 2, 1, `${specialtyAlert} specialty alerts`, `${specialtyAlert}টি স্পেশালিটি সতর্কতা`),
-      item("localOutage", "/local/outage", outages, 2, 1, `${outages} active/watch outages`, `${outages}টি সক্রিয়/নজরদারি বিঘ্ন`),
-      item("localAlerts", "/local/alerts", failedDeliveries + redAlerts, 2, 1, `${failedDeliveries} delivery retries · ${redAlerts} red`, `${failedDeliveries}টি ডেলিভারি রিট্রাই · ${redAlerts}টি রেড`),
-      liveItem("localSecurity", "/local/security", 1, "Desk security settings ready", "ডেস্ক নিরাপত্তা সেটিংস প্রস্তুত"),
+      item("localEntity", "/local", fieldHeat, 8, 1, `${openComplaints} open complaints · ${outages} outages · ${redAlerts} red`, `${openComplaints}টি খোলা অভিযোগ · ${outages}টি বিঘ্ন · ${redAlerts}টি রেড`),
+      item("localField", "/local/field", fieldHeat, 8, 1, `${openComplaints} open · ${overdue} overdue SLA · ${outages} outages`, `${openComplaints} খোলা · ${overdue} ওভারডিউ এসএলএ · ${outages} বিঘ্ন`),
+      item("localComplaints", "/local/complaints", overdue + redAlerts, 3, 1, `${openComplaints} open Instant Action · ${overdue} past 24h SLA · ${redAlerts} red`, `${openComplaints}টি খোলা · ${overdue}টি ২৪ঘণ্টা এসএলএ পেরিয়েছে · ${redAlerts}টি রেড`),
+      item("localHeatmap", "/local/heatmap", fieldHeat + osintHot, 10, 2, `${fieldHeat} ops pressure · ${osintHot} OSINT flags · ward heat live`, `${fieldHeat} অপস চাপ · ${osintHot} ওএসআইএনটি · ওয়ার্ড হিট লাইভ`),
+      item("localVisits", "/local/visits", visits, 4, 1, `${visits} planned field visits — WPI drop & red-alert wards first`, `${visits}টি পরিকল্পিত সফর — ডব্লিউপিআই ড্রপ ও রেড-অ্যালার্ট আগে`),
+      item("localWpi", "/local/wpi", wpiLow, 2, 1, `${wpiLow} wards below WPI 55 — service / infra / SLA mix`, `ডব্লিউপিআই ৫৫-এর নিচে ${wpiLow}টি ওয়ার্ড — সার্ভিস / অবকাঠামো / এসএলএ`),
+      item("localScorecard", "/local/scorecard", wpiLow, 2, 1, `${wpiLow} weak scorecard wards · compare service vs resolution`, `${wpiLow}টি দুর্বল স্কোরকার্ড · সার্ভিস বনাম সমাধান`),
+      liveItem("localBudget", "/local/budget", budgetProjects, `${budgetProjects} active ADP/local projects — burn & stall risk`, `${budgetProjects}টি চলমান প্রকল্প — খরচ ও স্থবিরতার ঝুঁকি`),
+      item("localOsint", "/local/osint", osintHot, 6, 1, `${osintHot} negative/propaganda hits in seat keywords`, `${osintHot}টি নেতিবাচক/প্রোপাগান্ডা — আসন কিওয়ার্ড`),
+      item("localPulse", "/local/pulse", pulseOpen, 4, 1, `${pulseOpen} open pulse events · influencers & polling live`, `${pulseOpen}টি খোলা পালস · ইনফ্লুয়েন্সার ও পোলিং লাইভ`),
+      liveItem("localEvidence", "/local/evidence", evidence, `${evidence} thesis/expert abstracts with 0–24h / 90d actions`, `${evidence}টি প্রমাণ সারাংশ — ০–২৪ঘণ্টা / ৯০ দিনের কাজ`),
+      item("localEducation", "/local/education", eduAlert, 2, 1, `${eduAlert} school-site alerts — attendance, dropout, teacher gap`, `${eduAlert}টি স্কুল সতর্কতা — উপস্থিতি, ঝরে পড়া, শিক্ষক ফাঁক`),
+      item("localHealth", "/local/health", healthAlert, 2, 1, `${healthAlert} clinic alerts — dengue, occupancy, stockouts`, `${healthAlert}টি ক্লিনিক সতর্কতা — ডেঙ্গু, অকুপেন্সি, স্টকআউট`),
+      item("localJobs", "/local/jobs", jobsAlert, 2, 1, `${jobsAlert} employment alerts — vacancies, job-fair gaps`, `${jobsAlert}টি কর্মসংস্থান সতর্কতা — শূন্যপদ, জব-ফেয়ার ফাঁক`),
+      item("localCrime", "/local/crime", crimeOpen, 3, 1, `${crimeOpen} open crime incidents — theft, snatch, night heat`, `${crimeOpen}টি খোলা অপরাধ — চুরি, ছিনতাই, রাতের হিট`),
+      item("localCorruption", "/local/corruption", corrOpen, 2, 1, `${corrOpen} open integrity flags — tender, tax, bribe`, `${corrOpen}টি অখণ্ডতা ফ্ল্যাগ — টেন্ডার, ট্যাক্স, ঘুষ`),
+      item("localCommand", "/local/command", commandHeat, 8, 2, `${commandHeat} layered pressure — outage + school + clinic + crime`, `${commandHeat}টি স্তর চাপ — বিঘ্ন + স্কুল + ক্লিনিক + অপরাধ`),
+      item("localSpecialty", "/local/specialty", specialtyAlert, 2, 1, `${specialtyAlert} specialty alerts for this seat pack`, `${specialtyAlert}টি স্পেশালিটি সতর্কতা — এই আসনের প্যাক`),
+      item("localOutage", "/local/outage", outages, 2, 1, `${outages} active/watch outages — power, gas, water, drains`, `${outages}টি সক্রিয়/নজরদারি বিঘ্ন — বিদ্যুৎ, গ্যাস, পানি, নালা`),
+      item("localAlerts", "/local/alerts", failedDeliveries + redAlerts, 2, 1, `${failedDeliveries} WhatsApp/voice retries · ${redAlerts} red alerts`, `${failedDeliveries}টি হোয়াটসঅ্যাপ/ভয়েস রিট্রাই · ${redAlerts}টি রেড`),
+      liveItem("localSecurity", "/local/security", 1, "Authenticator 2FA and desk security settings", "অথেন্টিকেটর ২এফএ ও ডেস্ক নিরাপত্তা"),
     ];
 
     return {

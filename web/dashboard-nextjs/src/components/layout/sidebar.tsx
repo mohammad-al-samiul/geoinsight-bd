@@ -215,17 +215,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               href={href}
               title={collapsed ? (hint ? `${label} — ${hint}` : label) : hint}
               className={cn(
-                "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                "group relative flex items-start gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                 active
                   ? "bg-primary/12 text-primary"
                   : "text-sidebar-foreground/65 hover:bg-accent/80 hover:text-foreground",
-                collapsed && "justify-center px-2",
+                collapsed && "items-center justify-center px-2 py-2.5",
               )}
             >
               {active && (
                 <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
               )}
-              <span className="relative shrink-0">
+              <span className="relative mt-0.5 shrink-0">
                 <Icon
                   className={cn(
                     "h-4 w-4 shrink-0 transition-colors",
@@ -240,12 +240,25 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400/80" />
                 ) : null}
               </span>
-              {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
-              {!collapsed && count > 0 && (hot || watch) ? (
+              {!collapsed && (
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{label}</span>
+                  {hint ? (
+                    <span className="mt-0.5 block line-clamp-2 text-[10px] font-normal leading-snug text-muted-foreground">
+                      {hint}
+                    </span>
+                  ) : null}
+                </span>
+              )}
+              {!collapsed && count > 0 ? (
                 <span
                   className={cn(
-                    "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
-                    hot ? "bg-destructive/15 text-destructive" : "bg-amber-400/15 text-amber-300",
+                    "mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+                    hot
+                      ? "bg-destructive/15 text-destructive"
+                      : watch
+                        ? "bg-amber-400/15 text-amber-300"
+                        : "bg-secondary text-muted-foreground",
                   )}
                 >
                   {count > 99 ? "99+" : count}

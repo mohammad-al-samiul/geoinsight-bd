@@ -106,6 +106,7 @@ function localWarmPaths(entityId: string | null): string[] {
     `local-entity/outages${q}`,
     `local-entity/alert-deliveries${q}`,
     `local-entity/field-summary${q}`,
+    `local-entity/live-intel${q}${entityId ? "&" : "?"}topic=ALL&limit=16`,
   ];
 }
 

@@ -129,6 +129,13 @@ export class PipelineOrchestrator {
         20_000,
       ),
       new IntervalWorker(
+        "pipeline:local-desk",
+        log("local-desk", () => pipelineService.syncLocalDesk()),
+        env.PIPELINE_NEWS_INTERVAL_MS,
+        env.PIPELINE_RUN_ON_START,
+        stagger + 25_000,
+      ),
+      new IntervalWorker(
         "pipeline:maintenance",
         log("maintenance", async () => {
           const { pruneIntelSnapshots } = await import("../intel/intel-snapshot.service");

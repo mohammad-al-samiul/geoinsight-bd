@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -15,6 +15,7 @@ import { fetchSocketToken } from "@/lib/socket-token";
 import { useAuth, useAuthContext } from "@/hooks/use-auth";
 import { isLocalEntityRole } from "@/types";
 import { NavPulseProvider } from "@/hooks/use-nav-pulse";
+import { LocalDeskIntel } from "@/components/local-entity/local-desk-intel";
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const user = useAuth();
@@ -91,6 +92,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                 </Link>
               </div>
             )}
+            <Suspense fallback={null}>
+              <LocalDeskIntel />
+            </Suspense>
             {children}
           </main>
 

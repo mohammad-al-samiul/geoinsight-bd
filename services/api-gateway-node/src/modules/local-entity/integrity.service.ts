@@ -228,7 +228,7 @@ export class LocalIntegrityService {
       domain,
       generatedAt: new Date().toISOString(),
       sourceNote:
-        "Demo / seed operational snapshot — not a live police, RAB, or ACC feed.",
+        "Incidents mix official seed snapshots with live news filtered to this seat — not a live police or ACC feed.",
       summary: {
         incidents: items.length,
         open: items.filter((i) => i.status === LocalIntegrityStatus.OPEN).length,

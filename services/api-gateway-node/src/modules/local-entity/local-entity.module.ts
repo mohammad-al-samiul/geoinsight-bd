@@ -42,6 +42,7 @@ import { localScorecardService } from "./scorecard.service";
 import { localPulseEventService } from "./pulse-event.service";
 import { deskAlertsService } from "./desk-alerts.service";
 import { alertDeliveryService } from "../alert-delivery/alert-delivery.service";
+import { localDeskIntelService } from "./local-desk-intel.service";
 import { resolveLocalEntityId } from "./local-entity.scope";
 
 const overviewQuery = z.object({
@@ -524,6 +525,61 @@ export class LocalEntityModule extends BaseModule {
       asyncHandler(async (req, res) => {
         const q = req.query as { entityId?: string; periodKey?: string };
         const data = await wpiService.recompute(
+          { role: req.user!.role, adminUnitId: req.user!.adminUnitId },
+          q,
+        );
+        sendSuccess(res, data);
+      }),
+    );
+
+    router.get(
+      "/local-entity/live-intel",
+      authenticate(),
+      container.rbac.requireRoles(...LOCAL_ROLES),
+      validate(
+        z.object({
+          entityId: z.string().uuid().optional(),
+          topic: z
+            .enum([
+              "ALL",
+              "EDUCATION",
+              "HEALTH",
+              "EMPLOYMENT",
+              "CRIME",
+              "CORRUPTION",
+              "OUTAGE",
+              "CIVIC",
+              "OSINT",
+              "PULSE",
+              "SPECIALTY",
+              "BUDGET",
+              "UNREST",
+            ])
+            .optional(),
+          limit: z.coerce.number().int().min(1).max(80).optional(),
+        }),
+        "query",
+      ),
+      asyncHandler(async (req, res) => {
+        const q = req.query as {
+          entityId?: string;
+          topic?:
+            | "ALL"
+            | "EDUCATION"
+            | "HEALTH"
+            | "EMPLOYMENT"
+            | "CRIME"
+            | "CORRUPTION"
+            | "OUTAGE"
+            | "CIVIC"
+            | "OSINT"
+            | "PULSE"
+            | "SPECIALTY"
+            | "BUDGET"
+            | "UNREST";
+          limit?: number;
+        };
+        const data = await localDeskIntelService.getFeed(
           { role: req.user!.role, adminUnitId: req.user!.adminUnitId },
           q,
         );

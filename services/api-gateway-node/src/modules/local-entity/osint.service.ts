@@ -9,6 +9,7 @@ import { ApiError } from "../../core/errors/api.error";
 import { AI_FETCH_DEFAULT_MS, fetchAi } from "../../shared/http/fetch-ai";
 import { catalogByUnitCode } from "./local-entity.catalog";
 import { resolveLocalEntityId } from "./local-entity.scope";
+import { matchEntity } from "./local-desk-topics";
 
 const PROPAGANDA_HINTS = [
   "জাল",
@@ -160,6 +161,7 @@ export class LocalOsintService {
         url: true,
         sourceName: true,
         district: true,
+        division: true,
         sentimentCategory: true,
         publishedAt: true,
         fetchedAt: true,
@@ -169,14 +171,16 @@ export class LocalOsintService {
     const liveDraft = articles
       .map((a) => {
         const blob = `${a.title} ${a.summary ?? ""}`;
+        const geo = matchEntity(entity.code, a.district, a.division, blob);
         const { kw, score } = matchScore(blob, keywords);
-        if (!kw || score < 3) return null;
+        if (!geo.hit && (!kw || score < 3)) return null;
         const heuristic = looksLikePropaganda(blob);
         const ageHours =
           (Date.now() - (a.publishedAt ?? a.fetchedAt).getTime()) / 3_600_000;
         const recencyBoost = ageHours < 24 ? 20 : ageHours < 72 ? 10 : 0;
         const sentimentBoost =
           a.sentimentCategory === IngestionSentiment.Grievance ? 8 : 0;
+        const localBoost = geo.local ? 16 : geo.hit ? 8 : 0;
         return {
           id: `live:${a.id}`,
           source: "live_news" as const,
@@ -186,14 +190,14 @@ export class LocalOsintService {
           sourceName: a.sourceName,
           sourceUrl: a.url,
           channel: "NEWS" as const,
-          matchedKeyword: kw,
+          matchedKeyword: kw ?? geo.keyword ?? entity.code,
           sentiment: mapIngestionSentiment(a.sentimentCategory),
           propagandaFlag: heuristic,
           propagandaNote: heuristic ? "Heuristic propaganda hint" : null,
           propagandaConfidence: heuristic ? 0.72 : 0.2,
           publishedAt: a.publishedAt ?? a.fetchedAt,
           ward: null,
-          matchScore: score + recencyBoost + sentimentBoost,
+          matchScore: score + recencyBoost + sentimentBoost + localBoost,
           _blob: blob,
         };
       })

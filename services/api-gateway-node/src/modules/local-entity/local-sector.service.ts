@@ -197,7 +197,7 @@ export class LocalSectorService {
       sector,
       generatedAt: new Date().toISOString(),
       sourceNote:
-        "Demo / seed operational snapshot — not a live EMIS, DGHS, or BBS feed.",
+        "Ward sites mix official seed snapshots with live news filtered to this seat — not a full EMIS/DGHS/BBS feed.",
       summary: {
         sites: items.length,
         alert: items.filter((i) => i.status === LocalSiteStatus.ALERT).length,
