@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { BookOpen, GraduationCap, Landmark, Newspaper } from "lucide-react";
-import { DataTable } from "@/components/modules/module-shell";
+import { ArrowUpRight, BookOpen, GraduationCap, Landmark, Newspaper } from "lucide-react";
 import { LocalVizCard } from "@/components/local-entity/local-viz";
 import { EvidenceAbstractDialog } from "@/components/local-entity/evidence-abstract-dialog";
 import { AppSelect } from "@/components/ui/app-select";
@@ -74,9 +73,100 @@ const KIND_ICON: Record<EvidenceKind, typeof GraduationCap> = {
 };
 
 function kindClass(kind: EvidenceKind) {
-  if (kind === "THESIS") return "border-violet-400/40 text-violet-200";
-  if (kind === "EXPERT") return "border-amber-400/40 text-amber-100";
-  return "border-sky-400/40 text-sky-100";
+  if (kind === "THESIS") return "border-violet-400/35 bg-violet-400/10 text-violet-100";
+  if (kind === "EXPERT") return "border-amber-400/35 bg-amber-400/10 text-amber-100";
+  return "border-sky-400/35 bg-sky-400/10 text-sky-100";
+}
+
+function kindBar(kind: EvidenceKind) {
+  if (kind === "THESIS") return "bg-violet-400";
+  if (kind === "EXPERT") return "bg-amber-400";
+  return "bg-sky-400";
+}
+
+function EvidenceCard({
+  row,
+  compact,
+  isBn,
+  t,
+  onOpen,
+}: {
+  row: EvidenceItem;
+  compact: boolean;
+  isBn: boolean;
+  t: ReturnType<typeof useTranslations>;
+  onOpen: (row: EvidenceItem) => void;
+}) {
+  const Icon = KIND_ICON[row.kind];
+  const title = isBn ? row.titleBn || row.title : row.title;
+  const abstract = isBn ? row.abstractBn || row.abstract : row.abstract;
+  const now = isBn ? row.solutions?.now?.bn : row.solutions?.now?.en;
+  const week = isBn ? row.solutions?.week?.bn : row.solutions?.week?.en;
+  const days90 = isBn ? row.solutions?.days90?.bn : row.solutions?.days90?.en;
+  const meta = [row.author, row.institution, String(row.year)].filter(Boolean).join(" · ");
+
+  return (
+    <article
+      className={cn(
+        "group relative flex h-full flex-col overflow-hidden rounded-xl border pl-5 pr-4 py-4",
+        "bg-gradient-to-br from-white/[0.05] via-card/75 to-secondary/30",
+        "border-white/[0.08] shadow-[0_12px_36px_-20px_rgba(0,0,0,0.7)]",
+        "transition-[transform,border-color,box-shadow] duration-200",
+        "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_18px_44px_-22px_rgba(16,185,129,0.35)]",
+      )}
+    >
+      <span aria-hidden className={cn("absolute inset-y-4 left-0 w-[3px] rounded-full", kindBar(row.kind))} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
+            kindClass(row.kind),
+          )}
+        >
+          <Icon className="h-3.5 w-3.5" />
+          {t(`kind${row.kind}`)}
+        </span>
+        <p className="text-xs text-muted-foreground">{row.year}</p>
+      </div>
+      <h3 className="mt-3 font-display text-[17px] font-semibold leading-snug tracking-tight text-foreground sm:text-lg">
+        {title}
+      </h3>
+      <p className="mt-2 line-clamp-3 text-[15px] leading-[1.7] text-muted-foreground">{abstract}</p>
+      {now ? (
+        <p className="mt-3 text-[13.5px] leading-relaxed text-sky-200/95">
+          <span className="font-semibold text-sky-300">{t("horizonNow")}: </span>
+          {now}
+        </p>
+      ) : null}
+      {!compact && week ? (
+        <p className="mt-1.5 text-[13.5px] leading-relaxed text-amber-100/90">
+          <span className="font-semibold text-amber-200">{t("horizonWeek")}: </span>
+          {week}
+        </p>
+      ) : null}
+      {!compact && days90 ? (
+        <p className="mt-1.5 text-[13.5px] leading-relaxed text-emerald-200/90">
+          <span className="font-semibold text-emerald-300">{t("horizon90")}: </span>
+          {days90}
+        </p>
+      ) : null}
+      <div className="mt-auto flex flex-wrap items-end justify-between gap-3 border-t border-white/[0.07] pt-3.5">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-foreground/90">{row.sourceName}</p>
+          {meta ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{meta}</p> : null}
+        </div>
+        <button
+          type="button"
+          data-testid="open-abstract"
+          onClick={() => onOpen(row)}
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary transition hover:bg-primary/20"
+        >
+          {t("openSource")}
+          <ArrowUpRight className="h-4 w-4" />
+        </button>
+      </div>
+    </article>
+  );
 }
 
 export function LocalEvidenceFeed({
@@ -133,7 +223,7 @@ export function LocalEvidenceFeed({
 
   return (
     <LocalVizCard title={title ?? t("panelTitle")} icon={BookOpen} delay={0.04}>
-      <div className="mb-3 toolbar-wrap">
+      <div className="mb-4 toolbar-wrap">
         <AppSelect
           size="sm"
           className="w-full min-w-0 sm:w-auto"
@@ -145,7 +235,7 @@ export function LocalEvidenceFeed({
             { value: "EXPERT", label: t("kindEXPERT") },
             { value: "POLICY_BRIEF", label: t("kindPOLICY_BRIEF") },
           ]}
-          triggerClassName="h-8 w-full min-w-[9rem] sm:w-[160px]"
+          triggerClassName="h-9 w-full min-w-[9rem] sm:w-[170px] text-sm"
         />
         <AppSelect
           size="sm"
@@ -153,91 +243,27 @@ export function LocalEvidenceFeed({
           value={topic}
           onValueChange={setTopic}
           options={topicOptions}
-          triggerClassName="h-8 w-full min-w-[9rem] sm:w-[170px]"
+          triggerClassName="h-9 w-full min-w-[9rem] sm:w-[180px] text-sm"
         />
       </div>
-      <DataTable
-        emptyMessage={t("empty")}
-        onRowClick={setOpenItem}
-        columns={[
-          {
-            key: "kind",
-            label: t("colKind"),
-            render: (row) => {
-              const Icon = KIND_ICON[row.kind];
-              return (
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]",
-                    kindClass(row.kind),
-                  )}
-                >
-                  <Icon className="h-3 w-3" />
-                  {t(`kind${row.kind}`)}
-                </span>
-              );
-            },
-          },
-          {
-            key: "title",
-            label: t("colTitle"),
-            render: (row) => (
-              <div className="max-w-xl">
-                <p className="font-medium">
-                  {isBn ? row.titleBn || row.title : row.title}
-                </p>
-                <p className="line-clamp-2 text-[11px] text-muted-foreground">
-                  {isBn ? row.abstractBn || row.abstract : row.abstract}
-                </p>
-                <p className="mt-1 text-[10px] text-sky-200/90">
-                  {t("horizonNow")}: {isBn ? row.solutions?.now?.bn : row.solutions?.now?.en}
-                </p>
-                {!compact ? (
-                  <>
-                    <p className="text-[10px] text-amber-100/80">
-                      {t("horizonWeek")}: {isBn ? row.solutions?.week?.bn : row.solutions?.week?.en}
-                    </p>
-                    <p className="text-[10px] text-emerald-200/80">
-                      {t("horizon90")}: {isBn ? row.solutions?.days90?.bn : row.solutions?.days90?.en}
-                    </p>
-                  </>
-                ) : null}
-              </div>
-            ),
-          },
-          {
-            key: "source",
-            label: t("colSource"),
-            render: (row) => (
-              <div className="text-xs">
-                <p>{row.sourceName}</p>
-                <p className="text-[10px] text-muted-foreground">
-                  {[row.author, row.institution, String(row.year)].filter(Boolean).join(" · ")}
-                </p>
-              </div>
-            ),
-          },
-          {
-            key: "link",
-            label: t("colLink"),
-            render: (row) => (
-              <button
-                type="button"
-                data-testid="open-abstract"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setOpenItem(row);
-                }}
-                className="text-[11px] text-primary underline-offset-2 hover:underline"
-              >
-                {t("openSource")}
-              </button>
-            ),
-          },
-        ]}
-        rows={rows}
-      />
+      {rows.length === 0 ? (
+        <p className="rounded-xl border border-border/50 bg-secondary/20 px-4 py-8 text-center text-sm text-muted-foreground">
+          {t("empty")}
+        </p>
+      ) : (
+        <div className={cn("grid gap-3", compact ? "sm:grid-cols-2" : "lg:grid-cols-2")}>
+          {rows.map((row) => (
+            <EvidenceCard
+              key={row.id}
+              row={row}
+              compact={compact}
+              isBn={isBn}
+              t={t}
+              onOpen={setOpenItem}
+            />
+          ))}
+        </div>
+      )}
       <EvidenceAbstractDialog
         item={openItem}
         open={Boolean(openItem)}
@@ -246,7 +272,7 @@ export function LocalEvidenceFeed({
         }}
       />
       {data?.sourceNote ? (
-        <p className="mt-2 text-[10px] text-muted-foreground/80">{data.sourceNote}</p>
+        <p className="mt-3 text-xs text-muted-foreground/80">{data.sourceNote}</p>
       ) : null}
     </LocalVizCard>
   );

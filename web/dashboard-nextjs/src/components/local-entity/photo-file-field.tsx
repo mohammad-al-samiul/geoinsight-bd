@@ -33,11 +33,16 @@ async function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+const fieldControlClass =
+  "h-10 min-w-0 flex-1 rounded-lg border border-input bg-secondary/40 px-3 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20";
+
 export function PhotoFileField({
   label,
   value,
   onChange,
   className,
+  hideLabel = false,
+  inputId,
   placeholder = "https://… or upload",
   imageOnlyError = "Image only",
   uploadFailedError = "Upload failed",
@@ -46,6 +51,8 @@ export function PhotoFileField({
   value: string;
   onChange: (url: string) => void;
   className?: string;
+  hideLabel?: boolean;
+  inputId?: string;
   placeholder?: string;
   imageOnlyError?: string;
   uploadFailedError?: string;
@@ -55,36 +62,41 @@ export function PhotoFileField({
   const [err, setErr] = useState<string | null>(null);
 
   return (
-    <div className={cn("space-y-1.5", className)}>
-      <label className="text-xs text-muted-foreground">{label}</label>
-      <div className="flex flex-wrap gap-2">
+    <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
+      {!hideLabel ? (
+        <label htmlFor={inputId} className="block h-4 text-xs leading-4 text-muted-foreground">
+          {label}
+        </label>
+      ) : null}
+      <div className="flex h-10 min-w-0 items-stretch gap-2">
         <input
+          id={inputId}
           value={value.startsWith("data:image/") ? "" : value}
           onChange={(e) => onChange(e.target.value)}
-          className="h-10 min-w-0 flex-1 rounded-lg border border-input bg-secondary/40 px-3 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
+          className={fieldControlClass}
           placeholder={placeholder}
         />
         <Button
           type="button"
-          size="sm"
+          size="icon"
           variant="outline"
-          className="h-10"
+          className="h-10 w-10 shrink-0"
           disabled={busy}
           onClick={() => inputRef.current?.click()}
         >
           {busy ? <Camera className="h-3.5 w-3.5 animate-pulse" /> : <Upload className="h-3.5 w-3.5" />}
         </Button>
-        {value && (
+        {value ? (
           <Button
             type="button"
-            size="sm"
+            size="icon"
             variant="ghost"
-            className="h-10"
+            className="h-10 w-10 shrink-0"
             onClick={() => onChange("")}
           >
             <X className="h-3.5 w-3.5" />
           </Button>
-        )}
+        ) : null}
         <input
           ref={inputRef}
           type="file"
@@ -110,15 +122,15 @@ export function PhotoFileField({
           }}
         />
       </div>
-      {value.startsWith("data:image/") && (
+      {value.startsWith("data:image/") ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={value}
           alt={label}
-          className="mt-1 h-20 w-28 rounded-md object-cover ring-1 ring-border/60"
+          className="h-20 w-28 rounded-md object-cover ring-1 ring-border/60"
         />
-      )}
-      {err && <p className="text-[11px] text-destructive">{err}</p>}
+      ) : null}
+      {err ? <p className="text-[11px] text-destructive">{err}</p> : null}
     </div>
   );
 }

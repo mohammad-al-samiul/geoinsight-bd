@@ -86,41 +86,41 @@ export function EvidenceAbstractDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="pr-8 text-left text-base leading-snug">{title}</DialogTitle>
-          <DialogDescription className="text-left text-xs">
+          <DialogTitle className="pr-8 text-left text-lg font-semibold leading-snug sm:text-xl">{title}</DialogTitle>
+          <DialogDescription className="text-left text-sm">
             {t(`kind${item.kind}`)} · {item.sourceName}
             {meta ? ` · ${meta}` : ""}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3 text-sm" data-testid="evidence-abstract-dialog">
+        <div className="space-y-4 text-[15px] leading-relaxed" data-testid="evidence-abstract-dialog">
           <section>
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               {t("abstractLabel")}
             </p>
-            <p className="whitespace-pre-wrap leading-relaxed text-foreground/90">{abstract}</p>
+            <p className="whitespace-pre-wrap leading-[1.7] text-foreground/90">{abstract}</p>
           </section>
           {now ? (
-            <p className="text-[12px] text-sky-200/90">
+            <p className="text-[14px] leading-relaxed text-sky-200/90">
               {t("horizonNow")}: {now}
             </p>
           ) : null}
           {week ? (
-            <p className="text-[12px] text-amber-100/80">
+            <p className="text-[14px] leading-relaxed text-amber-100/80">
               {t("horizonWeek")}: {week}
             </p>
           ) : null}
           {days90 ? (
-            <p className="text-[12px] text-emerald-200/80">
+            <p className="text-[14px] leading-relaxed text-emerald-200/80">
               {t("horizon90")}: {days90}
             </p>
           ) : null}
-          <p className="text-[11px] text-muted-foreground">{t("abstractDialogNote")}</p>
+          <p className="text-sm text-muted-foreground">{t("abstractDialogNote")}</p>
           {publicUrl ? (
             <a
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-[12px] text-primary underline-offset-2 hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary underline-offset-2 hover:underline"
             >
               <ExternalLink className="h-3.5 w-3.5" aria-hidden />
               {t("openExternal")}

@@ -843,19 +843,35 @@ export function LocalComplaintsPanel() {
           <CheckCircle2 className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-semibold">{t("resolveHelper")}</h2>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-x-3 gap-y-1.5 sm:grid-cols-2">
+          <label
+            htmlFor="complaint-after-photo"
+            className="block h-4 text-xs leading-4 text-muted-foreground sm:col-start-1 sm:row-start-1"
+          >
+            {t("afterPhoto")}
+          </label>
           <PhotoFileField
+            hideLabel
+            inputId="complaint-after-photo"
             label={t("afterPhoto")}
             value={resolveUrl}
             onChange={setResolveUrl}
             placeholder={t("photoPlaceholder")}
             imageOnlyError={t("photoImageOnly")}
             uploadFailedError={t("photoUploadFailed")}
+            className="sm:col-start-1 sm:row-start-2"
           />
+          <label
+            htmlFor="complaint-resolution-note"
+            className="block h-4 text-xs leading-4 text-muted-foreground sm:col-start-2 sm:row-start-1"
+          >
+            {t("resolutionNote")}
+          </label>
           <input
+            id="complaint-resolution-note"
             value={resolveNote}
             onChange={(e) => setResolveNote(e.target.value)}
-            className="h-10 rounded-lg border border-input bg-secondary/40 px-3 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
+            className="h-10 w-full self-start rounded-lg border border-input bg-secondary/40 px-3 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20 sm:col-start-2 sm:row-start-2"
             placeholder={t("resolutionNote")}
           />
         </div>
