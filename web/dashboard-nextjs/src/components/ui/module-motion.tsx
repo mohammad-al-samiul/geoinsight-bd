@@ -122,7 +122,7 @@ export function AnimatedContent({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 8 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className={cn("relative z-10 space-y-6", className)}
+        className={cn("relative z-10 min-w-0 space-y-6", className)}
       >
         {children}
       </motion.div>

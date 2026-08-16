@@ -105,7 +105,7 @@ export function LocalNotificationCenter() {
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-full z-[200] mt-2 w-[min(100vw-2rem,420px)] overflow-hidden rounded-2xl border border-border bg-popover shadow-xl">
+        <div className="fixed inset-x-3 top-[4.5rem] z-[200] max-h-[min(70dvh,28rem)] overflow-hidden rounded-2xl border border-border bg-popover shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[min(100vw-2rem,420px)]">
           <div className="border-b border-border/60 bg-gradient-to-r from-primary/10 via-background to-background p-4">
             <div className="flex items-start gap-3">
               <div className="rounded-xl border border-primary/20 bg-primary/10 p-2 text-primary">

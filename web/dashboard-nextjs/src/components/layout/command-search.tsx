@@ -156,7 +156,7 @@ export function CommandSearch() {
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         placeholder={t("placeholder")}
-        className="h-9 w-full rounded-lg border border-border/70 bg-secondary/35 pl-9 pr-3 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/35 focus:bg-secondary/50 focus:ring-2 focus:ring-primary/15"
+        className="h-9 w-full rounded-lg border border-border/70 bg-secondary/35 pl-9 pr-3 text-base outline-none transition placeholder:text-muted-foreground focus:border-primary/35 focus:bg-secondary/50 focus:ring-2 focus:ring-primary/15 sm:text-sm"
         aria-label={t("placeholder")}
         aria-expanded={showDropdown}
         role="combobox"

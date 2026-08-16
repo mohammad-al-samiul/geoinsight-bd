@@ -375,7 +375,7 @@ export function ImpactStatsPanel({
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-border/50">
-            <table className="w-full min-w-[520px] text-left text-xs">
+            <table className="data-table-stack w-full min-w-0 text-left text-xs md:min-w-[32rem]">
               <thead className="bg-background/50 text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-semibold">
@@ -401,15 +401,23 @@ export function ImpactStatsPanel({
                     key={d.district}
                     className="border-t border-border/40 odd:bg-background/20"
                   >
-                    <td className="max-w-[200px] truncate px-3 py-2 font-medium" title={d.district}>
+                    <td
+                      data-label={locale === "bn" ? "স্থান" : "Place"}
+                      className="max-w-[200px] truncate px-3 py-2 font-medium"
+                      title={d.district}
+                    >
                       {d.district}
                     </td>
-                    <td className="px-3 py-2 tabular-nums text-red-300">{d.deaths}</td>
-                    <td className="px-3 py-2 tabular-nums text-amber-300">{d.injuries}</td>
-                    <td className="px-3 py-2 tabular-nums text-sky-300">
+                    <td data-label={labels.deaths} className="px-3 py-2 tabular-nums text-red-300">
+                      {d.deaths}
+                    </td>
+                    <td data-label={labels.injuries} className="px-3 py-2 tabular-nums text-amber-300">
+                      {d.injuries}
+                    </td>
+                    <td data-label={labels.homes} className="px-3 py-2 tabular-nums text-sky-300">
                       {d.homes_damaged ?? 0}
                     </td>
-                    <td className="px-3 py-2 tabular-nums text-emerald-300">
+                    <td data-label={labels.livestock} className="px-3 py-2 tabular-nums text-emerald-300">
                       {d.livestock_lost ?? 0}
                     </td>
                   </tr>

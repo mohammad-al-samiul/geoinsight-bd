@@ -986,7 +986,7 @@ export function LocalComplaintsPanel() {
                         label: `${u.email} (${u.role})`,
                       })),
                     ]}
-                    triggerClassName="h-9 min-w-[220px] flex-1"
+                    triggerClassName="h-9 w-full min-w-0 sm:min-w-[220px] sm:flex-1"
                   />
                 </div>
                 {selected.assignee && (

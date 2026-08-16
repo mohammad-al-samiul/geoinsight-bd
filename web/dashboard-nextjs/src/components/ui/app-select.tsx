@@ -46,7 +46,7 @@ export function AppSelect({
   disabled,
 }: AppSelectProps) {
   return (
-    <div className={cn("inline-flex min-w-0 items-center", className)}>
+    <div className={cn("flex min-w-0 items-center", className)}>
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger
           className={cn(

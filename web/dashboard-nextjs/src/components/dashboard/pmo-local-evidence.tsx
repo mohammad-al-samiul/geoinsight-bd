@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { BookOpen, GraduationCap, Landmark, Newspaper } from "lucide-react";
@@ -8,6 +9,7 @@ import {
   type NationalBoard,
   type NationalEvidenceSnippet,
 } from "@/hooks/use-national-board";
+import { EvidenceAbstractDialog } from "@/components/local-entity/evidence-abstract-dialog";
 import { cn } from "@/lib/utils";
 
 const KIND_ICON = {
@@ -32,6 +34,7 @@ export function PmoLocalEvidenceCards({
   const t = useTranslations("modules.pmoLocal");
   const te = useTranslations("modules.localEvidence");
   const isBn = useLocale().startsWith("bn");
+  const [openItem, setOpenItem] = useState<NationalEvidenceSnippet | null>(null);
 
   if (!data.evidence.items.length) return null;
 
@@ -92,14 +95,14 @@ export function PmoLocalEvidenceCards({
                 </p>
               ) : null}
               <div className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  data-testid="open-abstract"
+                  onClick={() => setOpenItem(item)}
                   className="hover:text-primary"
                 >
                   {te("openSource")}
-                </a>
+                </button>
                 <Link href={deskHref} className="hover:text-primary">
                   {t("openEvidence")}
                 </Link>
@@ -108,6 +111,13 @@ export function PmoLocalEvidenceCards({
           );
         })}
       </div>
+      <EvidenceAbstractDialog
+        item={openItem}
+        open={Boolean(openItem)}
+        onOpenChange={(next) => {
+          if (!next) setOpenItem(null);
+        }}
+      />
       <p className="mt-2 text-[10px] text-muted-foreground/80">{t("evidenceNote")}</p>
     </div>
   );

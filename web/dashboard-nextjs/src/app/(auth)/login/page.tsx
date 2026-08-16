@@ -137,7 +137,7 @@ function LoginForm() {
   };
 
   return (
-    <div className="app-atmosphere relative flex min-h-screen items-center justify-center overflow-hidden p-4">
+    <div className="app-atmosphere relative flex min-h-dvh items-center justify-center overflow-hidden p-4">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
         <div className="absolute -right-16 bottom-0 h-80 w-80 rounded-full bg-sky-500/10 blur-3xl" />
@@ -285,7 +285,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="app-atmosphere flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+        <div className="app-atmosphere flex min-h-dvh items-center justify-center text-sm text-muted-foreground">
           {t("loading")}
         </div>
       }

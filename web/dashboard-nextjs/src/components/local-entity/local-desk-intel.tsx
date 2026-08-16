@@ -3,7 +3,16 @@
 import { useMemo } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
-import { ListTodo, Newspaper, Radio, Tags } from "lucide-react";
+import {
+  ArrowUpRight,
+  Building2,
+  Clock3,
+  ListTodo,
+  MapPin,
+  Newspaper,
+  Radio,
+  Tags,
+} from "lucide-react";
 import {
   LocalAreaTrend,
   LocalBars,
@@ -12,7 +21,9 @@ import {
   LocalKpiSparkGrid,
   LocalVizCard,
 } from "@/components/local-entity/local-viz";
+import { isPublicHttpUrl } from "@/components/local-entity/evidence-abstract-dialog";
 import { useLocalLiveIntel, type DeskTopic, type LiveIntelItem } from "@/hooks/use-local-live-intel";
+import { cn } from "@/lib/utils";
 
 const PATH_TOPICS: Array<{ prefix: string; topic: DeskTopic }> = [
   { prefix: "/local/education", topic: "EDUCATION" },
@@ -69,6 +80,24 @@ function hoursAgo(iso: string): string {
   return `${Math.round(h / 24)}d`;
 }
 
+const ORIGIN_META = {
+  news: {
+    icon: Newspaper,
+    bar: "bg-sky-400",
+    pill: "border-sky-400/25 bg-sky-400/10 text-sky-200",
+  },
+  ops: {
+    icon: Building2,
+    bar: "bg-violet-400",
+    pill: "border-violet-400/25 bg-violet-400/10 text-violet-200",
+  },
+  related: {
+    icon: Radio,
+    bar: "bg-amber-400",
+    pill: "border-amber-400/25 bg-amber-400/10 text-amber-100",
+  },
+} as const;
+
 function HeadlineCard({
   row,
   t,
@@ -80,38 +109,93 @@ function HeadlineCard({
 }) {
   const originLabel =
     row.origin === "ops" ? t("originOps") : row.origin === "related" ? t("originRelated") : t("originNews");
-  const body = (
+  const origin = ORIGIN_META[row.origin] ?? ORIGIN_META.news;
+  const OriginIcon = origin.icon;
+  const publicUrl = isPublicHttpUrl(row.url);
+  const action = isBn ? row.actionBn : row.actionEn;
+  const ago = hoursAgo(row.publishedAt);
+  const negative = row.sentiment === "NEGATIVE";
+
+  const inner = (
     <>
-      <span className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-        <span className="rounded-full bg-secondary px-1.5 py-0.5">{originLabel}</span>
+      <span
+        aria-hidden
+        className={cn(
+          "absolute inset-y-3 left-0 w-[3px] rounded-full",
+          negative ? "bg-rose-400" : origin.bar,
+        )}
+      />
+      <span className="flex flex-wrap items-center gap-1.5">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide",
+            origin.pill,
+          )}
+        >
+          <OriginIcon className="h-3 w-3" />
+          {originLabel}
+        </span>
         {row.local ? (
-          <span className="rounded-full bg-emerald-400/15 px-1.5 py-0.5 text-emerald-300">{t("localTag")}</span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+            <MapPin className="h-3 w-3" />
+            {t("localTag")}
+          </span>
         ) : null}
-        <span>{row.sourceName}</span>
-        <span>{hoursAgo(row.publishedAt)}</span>
-        {row.keyword ? <span>{row.keyword}</span> : null}
+        {row.keyword ? (
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] text-muted-foreground">
+            {row.keyword}
+          </span>
+        ) : null}
       </span>
-      <span className="mt-1 block text-[13px] font-semibold leading-snug text-foreground">{row.title}</span>
+      <span className="mt-3 block font-display text-[15px] font-semibold leading-snug tracking-tight text-foreground">
+        {row.title}
+      </span>
       {row.summary ? (
-        <span className="mt-1 block line-clamp-3 text-[12px] leading-relaxed text-muted-foreground">
+        <span className="mt-2 block line-clamp-3 text-[13px] leading-[1.65] text-muted-foreground">
           {row.summary}
         </span>
       ) : null}
-      {(isBn ? row.actionBn : row.actionEn) ? (
-        <span className="mt-1.5 block text-[11px] text-sky-200/90">
-          {t("doNow")}: {isBn ? row.actionBn : row.actionEn}
+      {action ? (
+        <span className="mt-3 block rounded-lg border border-sky-400/20 bg-sky-400/[0.07] px-2.5 py-2 text-[12px] leading-relaxed text-sky-100/95">
+          <span className="mr-1 font-semibold text-sky-300">{t("doNow")}:</span>
+          {action}
         </span>
       ) : null}
+      <span className="mt-auto flex items-center justify-between gap-3 border-t border-white/[0.06] pt-3">
+        <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+          <Clock3 className="h-3 w-3 shrink-0 opacity-70" />
+          <span className="truncate">{row.sourceName}</span>
+          {ago ? <span className="shrink-0 tabular-nums opacity-80">· {ago}</span> : null}
+        </span>
+        {publicUrl ? (
+          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-primary">
+            {t("openSource")}
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </span>
+        ) : (
+          <span className="shrink-0 text-[10px] text-muted-foreground/70">{t("inAppRecord")}</span>
+        )}
+      </span>
     </>
   );
-  const cls = "block rounded-lg border border-border/40 bg-secondary/15 px-3 py-2.5 transition hover:border-primary/40";
-  return row.url ? (
-    <a href={row.url} target="_blank" rel="noreferrer" className={cls}>
-      {body}
-    </a>
-  ) : (
-    <div className={cls}>{body}</div>
+
+  const cls = cn(
+    "group relative flex h-full flex-col overflow-hidden rounded-xl border px-4 py-3.5 pl-5",
+    "bg-gradient-to-br from-white/[0.045] via-card/70 to-secondary/25",
+    "border-white/[0.07] shadow-[0_10px_36px_-20px_rgba(0,0,0,0.75)]",
+    "transition-[transform,border-color,box-shadow] duration-200",
+    "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_18px_44px_-22px_rgba(16,185,129,0.38)]",
+    publicUrl && "cursor-pointer",
   );
+
+  if (publicUrl && row.url) {
+    return (
+      <a href={row.url} target="_blank" rel="noopener noreferrer" className={cls}>
+        {inner}
+      </a>
+    );
+  }
+  return <article className={cls}>{inner}</article>;
 }
 
 export function LocalDeskIntel() {
@@ -214,9 +298,10 @@ export function LocalDeskIntel() {
               {data.summary.keywords.map((kw) => (
                 <span
                   key={kw.name}
-                  className="rounded-full border border-border/50 bg-secondary/30 px-2.5 py-1 text-[11px] text-muted-foreground"
+                  className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-muted-foreground"
                 >
-                  {kw.name} · {kw.value}
+                  {kw.name}
+                  <span className="ml-1.5 tabular-nums text-foreground/80">{kw.value}</span>
                 </span>
               ))}
             </div>
@@ -236,11 +321,11 @@ export function LocalDeskIntel() {
 
           {data.summary.actions.length > 0 ? (
             <LocalVizCard title={t("actions")} icon={ListTodo} delay={0.14}>
-              <ul className="grid gap-2 md:grid-cols-2">
+              <ul className="grid gap-2.5 md:grid-cols-2">
                 {data.summary.actions.map((a) => (
                   <li
                     key={a.en}
-                    className="rounded-lg border border-sky-400/20 bg-sky-400/5 px-3 py-2 text-[12px] leading-relaxed text-sky-100"
+                    className="rounded-xl border border-sky-400/20 bg-gradient-to-br from-sky-400/10 to-transparent px-3.5 py-3 text-[13px] leading-relaxed text-sky-50"
                   >
                     {isBn ? a.bn : a.en}
                   </li>
@@ -250,7 +335,7 @@ export function LocalDeskIntel() {
           ) : null}
 
           <LocalVizCard title={t("headlines")} delay={0.16}>
-            <div className="grid gap-2 md:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               {primaryItems.map((row) => (
                 <HeadlineCard key={row.id} row={row} t={t} isBn={isBn} />
               ))}
@@ -259,7 +344,7 @@ export function LocalDeskIntel() {
 
           {relatedItems.length > 0 ? (
             <LocalVizCard title={t("related")} delay={0.2}>
-              <div className="grid gap-2 md:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {relatedItems.map((row) => (
                   <HeadlineCard key={row.id} row={row} t={t} isBn={isBn} />
                 ))}

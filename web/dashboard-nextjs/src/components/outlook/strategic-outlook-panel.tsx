@@ -502,7 +502,7 @@ function ChallengeDomainView({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[420px]">
+          <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4">
             <div className="rounded-xl border border-white/10 bg-background/35 px-3 py-2.5 text-center">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {t("riskScore")}

@@ -34,6 +34,16 @@ interface LocalWardMapProps {
   metricLabel?: string;
 }
 
+function desktopOnlyHeight(className: string) {
+  return className
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) =>
+      /^(sm:|md:|lg:|xl:|2xl:|max-)/.test(token) ? token : `sm:${token}`,
+    )
+    .join(" ");
+}
+
 export function LocalWardMap({
   entityCode,
   wards,
@@ -100,7 +110,12 @@ export function LocalWardMap({
         </div>
       </div>
 
-      <div className={cn("relative z-0 isolate", heightClassName)}>
+      <div
+        className={cn(
+          "relative z-0 isolate h-[min(52dvh,22rem)] min-h-[13.5rem]",
+          desktopOnlyHeight(heightClassName),
+        )}
+      >
         {wards.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             —

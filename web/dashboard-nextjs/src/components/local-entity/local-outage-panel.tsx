@@ -425,7 +425,7 @@ export function LocalOutagePanel() {
 
       <section className="glass-panel mb-4 rounded-xl p-4">
         <h3 className="mb-3 text-sm font-medium">{t("logNew")}</h3>
-        <div className="grid gap-3 md:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <AppSelect
             value={kind}
             onValueChange={(v) => setKind(v as OutageKind)}
@@ -455,7 +455,7 @@ export function LocalOutagePanel() {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="h-10 rounded-lg border border-input bg-secondary/40 px-3 text-sm md:col-span-2"
+            className="h-10 rounded-lg border border-input bg-secondary/40 px-3 text-sm sm:col-span-2 xl:col-span-2"
             placeholder={t("titlePlaceholder")}
           />
           <input

@@ -39,7 +39,7 @@ export function ModuleShell({
   const t = useTranslations("common");
 
   return (
-    <div className="relative mx-auto max-w-7xl space-y-7">
+    <div className="relative mx-auto max-w-7xl space-y-5 sm:space-y-7">
       <ModulePageAura />
 
       <motion.div
@@ -53,7 +53,7 @@ export function ModuleShell({
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/80">
               GeoInsight · Command
             </p>
-            <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
+            <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl lg:text-3xl">
               {title}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -76,7 +76,7 @@ export function ModuleShell({
           role="alert"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative z-10 flex items-start gap-3 rounded-xl border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive"
+          className="relative z-10 flex flex-col gap-3 rounded-xl border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive sm:flex-row sm:items-start"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="flex-1">
@@ -163,7 +163,7 @@ export function StatCard({ label, value, hint, accent = "default", icon }: StatC
 export function StatGrid({ children }: { children: ReactNode }) {
   const items = Children.toArray(children);
   return (
-    <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4">
       {items.map((child, i) => (
         <motion.div
           key={i}
@@ -235,7 +235,7 @@ function DataTableRowInner<T extends { id?: string }>({
       }
     >
       {columns.map((col) => (
-        <td key={col.key} className="px-4 py-3.5">
+        <td key={col.key} data-label={col.label} className="px-4 py-3.5 align-top">
           {col.render
             ? col.render(row)
             : String((row as Record<string, unknown>)[col.key] ?? "—")}
@@ -266,8 +266,8 @@ export function DataTable<T extends { id?: string }>({
 
   return (
     <div className="glass-panel min-w-0 overflow-hidden rounded-xl">
-      <div className="min-w-0 overflow-x-auto overscroll-x-contain">
-        <table className="w-full min-w-[640px] text-sm sm:min-w-0 lg:min-w-full">
+      <div className="min-w-0 overflow-x-auto overscroll-x-contain md:overflow-x-auto">
+        <table className="data-table-stack w-full min-w-0 text-sm md:min-w-[36rem] lg:min-w-full">
           <thead>
             <tr className="border-b border-border/50 bg-secondary/25 text-left text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               {columns.map((col) => (

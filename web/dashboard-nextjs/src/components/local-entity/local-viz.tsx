@@ -54,7 +54,7 @@ export function LocalVizCard({
   action?: ReactNode;
 }) {
   return (
-    <MotionSection delay={delay} className={cn("glass-panel rounded-xl p-4 shadow-panel", className)}>
+    <MotionSection delay={delay} className={cn("glass-panel min-w-0 rounded-xl p-3 shadow-panel sm:p-4", className)}>
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {Icon ? <Icon className="h-4 w-4 text-primary" /> : null}
@@ -80,7 +80,7 @@ export function LocalDonut({
   const empty = rows.length === 0;
 
   return (
-    <div style={{ height: height ?? layout.pieChartHeight }} className="w-full">
+    <div style={{ height: height ?? layout.pieChartHeight }} className="chart-box">
       {empty ? (
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
           —
@@ -154,7 +154,7 @@ export function LocalBars({
   const h = height ?? layout.chartHeightSm;
 
   return (
-    <div style={{ height: h }} className="w-full">
+    <div style={{ height: h }} className="chart-box">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
@@ -219,7 +219,7 @@ export function LocalAreaTrend({
   const gradId = `local-area-${dataKey}`;
 
   return (
-    <div style={{ height: h }} className="w-full">
+    <div style={{ height: h }} className="chart-box">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
           <defs>
@@ -436,14 +436,14 @@ export function LocalKpiSpark({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -3 }}
-      className="glass-panel rounded-xl border border-border/50 p-4 shadow-panel"
+      className="glass-panel min-w-0 rounded-xl border border-border/50 p-3 shadow-panel sm:p-4"
     >
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </p>
       <div className="mt-2 flex items-end justify-between gap-3">
         <div>
-          <p className={cn("font-display text-2xl font-semibold tabular-nums", tone)}>
+          <p className={cn("font-display text-xl font-semibold tabular-nums sm:text-2xl", tone)}>
             {value}
           </p>
           {hint ? (
@@ -461,6 +461,6 @@ export function LocalKpiSpark({
 
 export function LocalKpiSparkGrid({ children }: { children: ReactNode }) {
   return (
-    <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
+    <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">{children}</div>
   );
 }

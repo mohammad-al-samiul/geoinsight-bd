@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { BookOpen, GraduationCap, Landmark, Newspaper } from "lucide-react";
 import { DataTable } from "@/components/modules/module-shell";
 import { LocalVizCard } from "@/components/local-entity/local-viz";
+import { EvidenceAbstractDialog } from "@/components/local-entity/evidence-abstract-dialog";
 import { AppSelect } from "@/components/ui/app-select";
 import { apiClient } from "@/lib/api-client";
 import { useLocalEntityId } from "@/hooks/use-local-entity-id";
@@ -94,6 +95,7 @@ export function LocalEvidenceFeed({
   const [kind, setKind] = useState<string>("ALL");
   const [topic, setTopic] = useState<string>(topics?.[0] ?? "ALL");
   const [data, setData] = useState<EvidenceFeed | null>(null);
+  const [openItem, setOpenItem] = useState<EvidenceItem | null>(null);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
@@ -131,9 +133,10 @@ export function LocalEvidenceFeed({
 
   return (
     <LocalVizCard title={title ?? t("panelTitle")} icon={BookOpen} delay={0.04}>
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="mb-3 toolbar-wrap">
         <AppSelect
           size="sm"
+          className="w-full min-w-0 sm:w-auto"
           value={kind}
           onValueChange={setKind}
           options={[
@@ -142,18 +145,20 @@ export function LocalEvidenceFeed({
             { value: "EXPERT", label: t("kindEXPERT") },
             { value: "POLICY_BRIEF", label: t("kindPOLICY_BRIEF") },
           ]}
-          triggerClassName="h-8 w-[160px]"
+          triggerClassName="h-8 w-full min-w-[9rem] sm:w-[160px]"
         />
         <AppSelect
           size="sm"
+          className="w-full min-w-0 sm:w-auto"
           value={topic}
           onValueChange={setTopic}
           options={topicOptions}
-          triggerClassName="h-8 w-[170px]"
+          triggerClassName="h-8 w-full min-w-[9rem] sm:w-[170px]"
         />
       </div>
       <DataTable
         emptyMessage={t("empty")}
+        onRowClick={setOpenItem}
         columns={[
           {
             key: "kind",
@@ -185,15 +190,15 @@ export function LocalEvidenceFeed({
                   {isBn ? row.abstractBn || row.abstract : row.abstract}
                 </p>
                 <p className="mt-1 text-[10px] text-sky-200/90">
-                  {t("horizonNow")}: {isBn ? row.solutions.now.bn : row.solutions.now.en}
+                  {t("horizonNow")}: {isBn ? row.solutions?.now?.bn : row.solutions?.now?.en}
                 </p>
                 {!compact ? (
                   <>
                     <p className="text-[10px] text-amber-100/80">
-                      {t("horizonWeek")}: {isBn ? row.solutions.week.bn : row.solutions.week.en}
+                      {t("horizonWeek")}: {isBn ? row.solutions?.week?.bn : row.solutions?.week?.en}
                     </p>
                     <p className="text-[10px] text-emerald-200/80">
-                      {t("horizon90")}: {isBn ? row.solutions.days90.bn : row.solutions.days90.en}
+                      {t("horizon90")}: {isBn ? row.solutions?.days90?.bn : row.solutions?.days90?.en}
                     </p>
                   </>
                 ) : null}
@@ -216,18 +221,29 @@ export function LocalEvidenceFeed({
             key: "link",
             label: t("colLink"),
             render: (row) => (
-              <a
-                href={row.url}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                data-testid="open-abstract"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setOpenItem(row);
+                }}
                 className="text-[11px] text-primary underline-offset-2 hover:underline"
               >
                 {t("openSource")}
-              </a>
+              </button>
             ),
           },
         ]}
         rows={rows}
+      />
+      <EvidenceAbstractDialog
+        item={openItem}
+        open={Boolean(openItem)}
+        onOpenChange={(next) => {
+          if (!next) setOpenItem(null);
+        }}
       />
       {data?.sourceNote ? (
         <p className="mt-2 text-[10px] text-muted-foreground/80">{data.sourceNote}</p>

@@ -24,7 +24,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
 
   return (
     <div
-      className={cn("flex items-center gap-1 rounded-md border border-input bg-secondary/30 p-0.5", className)}
+      className={cn("flex items-center gap-0.5 rounded-md border border-input bg-secondary/30 p-0.5", className)}
       role="group"
       aria-label={t("language")}
     >
@@ -32,7 +32,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
         type="button"
         size="sm"
         variant={locale === "bn" ? "secondary" : "ghost"}
-        className="h-7 px-2.5 text-xs font-semibold"
+        className="h-7 px-2 text-[11px] font-semibold sm:px-2.5 sm:text-xs"
         onClick={() => switchTo("bn")}
       >
         বাংলা
@@ -41,7 +41,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
         type="button"
         size="sm"
         variant={locale === "en" ? "secondary" : "ghost"}
-        className="h-7 px-2.5 text-xs font-semibold"
+        className="h-7 px-2 text-[11px] font-semibold sm:px-2.5 sm:text-xs"
         onClick={() => switchTo("en")}
       >
         EN

@@ -50,7 +50,7 @@ export function CommandBar({
     <header className="sticky top-0 z-[100] overflow-visible border-b border-command-border/80 bg-command/90 shadow-panel backdrop-blur-xl">
       {/* Live data pulse tracing along the bottom edge of the command bar */}
       <span aria-hidden="true" className="data-pulse-line pointer-events-none absolute inset-x-0 bottom-0 h-px" />
-      <div className="flex h-14 items-center gap-3 px-4 lg:px-6">
+      <div className="flex min-h-14 flex-wrap items-center gap-2 px-3 py-2 sm:h-14 sm:flex-nowrap sm:gap-3 sm:px-4 sm:py-0 lg:px-6">
         <Button
           variant="ghost"
           size="icon"
@@ -61,16 +61,16 @@ export function CommandBar({
           <Menu className="h-5 w-5" />
         </Button>
 
-        <div className="hidden items-center gap-3 sm:flex">
+        <div className="hidden min-w-0 items-center gap-3 md:flex">
           <div className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-primary/25 bg-primary/10">
             <span className="absolute inset-0 rounded-lg bg-primary/10 blur-md" />
             <Radio className="relative h-4 w-4 text-primary" />
           </div>
-          <div>
-            <p className="font-display text-sm font-semibold leading-none tracking-tight">
+          <div className="min-w-0">
+            <p className="font-display truncate text-sm font-semibold leading-none tracking-tight">
               {localRole ? t("localSubtitle") : t("commandCenter")}
             </p>
-            <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            <p className="mt-0.5 truncate text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               {localRole
                 ? user.adminUnitName ?? t("localSubtitle")
                 : t("commandSubtitle")}
@@ -78,11 +78,11 @@ export function CommandBar({
           </div>
         </div>
 
-        <div className="mx-2 min-w-0 flex-1 max-w-md sm:mx-auto">
+        <div className="order-last w-full min-w-0 sm:order-none sm:mx-2 sm:max-w-md sm:flex-1">
           <CommandSearch />
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
           <LocaleSwitcher />
           <Badge
             variant="outline"

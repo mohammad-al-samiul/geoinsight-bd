@@ -43,6 +43,7 @@
 
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
@@ -51,6 +52,23 @@
     letter-spacing: -0.011em;
     /* Native form controls (select popup) follow the dark console palette */
     color-scheme: dark;
+  }
+
+  img,
+  video,
+  canvas,
+  svg,
+  iframe {
+    max-width: 100%;
+  }
+
+  /* iOS zooms inputs under 16px — keep readable without pinch-zoom jump */
+  @media (max-width: 639px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
 
   /* Fallback for any leftover native <select> — avoid white OS menus */
@@ -117,6 +135,15 @@
 
   .scroll-x-strip > * {
     @apply shrink-0;
+  }
+
+  /* Filter / action rows: wrap on phones, never force horizontal page scroll */
+  .toolbar-wrap {
+    @apply flex min-w-0 flex-wrap items-end gap-2;
+  }
+
+  .chart-box {
+    @apply relative min-h-0 min-w-0 w-full overflow-hidden;
   }
 
   .font-bengali {
@@ -381,6 +408,70 @@
   font-family: inherit;
   height: 100%;
   width: 100%;
+}
+
+.recharts-wrapper,
+.recharts-surface {
+  max-width: 100%;
+}
+
+/* Wide data tables become labeled cards on phones — no sideways page scroll */
+@media (max-width: 767px) {
+  table.data-table-stack {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  table.data-table-stack thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  table.data-table-stack tbody {
+    display: block;
+  }
+
+  table.data-table-stack tr {
+    display: block;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid hsl(var(--border) / 0.45);
+  }
+
+  table.data-table-stack tr:last-child {
+    border-bottom: 0;
+  }
+
+  table.data-table-stack td {
+    display: grid;
+    grid-template-columns: minmax(5rem, 34%) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.35rem 1rem !important;
+  }
+
+  table.data-table-stack td::before {
+    content: attr(data-label);
+    padding-top: 0.15rem;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+    word-break: break-word;
+  }
+
+  table.data-table-stack td > * {
+    min-width: 0;
+    max-width: 100%;
+  }
 }
 
 .map-panel .leaflet-container {

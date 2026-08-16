@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Noto_Sans_Bengali, Sora } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
@@ -30,6 +30,14 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500", "600"],
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: "#0a1220",
+};
+
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("metadata");
   return {
@@ -43,14 +51,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className="dark">
+    <html lang={locale} className="dark overflow-x-clip">
       <body
         className={cn(
           sora.variable,
           soraDisplay.variable,
           notoBengali.variable,
           jetbrainsMono.variable,
-          "app-atmosphere min-h-screen",
+          "app-atmosphere min-h-dvh overflow-x-clip",
           locale === "bn" ? "font-bengali" : "font-sans",
         )}
       >

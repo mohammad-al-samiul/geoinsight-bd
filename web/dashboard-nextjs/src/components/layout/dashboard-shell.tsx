@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Sidebar } from "@/components/layout/sidebar";
 import { CommandBar } from "@/components/layout/command-bar";
@@ -21,12 +22,17 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const user = useAuth();
   const { isLoading: authLoading } = useAuthContext();
   const tSec = useTranslations("modules.security");
+  const pathname = usePathname();
   const authReady = !authLoading && user.id !== "loading";
   const localRole = authReady && isLocalEntityRole(user.role);
   const showMfaBanner = authReady && user.mfaRequired && !user.mfaEnabled;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   // Warm shared caches as soon as chrome mounts — before modules ask for them.
   // Wait for real role so MP/Mayor never boot national endpoints as fake-PMO.
@@ -51,7 +57,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   return (
     <NavPulseProvider>
-    <div className="flex h-[100dvh] overflow-hidden bg-background">
+    <div className="flex h-[100dvh] overflow-hidden bg-background pt-[env(safe-area-inset-top)]">
       <div className="hidden lg:flex">
         <Sidebar
           collapsed={sidebarCollapsed}
@@ -65,7 +71,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute left-0 top-0 h-full max-w-[min(100%,300px)] animate-slide-in shadow-soft">
+          <div className="absolute left-0 top-0 h-full w-[min(100%,18.5rem)] max-w-[85vw] animate-slide-in shadow-soft">
             <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
           </div>
         </div>
@@ -80,7 +86,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         />
         <div className="app-atmosphere relative flex min-h-0 flex-1 overflow-hidden">
           <DataFlowBackground className="absolute inset-0 z-0" intensity="ambient" />
-          <main className="relative z-10 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-7">
+          <main className="relative z-10 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 lg:p-7">
             {showMfaBanner && (
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
                 <p>{tSec("enrollBanner")}</p>
