@@ -58,7 +58,7 @@ export function ProgressMeter({
         )}
         initial={{ width: 0 }}
         animate={{ width: `${Math.max(clamped, 3)}%` }}
-        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay }}
+        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay }}
       />
     </div>
   );

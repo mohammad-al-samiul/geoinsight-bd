@@ -3,32 +3,9 @@
 import { type ReactNode } from "react";
 import { motion, type HTMLMotionProps } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { itemFade, staggerContainer } from "@/lib/motion";
 
-export const fadeUp = {
-  hidden: { opacity: 0, y: 18 },
-  show: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.07, duration: 0.48, ease: [0.22, 1, 0.36, 1] as const },
-  }),
-};
-
-export const staggerContainer = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.08, delayChildren: 0.05 },
-  },
-};
-
-export const itemFade = {
-  hidden: { opacity: 0, y: 14 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] as const },
-  },
-};
+export { fadeUp, itemFade, staggerContainer } from "@/lib/motion";
 
 type Accent = "default" | "danger" | "warning" | "success" | "info";
 

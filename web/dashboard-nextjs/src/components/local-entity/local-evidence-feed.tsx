@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowUpRight, BookOpen, GraduationCap, Landmark, Newspaper } from "lucide-react";
+import { motion } from "framer-motion";
 import { LocalVizCard } from "@/components/local-entity/local-viz";
 import { EvidenceAbstractDialog } from "@/components/local-entity/evidence-abstract-dialog";
 import { AppSelect } from "@/components/ui/app-select";
@@ -10,6 +11,7 @@ import { apiClient } from "@/lib/api-client";
 import { useLocalEntityId } from "@/hooks/use-local-entity-id";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { cn } from "@/lib/utils";
+import { enterDelay } from "@/lib/motion";
 
 export const EVIDENCE_TOPICS = [
   "POWER",
@@ -89,12 +91,14 @@ function EvidenceCard({
   compact,
   isBn,
   t,
+  index,
   onOpen,
 }: {
   row: EvidenceItem;
   compact: boolean;
   isBn: boolean;
   t: ReturnType<typeof useTranslations>;
+  index: number;
   onOpen: (row: EvidenceItem) => void;
 }) {
   const Icon = KIND_ICON[row.kind];
@@ -106,7 +110,10 @@ function EvidenceCard({
   const meta = [row.author, row.institution, String(row.year)].filter(Boolean).join(" · ");
 
   return (
-    <article
+    <motion.article
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={enterDelay(index)}
       className={cn(
         "group relative flex h-full flex-col overflow-hidden rounded-xl border pl-5 pr-4 py-4",
         "bg-gradient-to-br from-white/[0.05] via-card/75 to-secondary/30",
@@ -165,7 +172,7 @@ function EvidenceCard({
           <ArrowUpRight className="h-4 w-4" />
         </button>
       </div>
-    </article>
+    </motion.article>
   );
 }
 
@@ -252,13 +259,14 @@ export function LocalEvidenceFeed({
         </p>
       ) : (
         <div className={cn("grid gap-3", compact ? "sm:grid-cols-2" : "lg:grid-cols-2")}>
-          {rows.map((row) => (
+          {rows.map((row, i) => (
             <EvidenceCard
               key={row.id}
               row={row}
               compact={compact}
               isBn={isBn}
               t={t}
+              index={i}
               onOpen={setOpenItem}
             />
           ))}

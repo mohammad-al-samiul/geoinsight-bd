@@ -71,9 +71,12 @@ const config: Config = {
       animation: {
         "fade-in": "fadeIn 0.28s ease-out",
         "slide-in": "slideIn 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
+        "slide-in-right": "slideInRight 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
         rise: "riseIn 0.45s cubic-bezier(0.22, 1, 0.36, 1)",
         "scale-in": "scaleIn 0.24s cubic-bezier(0.22, 1, 0.36, 1)",
         shimmer: "shimmer 1.8s ease-in-out infinite",
+        "status-pulse": "statusPulse 2.4s ease-in-out infinite",
+        "marker-enter": "markerEnter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both",
       },
       keyframes: {
         fadeIn: {
@@ -82,6 +85,10 @@ const config: Config = {
         },
         slideIn: {
           from: { opacity: "0", transform: "translateX(-8px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
+        slideInRight: {
+          from: { opacity: "0", transform: "translateX(12px)" },
           to: { opacity: "1", transform: "translateX(0)" },
         },
         riseIn: {
@@ -95,6 +102,14 @@ const config: Config = {
         shimmer: {
           from: { transform: "translateX(-100%)" },
           to: { transform: "translateX(100%)" },
+        },
+        statusPulse: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.62" },
+        },
+        markerEnter: {
+          from: { opacity: "0", strokeWidth: "7" },
+          to: { opacity: "1", strokeWidth: "1.8" },
         },
       },
     },

@@ -93,7 +93,7 @@ const STATUS_FILTERS: Array<ComplaintOperationalStatus | "ALL"> = [
 function statusClass(status: string) {
   switch (status) {
     case "OVERDUE":
-      return "border-destructive/40 bg-destructive/15 text-destructive";
+      return "border-destructive/40 bg-destructive/15 text-destructive animate-status-pulse";
     case "OPEN":
       return "border-amber-500/30 bg-amber-500/10 text-amber-200";
     case "IN_PROGRESS":
@@ -550,7 +550,7 @@ export function LocalComplaintsPanel() {
               type="button"
               onClick={() => setStatusFilter(s)}
               className={cn(
-                "rounded-md border px-2.5 py-1 text-[11px] font-medium tracking-wide transition",
+                "rounded-md border px-2.5 py-1 text-[11px] font-medium tracking-wide transition-colors duration-200",
                 statusFilter === s
                   ? "border-primary/40 bg-primary/15 text-primary"
                   : "border-border/50 bg-background/40 text-muted-foreground hover:text-foreground",
@@ -883,7 +883,7 @@ export function LocalComplaintsPanel() {
             <div className="space-y-3 p-5">
               <div className="flex flex-wrap items-center gap-2">
                 {selected.isRedAlert && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/15 px-2.5 py-0.5 text-[11px] font-medium text-destructive">
+                  <span className="inline-flex animate-status-pulse items-center gap-1 rounded-full border border-destructive/40 bg-destructive/15 px-2.5 py-0.5 text-[11px] font-medium text-destructive">
                     <Siren className="h-3 w-3" /> {t("red")}
                   </span>
                 )}
@@ -941,7 +941,7 @@ export function LocalComplaintsPanel() {
                   className={cn(
                     "rounded-xl border px-4 py-3",
                     slaCountdown(selected.slaDeadline, selected.status, locale, slaUnits).breached
-                      ? "border-destructive/40 bg-destructive/10"
+                      ? "border-destructive/40 bg-destructive/10 animate-status-pulse"
                       : "border-primary/25 bg-primary/5",
                   )}
                 >
@@ -1117,7 +1117,7 @@ export function LocalComplaintsPanel() {
             label: t("colAlert"),
             render: (row) =>
               row.isRedAlert ? (
-                <span className="inline-flex items-center gap-1 text-xs text-destructive">
+                <span className="inline-flex animate-status-pulse items-center gap-1 text-xs text-destructive">
                   <Siren className="h-3.5 w-3.5" /> {t("red")}
                 </span>
               ) : (

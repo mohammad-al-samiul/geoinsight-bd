@@ -1,4 +1,4 @@
-import { catalogByUnitCode, type LocalEntityDefinition } from "./local-entity.catalog";
+import { catalogByUnitCode, LOCAL_ENTITY_CODES, type LocalEntityDefinition } from "./local-entity.catalog";
 
 export type DeskTopic =
   | "ALL"
@@ -226,8 +226,79 @@ const TOPIC_KEYWORDS: Record<Exclude<DeskTopic, "ALL" | "OSINT">, string[]> = {
 const CTG_DISTRICTS = ["chattogram", "chittagong", "চট্টগ্রাম"];
 const COCC_DISTRICTS = ["cumilla", "comilla", "কুমিল্লা"];
 
+const FOREIGN_PLACES = [
+  "dhaka",
+  "ঢাকা",
+  "gazipur",
+  "গাজীপুর",
+  "narayanganj",
+  "নারায়ণগঞ্জ",
+  "sylhet",
+  "সিলেট",
+  "khulna",
+  "খুলনা",
+  "rajshahi",
+  "রাজশাহী",
+  "rangpur",
+  "রংপুর",
+  "barishal",
+  "বরিশাল",
+  "barisal",
+  "mymensingh",
+  "ময়মনসিংহ",
+  "cox's bazar",
+  "coxs bazar",
+  "কক্সবাজার",
+  "noakhali",
+  "নোয়াখালী",
+];
+
+/** Upazilas in Chattogram district that are outside CCC (city) limits. */
+const OUTSIDE_CCC = [
+  "patiya",
+  "পটিয়া",
+  "anowara",
+  "anwara",
+  "আনোয়ারা",
+  "chandanaish",
+  "চন্দনাইশ",
+  "boalkhali",
+  "বোয়ালখালী",
+];
+
+const WEAK_PLACE = new Set(["kotwali", "কোতোয়ালী", "town hall", "টাউন হল", "epz", "ইপিজেড"]);
+
+const GENERIC_KEYWORD_STOP = new Set([
+  "canal",
+  "pothole",
+  "dredging",
+  "খাল",
+  "ড্রেজিং",
+  "পথহোল",
+  "hill cutting",
+  "পাহাড় কাটা",
+  "41 ccc wards",
+  "সিসিসি-এর ৪১টি ওয়ার্ড",
+  "27 cocc wards",
+  "কুমিল্লা সিটির ২৭টি ওয়ার্ড",
+]);
+
 export function norm(s: string | null | undefined): string {
   return (s ?? "").toLowerCase().trim();
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function textHasKeyword(blob: string, keyword: string): boolean {
+  const k = norm(keyword);
+  if (k.length < 3) return false;
+  const latinShort = /^[a-z0-9][a-z0-9-]*$/.test(k) && k.length <= 5;
+  if (latinShort) {
+    return new RegExp(`(?:^|[^a-z0-9])${escapeRe(k)}(?:$|[^a-z0-9])`).test(blob);
+  }
+  return blob.includes(k);
 }
 
 export function districtAliases(code: string): string[] {
@@ -244,7 +315,63 @@ export function entityKeywords(code: string): string[] {
     ...(cat?.focusAreasEn ?? []),
     ...(cat?.focusAreasBn ?? []),
   ];
-  return extra.map((x) => norm(x)).filter((x) => x.length >= 3);
+  return extra
+    .map((x) => norm(x))
+    .filter((x) => x.length >= 3 && !GENERIC_KEYWORD_STOP.has(x));
+}
+
+function rivalPlaceKeywords(code: string): string[] {
+  const ours = new Set(entityKeywords(code));
+  const rival: string[] = [];
+  for (const other of LOCAL_ENTITY_CODES) {
+    if (other === code) continue;
+    for (const k of entityKeywords(other)) {
+      if (!ours.has(k) && k.length >= 4) rival.push(k);
+    }
+  }
+  return rival;
+}
+
+function isMayor(code: string): boolean {
+  return catalogByUnitCode(code)?.role === "MAYOR";
+}
+
+function ownDistrictHit(
+  code: string,
+  district: string | null | undefined,
+  division: string | null | undefined,
+  blob: string,
+): boolean {
+  const aliases = districtAliases(code);
+  const d = norm(district);
+  const div = norm(division);
+  return aliases.some(
+    (a) =>
+      (d && (d.includes(a) || a.includes(d))) ||
+      (div && div.includes(a)) ||
+      blob.includes(a),
+  );
+}
+
+function isForeignGeo(
+  code: string,
+  district: string | null | undefined,
+  division: string | null | undefined,
+  blob: string,
+  hasOwnPlace: boolean,
+): boolean {
+  if (hasOwnPlace) return false;
+  const own = districtAliases(code);
+  const d = norm(district);
+  const div = norm(division);
+  const hay = `${d} ${div} ${blob}`;
+  if (d && own.some((a) => d.includes(a) || a.includes(d))) return false;
+  if (d && FOREIGN_PLACES.some((f) => d.includes(f))) return true;
+  const otherCity = code === "COCC" ? CTG_DISTRICTS : COCC_DISTRICTS;
+  if (otherCity.some((a) => (d && d.includes(a)) || blob.includes(a))) return true;
+  const blobOwnDistrict = own.some((a) => blob.includes(a));
+  if (blobOwnDistrict) return false;
+  return FOREIGN_PLACES.some((f) => hay.includes(f));
 }
 
 export function matchEntity(
@@ -253,31 +380,39 @@ export function matchEntity(
   division: string | null | undefined,
   text: string,
 ): { hit: boolean; local: boolean; score: number; keyword: string | null } {
-  const aliases = districtAliases(code);
   const keys = entityKeywords(code);
-  const d = norm(district);
-  const div = norm(division);
   const blob = norm(text);
-  const districtHit =
-    aliases.some((a) => (d && (d.includes(a) || a.includes(d))) || (div && div.includes(a))) ||
-    aliases.some((a) => blob.includes(a));
+  const dHit = ownDistrictHit(code, district, division, blob);
 
   let localKw: string | null = null;
   let localScore = 0;
   for (const k of keys) {
-    if (blob.includes(k)) {
-      const add = Math.min(14, Math.max(4, k.length));
-      localScore += add;
-      if (!localKw) localKw = k;
-    }
+    if (!textHasKeyword(blob, k)) continue;
+    if (WEAK_PLACE.has(k) && !dHit) continue;
+    localScore += Math.min(14, Math.max(4, k.length));
+    if (!localKw) localKw = k;
+  }
+  const hasOwnPlace = localScore > 0;
+  if (isForeignGeo(code, district, division, blob, hasOwnPlace)) {
+    return { hit: false, local: false, score: 0, keyword: null };
   }
 
-  if (localScore > 0) {
-    return { hit: true, local: true, score: 28 + localScore + (districtHit ? 8 : 0), keyword: localKw };
+  const rivalHit = rivalPlaceKeywords(code).some((k) => textHasKeyword(blob, k));
+  if (rivalHit && !hasOwnPlace) {
+    return { hit: false, local: false, score: 0, keyword: null };
   }
-  if (districtHit) {
-    return { hit: true, local: false, score: 14, keyword: aliases[0] ?? null };
+
+  if (hasOwnPlace) {
+    return { hit: true, local: true, score: 28 + localScore + (dHit ? 8 : 0), keyword: localKw };
   }
+
+  if (isMayor(code) && dHit) {
+    if (code === "CCC" && OUTSIDE_CCC.some((k) => textHasKeyword(blob, k))) {
+      return { hit: false, local: false, score: 0, keyword: null };
+    }
+    return { hit: true, local: true, score: 18, keyword: districtAliases(code)[0] ?? null };
+  }
+
   return { hit: false, local: false, score: 0, keyword: null };
 }
 

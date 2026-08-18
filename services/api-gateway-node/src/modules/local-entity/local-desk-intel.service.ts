@@ -85,6 +85,80 @@ function clip(s: string | null | undefined, n: number): string | null {
   return t.length <= n ? t : `${t.slice(0, n - 1)}…`;
 }
 
+/** Same story often lands as article + live signal + OSINT/ops fanout. */
+function foldTitle(title: string): string {
+  return title
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, "")
+    .slice(0, 96);
+}
+
+function foldUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+    const path = parsed.pathname.replace(/\/+$/, "").toLowerCase();
+    return `${host}${path}`;
+  } catch {
+    const raw = url.toLowerCase().split("?")[0]?.replace(/\/+$/, "") ?? "";
+    return raw || null;
+  }
+}
+
+function storyFingerprints(row: { id: string; title: string; url: string | null }): string[] {
+  const keys: string[] = [];
+  const urlKey = foldUrl(row.url);
+  if (urlKey) keys.push(`u:${urlKey}`);
+  const titleKey = foldTitle(row.title);
+  if (titleKey.length >= 12) keys.push(`t:${titleKey}`);
+  if (!keys.length) keys.push(`id:${row.id}`);
+  return keys;
+}
+
+function mergeStory(keep: LiveIntelItem, extra: LiveIntelItem): LiveIntelItem {
+  const score = (row: LiveIntelItem) =>
+    Number(row.local) * 8 +
+    Number(Boolean(row.url)) * 4 +
+    Number(Boolean(row.actionEn)) * 3 +
+    (row.origin === "ops" ? 1 : 0) +
+    row.matchScore / 100;
+
+  const primary = score(extra) > score(keep) ? { ...extra } : { ...keep };
+  const other = score(extra) > score(keep) ? keep : extra;
+  if (!primary.url) primary.url = other.url;
+  if (!primary.actionEn) {
+    primary.actionEn = other.actionEn;
+    primary.actionBn = other.actionBn;
+  }
+  primary.local = primary.local || other.local;
+  primary.matchScore = Math.max(primary.matchScore, other.matchScore);
+  if (primary.origin === "related" && other.origin !== "related") {
+    primary.origin = other.origin;
+    primary.related = other.related;
+  }
+  if (!primary.summary && other.summary) primary.summary = other.summary;
+  return primary;
+}
+
+function collapseStories(rows: LiveIntelItem[]): LiveIntelItem[] {
+  const byCanon = new Map<string, LiveIntelItem>();
+  const alias = new Map<string, string>();
+
+  for (const row of rows) {
+    const prints = storyFingerprints(row);
+    const existingCanon = prints.map((p) => alias.get(p)).find(Boolean);
+    const canon = existingCanon ?? prints[0];
+    for (const print of prints) alias.set(print, canon);
+    const prev = byCanon.get(canon);
+    byCanon.set(canon, prev ? mergeStory(prev, row) : { ...row });
+  }
+
+  return [...byCanon.values()];
+}
+
 export class LocalDeskIntelService {
   async getFeed(
     user: { role: UserRole; adminUnitId: string | null },
@@ -161,7 +235,7 @@ export class LocalDeskIntelService {
           createdAt: true,
         },
       }),
-      this.opsItems(entityId, topic),
+      this.opsItems(entityId, entity.code, topic),
     ]);
 
     const primary: LiveIntelItem[] = [];
@@ -179,14 +253,14 @@ export class LocalDeskIntelService {
       sentiment: IngestionSentiment | null,
       publishedAt: Date,
     ) => {
-      const key = url || id;
-      if (seen.has(key)) return;
+      const prints = storyFingerprints({ id, title, url });
+      if (prints.some((p) => seen.has(p))) return;
       const blob = `${title} ${summary ?? ""}`;
       const match = matchEntity(entity.code, district, division, blob);
       if (!match.hit) return;
       const hits: TopicHit[] = classifyTopics(blob);
       const onTopic = topicMatches(topic, hits) || topic === "ALL" || topic === "OSINT";
-      seen.add(key);
+      for (const print of prints) seen.add(print);
       const topics = hits.map((h) => h.topic);
       if (!topics.includes("OSINT")) topics.push("OSINT");
       const row: LiveIntelItem = {
@@ -249,10 +323,11 @@ export class LocalDeskIntelService {
     sortItems(related);
 
     const relatedNeed = Math.max(0, Math.min(12, 18 - primary.length));
-    const merged = [...ops, ...primary, ...related.slice(0, relatedNeed)];
+    const merged = collapseStories([...ops, ...primary, ...related.slice(0, relatedNeed)]);
     merged.sort((a, b) => {
       if (a.origin === "ops" && b.origin !== "ops") return -1;
       if (b.origin === "ops" && a.origin !== "ops") return 1;
+      if (b.local !== a.local) return Number(b.local) - Number(a.local);
       return Date.parse(b.publishedAt) - Date.parse(a.publishedAt);
     });
     const items = merged.slice(0, limit);
@@ -333,10 +408,12 @@ export class LocalDeskIntelService {
     };
   }
 
-  private async opsItems(entityId: string, topic: DeskTopic): Promise<LiveIntelItem[]> {
+  private async opsItems(entityId: string, entityCode: string, topic: DeskTopic): Promise<LiveIntelItem[]> {
     const want = (t: DeskTopic) => topic === "ALL" || topic === t || (topic === "CIVIC" && t === "OUTAGE");
     const cap = (n: number) => (topic === "ALL" ? Math.min(6, n) : n);
     const out: LiveIntelItem[] = [];
+    const seatNews = (title: string, detail: string | null | undefined) =>
+      matchEntity(entityCode, null, null, `${title} ${detail ?? ""}`).hit;
 
     const push = (row: LiveIntelItem) => {
       out.push(row);
@@ -355,6 +432,7 @@ export class LocalDeskIntelService {
           take: cap(18),
         });
         for (const r of rows) {
+          if (String(r.source) === "NEWS" && !seatNews(r.title, r.detail)) continue;
           const hint = sectorOpsHint(r.sector, r.kind);
           const desk: Exclude<DeskTopic, "ALL"> =
             r.sector === LocalSector.HEALTH
@@ -396,6 +474,7 @@ export class LocalDeskIntelService {
           take: cap(18),
         });
         for (const r of rows) {
+          if (String(r.source) === "NEWS" && !seatNews(r.title, r.detail)) continue;
           const hint = integrityOpsHint(r.domain, r.kind);
           const desk: Exclude<DeskTopic, "ALL"> = r.domain === LocalIntegrityDomain.CRIME ? "CRIME" : "CORRUPTION";
           push({
@@ -430,6 +509,7 @@ export class LocalDeskIntelService {
         take: cap(14),
       });
       for (const r of rows) {
+        if (String(r.source) === "NEWS" && !seatNews(r.title, r.detail)) continue;
         const hint = outageOpsHint(r.kind);
         push({
           id: `ops:outage:${r.id}`,
@@ -468,6 +548,7 @@ export class LocalDeskIntelService {
         },
       });
       for (const r of rows) {
+        if (String(r.source) === "NEWS" && !seatNews(r.title, r.description)) continue;
         push({
           id: `ops:complaint:${r.id}`,
           title: r.title,
@@ -593,6 +674,7 @@ export class LocalDeskIntelService {
         take: cap(12),
       });
       for (const r of rows) {
+        if (!seatNews(r.title, r.summary)) continue;
         push({
           id: `ops:osint:${r.id}`,
           title: r.title,

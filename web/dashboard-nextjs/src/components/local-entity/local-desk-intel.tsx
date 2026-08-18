@@ -22,8 +22,10 @@ import {
   LocalVizCard,
 } from "@/components/local-entity/local-viz";
 import { isPublicHttpUrl } from "@/components/local-entity/evidence-abstract-dialog";
-import { useLocalLiveIntel, type DeskTopic, type LiveIntelItem } from "@/hooks/use-local-live-intel";
+import { useLocalLiveIntel, uniqueLiveIntel, type DeskTopic, type LiveIntelItem } from "@/hooks/use-local-live-intel";
 import { cn } from "@/lib/utils";
+import { enterDelay } from "@/lib/motion";
+import { motion } from "framer-motion";
 
 const PATH_TOPICS: Array<{ prefix: string; topic: DeskTopic }> = [
   { prefix: "/local/education", topic: "EDUCATION" },
@@ -102,10 +104,12 @@ function HeadlineCard({
   row,
   t,
   isBn,
+  index = 0,
 }: {
   row: LiveIntelItem;
   t: (k: string) => string;
   isBn: boolean;
+  index?: number;
 }) {
   const originLabel =
     row.origin === "ops" ? t("originOps") : row.origin === "related" ? t("originRelated") : t("originNews");
@@ -186,16 +190,28 @@ function HeadlineCard({
     "transition-[transform,border-color,box-shadow] duration-200",
     "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_18px_44px_-22px_rgba(16,185,129,0.38)]",
     publicUrl && "cursor-pointer",
+    negative && "ring-1 ring-rose-400/20",
   );
 
-  if (publicUrl && row.url) {
-    return (
+  const card =
+    publicUrl && row.url ? (
       <a href={row.url} target="_blank" rel="noopener noreferrer" className={cls}>
         {inner}
       </a>
+    ) : (
+      <article className={cls}>{inner}</article>
     );
-  }
-  return <article className={cls}>{inner}</article>;
+
+  return (
+    <motion.div
+      className="h-full"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={enterDelay(index)}
+    >
+      {card}
+    </motion.div>
+  );
 }
 
 export function LocalDeskIntel() {
@@ -239,17 +255,22 @@ export function LocalDeskIntel() {
   );
 
   const primaryItems = useMemo(
-    () => (data?.items ?? []).filter((r) => !r.related).slice(0, 18),
+    () => uniqueLiveIntel((data?.items ?? []).filter((r) => !r.related)).slice(0, 18),
     [data?.items],
   );
   const relatedItems = useMemo(
-    () => (data?.items ?? []).filter((r) => r.related).slice(0, 8),
+    () => uniqueLiveIntel((data?.items ?? []).filter((r) => r.related)).slice(0, 8),
     [data?.items],
   );
 
   if (!enabled) return null;
   if (loading && !data) {
-    return <div className="mb-4 h-40 animate-pulse rounded-xl border border-border/50 bg-secondary/20" />;
+    return (
+      <div
+        className="skeleton-shimmer mb-4 h-40 rounded-xl border border-border/50 bg-secondary/20"
+        aria-hidden
+      />
+    );
   }
   if (!data) return null;
 
@@ -336,8 +357,8 @@ export function LocalDeskIntel() {
 
           <LocalVizCard title={t("headlines")} delay={0.16}>
             <div className="grid gap-3 sm:grid-cols-2">
-              {primaryItems.map((row) => (
-                <HeadlineCard key={row.id} row={row} t={t} isBn={isBn} />
+              {primaryItems.map((row, i) => (
+                <HeadlineCard key={row.id} row={row} t={t} isBn={isBn} index={i} />
               ))}
             </div>
           </LocalVizCard>
@@ -345,9 +366,9 @@ export function LocalDeskIntel() {
           {relatedItems.length > 0 ? (
             <LocalVizCard title={t("related")} delay={0.2}>
               <div className="grid gap-3 sm:grid-cols-2">
-                {relatedItems.map((row) => (
-                  <HeadlineCard key={row.id} row={row} t={t} isBn={isBn} />
-                ))}
+              {relatedItems.map((row, i) => (
+                <HeadlineCard key={row.id} row={row} t={t} isBn={isBn} index={i} />
+              ))}
               </div>
             </LocalVizCard>
           ) : null}

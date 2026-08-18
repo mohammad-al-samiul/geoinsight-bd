@@ -371,6 +371,8 @@ export function LocalWardMapInner({
                 fillColor: fill,
                 fillOpacity: 0.92,
                 weight: 1.8,
+                className:
+                  m.severity === "CRITICAL" ? "map-marker-enter map-marker-critical" : "map-marker-enter",
               }}
             >
               {m.label ? (

@@ -532,6 +532,37 @@
   }
 }
 
+.leaflet-interactive.map-marker-enter {
+  animation: markerEnter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.leaflet-interactive.map-marker-critical {
+  animation:
+    markerEnter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both,
+    statusPulse 2.8s ease-in-out 0.55s infinite;
+}
+
+@keyframes markerEnter {
+  from {
+    opacity: 0;
+    stroke-width: 7;
+  }
+  to {
+    opacity: 1;
+    stroke-width: 1.8;
+  }
+}
+
+@keyframes statusPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.62;
+  }
+}
+
 @keyframes riseIn {
   from {
     opacity: 0;

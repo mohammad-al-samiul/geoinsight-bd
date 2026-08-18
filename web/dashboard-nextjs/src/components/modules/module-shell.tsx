@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { IntelCard } from "@/components/ui/intel-card";
 import { AnimatedContent, ModulePageAura } from "@/components/ui/module-motion";
 import { ModuleContentSkeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { CountUp } from "@/components/ui/count-up";
+import { enterDelay, enterTransition } from "@/lib/motion";
 import { useTranslations } from "next-intl";
 import { Children, memo, type ReactNode } from "react";
 
@@ -45,7 +48,7 @@ export function ModuleShell({
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        transition={enterTransition()}
         className="surface-hero intel-rail relative z-10 px-3 py-5 sm:px-5 sm:py-6"
       >
         <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -97,7 +100,16 @@ export function ModuleShell({
         </motion.div>
       )}
 
-      {stats && !loading ? <div className="relative z-10">{stats}</div> : null}
+      {stats && !loading ? (
+        <motion.div
+          className="relative z-10"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={enterTransition(0.08)}
+        >
+          {stats}
+        </motion.div>
+      ) : null}
 
       <div className="relative z-10">
         {loading ? (
@@ -149,11 +161,11 @@ export function StatCard({ label, value, hint, accent = "default", icon }: StatC
           "mt-2.5 font-display text-2xl font-semibold tabular-nums tracking-tight",
           ACCENT[accent],
         )}
-        initial={{ opacity: 0, scale: 0.86, y: 6 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={enterTransition()}
       >
-        {value}
+        <CountUp value={value} />
       </motion.p>
       {hint && <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{hint}</p>}
     </IntelCard>
@@ -168,14 +180,10 @@ export function StatGrid({ children }: { children: ReactNode }) {
         <motion.div
           key={i}
           className="relative isolate min-w-0 overflow-hidden rounded-xl"
-          initial={{ opacity: 0, y: 16, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{
-            delay: i * 0.07,
-            duration: 0.45,
-            ease: [0.22, 1, 0.36, 1],
-          }}
-          whileHover={{ y: -4, scale: 1.02, transition: { duration: 0.2 } }}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={enterDelay(i)}
+          whileHover={{ y: -3, transition: { duration: 0.2 } }}
         >
           {child}
         </motion.div>
@@ -212,11 +220,11 @@ function DataTableRowInner<T extends { id?: string }>({
 
   return (
     <motion.tr
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: Math.min(index * 0.04, 0.5), duration: 0.35 }}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={enterDelay(index, 0.04, 0.4)}
       className={cn(
-        "border-b border-border/30 transition-colors",
+        "border-b border-border/30 transition-colors duration-200",
         clickable
           ? "cursor-pointer hover:bg-primary/5 focus-visible:bg-primary/10 focus-visible:outline-none"
           : "hover:bg-secondary/25",
@@ -258,9 +266,7 @@ export function DataTable<T extends { id?: string }>({
   const empty = emptyMessage ?? t("noData");
   if (rows.length === 0) {
     return (
-      <div className="glass-panel rounded-xl p-10 text-center text-sm text-muted-foreground">
-        {empty}
-      </div>
+      <EmptyState title={empty} className="glass-panel border-solid bg-card/40" />
     );
   }
 

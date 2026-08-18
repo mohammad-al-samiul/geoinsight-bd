@@ -173,7 +173,7 @@ export class LocalOsintService {
         const blob = `${a.title} ${a.summary ?? ""}`;
         const geo = matchEntity(entity.code, a.district, a.division, blob);
         const { kw, score } = matchScore(blob, keywords);
-        if (!geo.hit && (!kw || score < 3)) return null;
+        if (!geo.hit) return null;
         const heuristic = looksLikePropaganda(blob);
         const ageHours =
           (Date.now() - (a.publishedAt ?? a.fetchedAt).getTime()) / 3_600_000;

@@ -10,7 +10,9 @@ import { useAdminFilter } from "@/hooks/use-admin-filter";
 import type { AnomalyAlert } from "@/types/alerts";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
+import { motion } from "framer-motion";
 import { AlertTriangle, ChevronRight, Radio, RefreshCw } from "lucide-react";
+import { enterDelay } from "@/lib/motion";
 
 const SEVERITY_STYLES: Record<AnomalyAlert["severity"], string> = {
   LOW: "border-sky-500/30 bg-sky-500/5",
@@ -33,12 +35,16 @@ const AnomalyAlertItem = memo(function AnomalyAlertItem({
   onOpen,
 }: AnomalyAlertItemProps) {
   return (
-    <li>
+    <motion.li
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={enterDelay(0)}
+    >
       <button
         type="button"
         onClick={() => onOpen(alert)}
         className={cn(
-          "group flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-all hover:border-primary/40",
+          "group flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-all duration-200 hover:border-primary/40",
           SEVERITY_STYLES[alert.severity],
           alert.isNew && "animate-score-pulse ring-1 ring-primary/30",
         )}
@@ -66,7 +72,7 @@ const AnomalyAlertItem = memo(function AnomalyAlertItem({
         </div>
         <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition group-hover:text-primary" />
       </button>
-    </li>
+    </motion.li>
   );
 });
 

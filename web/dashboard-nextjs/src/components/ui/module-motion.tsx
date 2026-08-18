@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { AnimatePresence, motion, type HTMLMotionProps } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ModuleContentSkeleton } from "@/components/ui/skeleton";
+import { duration, easeOutExpo, enterTransition } from "@/lib/motion";
 
 /** Ambient aurora behind module content — same language as Narrative Shield. */
 export function ModulePageAura({ className }: { className?: string }) {
@@ -97,9 +98,9 @@ export function MotionSection({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 18 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      transition={enterTransition(delay)}
       className={className}
     >
       {children}
@@ -118,14 +119,69 @@ export function AnimatedContent({
     <AnimatePresence mode="wait">
       <motion.div
         key="module-content"
-        initial={{ opacity: 0, y: 16 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 8 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        exit={{ opacity: 0, y: 6 }}
+        transition={enterTransition(0.06)}
         className={cn("relative z-10 min-w-0 space-y-6", className)}
       >
         {children}
       </motion.div>
+    </AnimatePresence>
+  );
+}
+
+/** Overlay + edge drawer with enter/exit — used by mobile sidebar and alert feed. */
+export function DrawerPresence({
+  open,
+  side = "left",
+  onDismiss,
+  children,
+  className,
+  labelledBy,
+}: {
+  open: boolean;
+  side?: "left" | "right";
+  onDismiss: () => void;
+  children: ReactNode;
+  className?: string;
+  labelledBy?: string;
+}) {
+  const hiddenX = side === "left" ? "-100%" : "100%";
+  return (
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          className="fixed inset-0 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: duration.short, ease: easeOutExpo }}
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            aria-label="Close"
+            onClick={onDismiss}
+          />
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={labelledBy}
+            className={cn(
+              "absolute top-0 h-full shadow-soft",
+              side === "left" ? "left-0" : "right-0",
+              className,
+            )}
+            initial={{ x: hiddenX }}
+            animate={{ x: 0 }}
+            exit={{ x: hiddenX }}
+            transition={{ duration: duration.enter, ease: easeOutExpo }}
+          >
+            {children}
+          </motion.div>
+        </motion.div>
+      ) : null}
     </AnimatePresence>
   );
 }

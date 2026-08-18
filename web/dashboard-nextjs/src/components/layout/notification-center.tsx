@@ -11,6 +11,8 @@ import { useAdminFilter } from "@/hooks/use-admin-filter";
 import type { AnomalyAlert } from "@/types/alerts";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Bell, CheckCheck, ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { enterDelay, easeOutExpo } from "@/lib/motion";
 
 const READ_KEY = "geoinsight-notifications-read-at";
 const READ_IDS_KEY = "geoinsight-notifications-read-ids";
@@ -169,19 +171,30 @@ export function NotificationCenter({
           </div>
         ) : (
           <ul className="divide-y divide-border/50">
-            {preview.map((alert) => {
+            {preview.map((alert, i) => {
               const unread = isUnread(alert);
               return (
-                <li key={alert.id}>
+                <motion.li
+                  key={alert.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={enterDelay(i, 0.04, 0.32)}
+                >
                   <button
                     type="button"
                     onClick={() => openAlert(alert)}
                     className={cn(
-                      "flex w-full items-start gap-3 px-4 py-3.5 text-left transition-all hover:bg-accent/60",
+                      "flex w-full items-start gap-3 px-4 py-3.5 text-left transition-all duration-200 hover:bg-accent/60",
                       unread && "bg-primary/5",
                     )}
                   >
-                    <span className={cn("mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full", SEVERITY_META[alert.severity].dot)} />
+                    <span
+                      className={cn(
+                        "mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full",
+                        SEVERITY_META[alert.severity].dot,
+                        unread && alert.severity === "CRITICAL" && "animate-status-pulse",
+                      )}
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className={cn("text-sm leading-snug", unread ? "font-semibold text-foreground" : "text-foreground/90")}>{alert.headline}</p>
@@ -195,7 +208,7 @@ export function NotificationCenter({
                     </div>
                     <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                   </button>
-                </li>
+                </motion.li>
               );
             })}
           </ul>
@@ -250,17 +263,25 @@ export function NotificationCenter({
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground">
+            <span className="absolute right-1 top-1 flex h-4 min-w-4 animate-status-pulse items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </Button>
 
-        {open && (
-        <div className="fixed inset-x-3 top-[4.5rem] z-[200] max-h-[min(70dvh,28rem)] overflow-hidden rounded-2xl border border-border bg-popover shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[min(100vw-2rem,420px)]">
-            {content}
-          </div>
-        )}
+        <AnimatePresence>
+          {open ? (
+            <motion.div
+              initial={{ opacity: 0, y: 8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 6, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: easeOutExpo }}
+              className="fixed inset-x-3 top-[4.5rem] z-[200] max-h-[min(70dvh,28rem)] overflow-hidden rounded-2xl border border-border bg-popover shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[min(100vw-2rem,420px)]"
+            >
+              {content}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
 
       <AlertDetailModal

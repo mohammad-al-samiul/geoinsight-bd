@@ -1,51 +1,9 @@
 import { AdminUnitType, UserRole } from "@prisma/client";
 import { prismaRead } from "../../core/database/prisma.client";
 import { unrestService } from "../unrest/unrest.service";
-import { catalogByUnitCode } from "./local-entity.catalog";
 import { resolveLocalEntityId } from "./local-entity.scope";
 import { unrestOpsHint } from "./ops-solutions";
-
-const CTG_DISTRICTS = ["chattogram", "chittagong"];
-const COCC_DISTRICTS = ["cumilla", "comilla"];
-
-function norm(s: string | null | undefined): string {
-  return (s ?? "").toLowerCase().trim();
-}
-
-function districtAliases(code: string): string[] {
-  if (code === "COCC") return COCC_DISTRICTS;
-  return CTG_DISTRICTS;
-}
-
-function keywordHay(code: string): string[] {
-  const cat = catalogByUnitCode(code);
-  const extra = [
-    cat?.nameEn,
-    cat?.nameBn,
-    ...(cat?.osintKeywords ?? []),
-    ...(cat?.focusAreasEn ?? []),
-    ...(cat?.focusAreasBn ?? []),
-  ];
-  return extra.map((x) => norm(x)).filter(Boolean);
-}
-
-function matchesEntity(
-  code: string,
-  district: string | null,
-  division: string | null,
-  text: string,
-): { hit: boolean; local: boolean } {
-  const aliases = districtAliases(code);
-  const d = norm(district);
-  const div = norm(division);
-  const districtHit =
-    aliases.some((a) => d.includes(a) || a.includes(d)) ||
-    aliases.some((a) => div.includes(a));
-  const keys = keywordHay(code);
-  const blob = norm(text);
-  const local = keys.some((k) => k.length >= 3 && blob.includes(k));
-  return { hit: districtHit || local, local };
-}
+import { matchEntity } from "./local-desk-topics";
 
 function hoursAgo(iso: string | null | undefined): number | null {
   if (!iso) return null;
@@ -88,7 +46,7 @@ export class LocalUnrestService {
     const movements = (pulse.movements ?? [])
       .map((m) => {
         const text = `${m.title} ${m.title_bn} ${m.place} ${m.theme} ${m.summary_en} ${m.summary_bn}`;
-        const match = matchesEntity(code, m.district, m.division, text);
+        const match = matchEntity(code, m.district, m.division, text);
         return { m, match };
       })
       .filter((x) => x.match.hit)
@@ -120,7 +78,7 @@ export class LocalUnrestService {
 
     const signals = pulse.signals
       .map((s) => {
-        const match = matchesEntity(code, s.district, s.division, `${s.title} ${s.title_bn_hint}`);
+        const match = matchEntity(code, s.district, s.division, `${s.title} ${s.title_bn_hint}`);
         return { s, match };
       })
       .filter((x) => x.match.hit)

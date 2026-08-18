@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Children } from "react";
 import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -24,6 +25,8 @@ import { useLiveSpark } from "@/hooks/use-live-spark";
 import { chartLayout, piePercentLabel } from "@/lib/chart-theme";
 import { cn } from "@/lib/utils";
 import { MotionSection } from "@/components/ui/module-motion";
+import { CountUp } from "@/components/ui/count-up";
+import { enterDelay, hoverLift, itemFade, staggerContainer, tapPress, useChartMotion } from "@/lib/motion";
 
 export const LOCAL_VIZ_COLORS = [
   "#38bdf8",
@@ -76,6 +79,7 @@ export function LocalDonut({
 }) {
   const bp = useBreakpoint();
   const layout = chartLayout(bp);
+  const chartMotion = useChartMotion();
   const rows = data.filter((d) => d.value > 0);
   const empty = rows.length === 0;
 
@@ -108,8 +112,8 @@ export function LocalDonut({
                 })
               }
               labelLine={false}
-              isAnimationActive
-              animationDuration={900}
+              isAnimationActive={chartMotion.isAnimationActive}
+              animationDuration={chartMotion.animationDuration}
             >
               {rows.map((row, i) => (
                 <Cell
@@ -151,6 +155,7 @@ export function LocalBars({
 }) {
   const bp = useBreakpoint();
   const layout = chartLayout(bp);
+  const chartMotion = useChartMotion();
   const h = height ?? layout.chartHeightSm;
 
   return (
@@ -191,8 +196,8 @@ export function LocalBars({
             fill={color}
             radius={layoutDir === "horizontal" ? [0, 6, 6, 0] : [6, 6, 0, 0]}
             maxBarSize={layout.barMaxSize}
-            isAnimationActive
-            animationDuration={800}
+            isAnimationActive={chartMotion.isAnimationActive}
+            animationDuration={chartMotion.animationDuration}
           />
         </BarChart>
       </ResponsiveContainer>
@@ -215,6 +220,7 @@ export function LocalAreaTrend({
 }) {
   const bp = useBreakpoint();
   const layout = chartLayout(bp);
+  const chartMotion = useChartMotion();
   const h = height ?? layout.chartHeightSm;
   const gradId = `local-area-${dataKey}`;
 
@@ -245,8 +251,8 @@ export function LocalAreaTrend({
             stroke={color}
             fill={`url(#${gradId})`}
             strokeWidth={2.5}
-            isAnimationActive
-            animationDuration={1000}
+            isAnimationActive={chartMotion.isAnimationActive}
+            animationDuration={chartMotion.animationDuration}
           />
         </AreaChart>
       </ResponsiveContainer>
@@ -271,11 +277,11 @@ export function LocalQuickNav({
         return (
           <motion.div
             key={item.href}
-            initial={{ opacity: 0, y: 16, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: 0.05 * i, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={{ y: -4, scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={enterDelay(i)}
+            whileHover={hoverLift}
+            whileTap={tapPress}
           >
             <Link
               href={item.href}
@@ -334,7 +340,7 @@ export function LocalPulseRing({
           strokeDasharray={c}
           initial={{ strokeDashoffset: c }}
           animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           transform="rotate(-90 55 55)"
         />
         <text
@@ -433,9 +439,7 @@ export function LocalKpiSpark({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -3 }}
+      whileHover={hoverLift}
       className="glass-panel min-w-0 rounded-xl border border-border/50 p-3 shadow-panel sm:p-4"
     >
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -444,7 +448,7 @@ export function LocalKpiSpark({
       <div className="mt-2 flex items-end justify-between gap-3">
         <div>
           <p className={cn("font-display text-xl font-semibold tabular-nums sm:text-2xl", tone)}>
-            {value}
+            <CountUp value={value} />
           </p>
           {hint ? (
             <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>
@@ -461,6 +465,17 @@ export function LocalKpiSpark({
 
 export function LocalKpiSparkGrid({ children }: { children: ReactNode }) {
   return (
-    <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">{children}</div>
+    <motion.div
+      className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4"
+      variants={staggerContainer}
+      initial="hidden"
+      animate="show"
+    >
+      {Children.map(children, (child) => (
+        <motion.div variants={itemFade} className="min-w-0">
+          {child}
+        </motion.div>
+      ))}
+    </motion.div>
   );
 }

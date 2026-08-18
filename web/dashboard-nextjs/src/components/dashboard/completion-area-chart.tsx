@@ -84,7 +84,7 @@ export function CompletionAreaChart({
             stroke="hsl(158 64% 42%)"
             strokeWidth={layout.narrow ? 2 : 3}
             fill={`url(#${gradientId})`}
-            animationDuration={800}
+            animationDuration={550}
             animationEasing="ease-out"
           >
             {!layout.narrow && (

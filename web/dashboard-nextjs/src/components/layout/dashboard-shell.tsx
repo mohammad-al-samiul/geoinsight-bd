@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { CommandBar } from "@/components/layout/command-bar";
 import { AnomalyFeedPanel } from "@/components/alerts/anomaly-feed-panel";
 import { DataFlowBackground } from "@/components/ui/data-flow-background";
+import { DrawerPresence } from "@/components/ui/module-motion";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -65,17 +66,16 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         />
       </div>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div className="absolute left-0 top-0 h-full w-[min(100%,18.5rem)] max-w-[85vw] animate-slide-in shadow-soft">
-            <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
-          </div>
-        </div>
-      )}
+      <div className="lg:hidden">
+        <DrawerPresence
+          open={mobileOpen}
+          side="left"
+          onDismiss={() => setMobileOpen(false)}
+          className="w-[min(100%,18.5rem)] max-w-[85vw]"
+        >
+          <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
+        </DrawerPresence>
+      </div>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <CommandBar
@@ -117,37 +117,32 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           )}
 
           {/* Tablet/mobile feed drawer */}
-          {feedOpen && (
-            <div className="fixed inset-0 z-[60] xl:hidden">
-              <button
-                type="button"
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                aria-label="Close alert feed"
-                onClick={() => setFeedOpen(false)}
-              />
-              <aside
-                className={cn(
-                  "absolute right-0 top-0 flex h-full w-[min(100%,360px)] flex-col",
-                  "border-l border-border/50 bg-sidebar/95 p-3 shadow-soft backdrop-blur-md animate-slide-in",
-                )}
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold">Live alerts</p>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setFeedOpen(false)}
-                    aria-label="Close"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="min-h-0 flex-1 overflow-hidden">
-                  <AnomalyFeedPanel compact className="h-full" />
-                </div>
-              </aside>
-            </div>
-          )}
+          <div className="xl:hidden">
+            <DrawerPresence
+              open={feedOpen}
+              side="right"
+              onDismiss={() => setFeedOpen(false)}
+              className="flex w-[min(100%,360px)] flex-col border-l border-border/50 bg-sidebar/95 p-3 backdrop-blur-md"
+              labelledBy="live-alerts-title"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p id="live-alerts-title" className="text-sm font-semibold">
+                  Live alerts
+                </p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setFeedOpen(false)}
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <AnomalyFeedPanel compact className="h-full" />
+              </div>
+            </DrawerPresence>
+          </div>
         </div>
       </div>
     </div>

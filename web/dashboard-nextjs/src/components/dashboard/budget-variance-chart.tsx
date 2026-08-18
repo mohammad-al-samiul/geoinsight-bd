@@ -98,7 +98,7 @@ export function BudgetVarianceChart({
           <Bar
             dataKey="variance"
             radius={[0, 6, 6, 0]}
-            animationDuration={800}
+            animationDuration={550}
             maxBarSize={layout.narrow ? 18 : 28}
           >
             {chartData.map((entry) => (

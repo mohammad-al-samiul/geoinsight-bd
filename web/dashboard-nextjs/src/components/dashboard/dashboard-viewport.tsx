@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
+import { motion } from "framer-motion";
 import { useAdminFilter } from "@/hooks/use-admin-filter";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -17,6 +18,7 @@ import { Radio, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DataTrustBanner } from "@/components/ui/data-trust-banner";
 import { Button } from "@/components/ui/button";
+import { itemFade, staggerContainer } from "@/lib/motion";
 
 export function DashboardViewport() {
   const t = useTranslations("modules.dashboard");
@@ -78,8 +80,16 @@ export function DashboardViewport() {
   // Progressive SaaS pattern: chrome + map + KPI skeletons paint immediately.
   // Data streams in without a full-screen blocker.
   return (
-    <div className="mx-auto max-w-[1600px] space-y-5 animate-fade-in">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <motion.div
+      className="mx-auto max-w-[1600px] space-y-5"
+      variants={staggerContainer}
+      initial="hidden"
+      animate="show"
+    >
+      <motion.div
+        variants={itemFade}
+        className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"
+      >
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground lg:text-3xl">
             {t("viewport")}
@@ -101,19 +111,19 @@ export function DashboardViewport() {
             </span>
           )}
         </Badge>
-      </div>
+      </motion.div>
 
       {error ? (
-        <div className="space-y-2">
+        <motion.div variants={itemFade} className="space-y-2">
           <DataTrustBanner kind="error" />
           <p className="text-xs text-muted-foreground">{error}</p>
           <Button size="sm" variant="outline" onClick={() => void refresh()}>
             {tt("retry")}
           </Button>
-        </div>
+        </motion.div>
       ) : null}
 
-      <div className="min-w-0 space-y-5">
+      <motion.div variants={itemFade} className="min-w-0 space-y-5">
         <PmoNationalSectorStrip />
         <PmoLocalStrip />
         <div className="min-w-0 h-[260px] sm:h-[360px] lg:h-[480px]">
@@ -137,7 +147,7 @@ export function DashboardViewport() {
             />
           )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -67,6 +67,46 @@ export type LiveIntelFeed = {
   items: LiveIntelItem[];
 };
 
+function foldTitle(title: string): string {
+  return title
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, "")
+    .slice(0, 96);
+}
+
+function foldUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+    const path = parsed.pathname.replace(/\/+$/, "").toLowerCase();
+    return `${host}${path}`;
+  } catch {
+    const raw = url.toLowerCase().split("?")[0]?.replace(/\/+$/, "") ?? "";
+    return raw || null;
+  }
+}
+
+/** Drop republished copies of the same headline (article + signal + OSINT). */
+export function uniqueLiveIntel(rows: LiveIntelItem[]): LiveIntelItem[] {
+  const seen = new Set<string>();
+  const out: LiveIntelItem[] = [];
+  for (const row of rows) {
+    const keys: string[] = [];
+    const urlKey = foldUrl(row.url);
+    if (urlKey) keys.push(`u:${urlKey}`);
+    const titleKey = foldTitle(row.title);
+    if (titleKey.length >= 12) keys.push(`t:${titleKey}`);
+    if (!keys.length) keys.push(`id:${row.id}`);
+    if (keys.some((k) => seen.has(k))) continue;
+    for (const k of keys) seen.add(k);
+    out.push(row);
+  }
+  return out;
+}
+
 interface ApiOk<T> {
   success: boolean;
   data: T;

@@ -9,6 +9,9 @@ import { ArbitrageHeatmap } from "@/components/dashboard/arbitrage-heatmap";
 import { TradeFlowMap } from "@/components/dashboard/trade-flow-map";
 import type { DashboardMetrics } from "@/types/dashboard";
 import { Globe2, Percent, Wallet } from "lucide-react";
+import { motion } from "framer-motion";
+import { CountUp } from "@/components/ui/count-up";
+import { enterTransition } from "@/lib/motion";
 
 interface KpiScorecardsProps {
   metrics: DashboardMetrics | null;
@@ -34,7 +37,10 @@ function ScorecardShell({
   contentClassName?: string;
 }) {
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={enterTransition()}
       className={cn(
         "glass-panel rounded-xl p-4 shadow-panel transition-all duration-300 hover:border-primary/25 sm:p-5 lg:p-6",
         pulseKey ? "animate-score-pulse ring-1 ring-primary/40" : "",
@@ -45,11 +51,8 @@ function ScorecardShell({
           <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {label}
           </p>
-          <p
-            className="mt-1.5 text-3xl font-extrabold tabular-nums text-foreground transition-all duration-500 sm:mt-2 sm:text-4xl"
-            key={value}
-          >
-            {value}
+          <p className="mt-1.5 text-3xl font-extrabold tabular-nums text-foreground sm:mt-2 sm:text-4xl">
+            <CountUp value={value} />
           </p>
           {sub && (
             <p className="mt-1 truncate text-sm text-primary sm:whitespace-normal">
@@ -62,7 +65,7 @@ function ScorecardShell({
         </div>
       </div>
       <div className={cn("mt-4 sm:mt-5", contentClassName)}>{children}</div>
-    </div>
+    </motion.div>
   );
 }
 

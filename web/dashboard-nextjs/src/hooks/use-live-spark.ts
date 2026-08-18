@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 /** Deterministic seed series so SSR/hydration stay stable before the live tick. */
 export function seedSparkSeries(base: number, points = 14): number[] {
   const safe = Number.isFinite(base) ? Math.max(0, base) : 0;
+  if (safe === 0) return Array.from({ length: points }, () => 0);
   const out: number[] = [];
   let v = safe * 0.86;
   for (let i = 0; i < points; i += 1) {
@@ -27,6 +28,7 @@ export function useLiveSpark(base: number, points = 14, intervalMs = 2800) {
   }, [base, points]);
 
   useEffect(() => {
+    if (!Number.isFinite(base) || base <= 0) return;
     const id = window.setInterval(() => {
       setSeries((prev) => {
         const last = prev[prev.length - 1] ?? base;
