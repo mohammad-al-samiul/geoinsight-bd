@@ -26,6 +26,9 @@
     "representatives": "প্রতিনিধি",
     "faceIntel": "ফেস ইন্টেল",
     "localEntity": "স্থানীয় এন্টিটি ডিএসএস",
+    "localUnrest": "আন্দোলন ও বিক্ষোভ",
+    "localPolitics": "দলীয় রাজনীতি ও সমাবেশ",
+    "localIssues": "ইস্যু ট্র্যাকার",
     "localComplaints": "তাৎক্ষণিক ব্যবস্থা",
     "localWpi": "ওয়ার্ড পারফরম্যান্স ইনডেক্স",
     "localOsint": "লোকাল ওএসআইএনটি ফিড",
@@ -455,7 +458,11 @@
       "pulse": "পালস",
       "specialty": "স্পেশালিটি",
       "budget": "বাজেট",
-      "unrest": "অস্থিরতা"
+      "unrest": "আন্দোলন",
+      "party": "দল",
+      "issue": "ইস্যু",
+      "filterAll": "সব ট্যাগ",
+      "emptyFilter": "এই ট্যাগে এই আসনের মিল পাওয়া যায়নি।"
     },
     "localMapLayers": {
       "layers": "লেয়ার",
@@ -639,7 +646,12 @@
       "sentimentPositive": "ইতিবাচক",
       "sentimentNeutral": "নিরপেক্ষ",
       "sentimentNegative": "নেতিবাচক",
-      "openInShield": "ন্যারেটিভ শিল্ডে খুলুন"
+      "openInShield": "ন্যারেটিভ শিল্ডে খুলুন",
+      "filterAll": "সব",
+      "unrest": "আন্দোলন",
+      "party": "দল",
+      "issue": "ইস্যু",
+      "colTags": "ট্যাগ"
     },
     "localPulse": {
       "title": "পালস · আন্দোলন, ভোটার, প্রভাবশালী",

@@ -26,6 +26,9 @@
     "representatives": "Representatives",
     "faceIntel": "Face Intel",
     "localEntity": "Local Entity DSS",
+    "localUnrest": "Unrest & Protests",
+    "localPolitics": "Politics & Rallies",
+    "localIssues": "Chronic Issue Tracker",
     "localComplaints": "Instant Action SLA",
     "localWpi": "Ward Performance Index",
     "localOsint": "Local OSINT Feed",
@@ -455,7 +458,11 @@
       "pulse": "Pulse",
       "specialty": "Specialty",
       "budget": "Budget",
-      "unrest": "Unrest"
+      "unrest": "Movement",
+      "party": "Party",
+      "issue": "Issue",
+      "filterAll": "All tags",
+      "emptyFilter": "No stories on this seat match that tag."
     },
     "localMapLayers": {
       "layers": "Layers",
@@ -639,7 +646,12 @@
       "sentimentPositive": "Positive",
       "sentimentNeutral": "Neutral",
       "sentimentNegative": "Negative",
-      "openInShield": "Open in Narrative Shield"
+      "openInShield": "Open in Narrative Shield",
+      "filterAll": "All",
+      "unrest": "Movement",
+      "party": "Party",
+      "issue": "Issue",
+      "colTags": "Tags"
     },
     "localPulse": {
       "title": "Pulse · unrest, voters, influencers",

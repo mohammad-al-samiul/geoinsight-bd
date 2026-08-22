@@ -32,6 +32,8 @@ export interface OsintItem {
   propagandaConfidence?: number;
   publishedAt: string;
   ward: { id: string; code: string; name: string; nameBn: string | null } | null;
+  topics?: string[];
+  places?: string[];
 }
 
 export interface OsintFeedResponse {

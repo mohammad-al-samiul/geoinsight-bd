@@ -9,7 +9,7 @@ import { ApiError } from "../../core/errors/api.error";
 import { AI_FETCH_DEFAULT_MS, fetchAi } from "../../shared/http/fetch-ai";
 import { catalogByUnitCode } from "./local-entity.catalog";
 import { resolveLocalEntityId } from "./local-entity.scope";
-import { matchEntity } from "./local-desk-topics";
+import { decorateTopics, matchEntity } from "./local-desk-topics";
 
 const PROPAGANDA_HINTS = [
   "জাল",
@@ -224,29 +224,40 @@ export class LocalOsintService {
       ...classified,
       ...liveDraft.filter((d) => !classifiedIds.has(d.id)),
     ]
-      .map(({ _blob: _b, ...rest }) => rest)
+      .map(({ _blob, ...rest }) => {
+        const tagged = decorateTopics(entity.code, _blob);
+        return { ...rest, topics: tagged.topics, places: tagged.places };
+      })
       .filter((x) => !(opts.propagandaOnly && !x.propagandaFlag))
       .sort((a, b) => b.matchScore - a.matchScore)
       .slice(0, limit);
 
-    const curatedMapped = curated.map((h) => ({
-      id: h.id,
-      source: "curated" as const,
-      title: h.title,
-      titleBn: h.titleBn,
-      summary: h.summary,
-      sourceName: h.sourceName,
-      sourceUrl: h.sourceUrl,
-      channel: h.channel,
-      matchedKeyword: h.matchedKeyword,
-      sentiment: h.sentiment,
-      propagandaFlag: h.propagandaFlag,
-      propagandaNote: h.propagandaNote,
-      propagandaConfidence: h.propagandaFlag ? 0.85 : 0.15,
-      publishedAt: h.publishedAt ?? h.createdAt,
-      ward: h.ward,
-      matchScore: 40,
-    }));
+    const curatedMapped = curated.map((h) => {
+      const tagged = decorateTopics(
+        entity.code,
+        `${h.title} ${h.summary ?? ""} ${h.titleBn ?? ""}`,
+      );
+      return {
+        id: h.id,
+        source: "curated" as const,
+        title: h.title,
+        titleBn: h.titleBn,
+        summary: h.summary,
+        sourceName: h.sourceName,
+        sourceUrl: h.sourceUrl,
+        channel: h.channel,
+        matchedKeyword: h.matchedKeyword,
+        sentiment: h.sentiment,
+        propagandaFlag: h.propagandaFlag,
+        propagandaNote: h.propagandaNote,
+        propagandaConfidence: h.propagandaFlag ? 0.85 : 0.15,
+        publishedAt: h.publishedAt ?? h.createdAt,
+        ward: h.ward,
+        matchScore: 40,
+        topics: tagged.topics,
+        places: tagged.places,
+      };
+    });
 
     const items = [...liveMatched, ...curatedMapped]
       .sort((a, b) => {

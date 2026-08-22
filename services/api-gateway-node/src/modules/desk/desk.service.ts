@@ -413,6 +413,11 @@ export class DeskService {
       }),
     ]);
 
+    const chronicComplaints = openComplaints;
+    const unrestCount = pulseOpen + (osintHot > 0 ? 1 : 0);
+    const politicsCount = pulseOpen;
+    const issueCount = outages + chronicComplaints;
+
     const dueActions: DeskDueAction[] = [];
     if (overdue > 0) {
       dueActions.push({
@@ -441,6 +446,9 @@ export class DeskService {
 
     const items: NavPulseItem[] = [
       item("localEntity", "/local", fieldHeat, 8, 1, `${openComplaints} open complaints · ${outages} outages · ${redAlerts} red`, `${openComplaints}টি খোলা অভিযোগ · ${outages}টি বিঘ্ন · ${redAlerts}টি রেড`),
+      item("localUnrest", "/local/unrest", unrestCount, 3, 1, `${unrestCount} local unrest & protest hits for this seat`, `${unrestCount}টি স্থানীয় আন্দোলন ও অসন্তোষের সংবাদ`),
+      item("localPolitics", "/local/politics", politicsCount, 3, 1, `${politicsCount} local party activities & rally hits`, `${politicsCount}টি দলীয় সমাবেশ ও স্থানীয় কর্মকাণ্ড`),
+      item("localIssues", "/local/issues", issueCount, 5, 1, `${issueCount} active chronic issues & outage tracks`, `${issueCount}টি চলমান দীর্ঘমেয়াদী সমস্যা ও বিঘ্ন`),
       item("localField", "/local/field", fieldHeat, 8, 1, `${openComplaints} open · ${overdue} overdue SLA · ${outages} outages`, `${openComplaints} খোলা · ${overdue} ওভারডিউ এসএলএ · ${outages} বিঘ্ন`),
       item("localComplaints", "/local/complaints", overdue + redAlerts, 3, 1, `${openComplaints} open Instant Action · ${overdue} past 24h SLA · ${redAlerts} red`, `${openComplaints}টি খোলা · ${overdue}টি ২৪ঘণ্টা এসএলএ পেরিয়েছে · ${redAlerts}টি রেড`),
       item("localHeatmap", "/local/heatmap", fieldHeat + osintHot, 10, 2, `${fieldHeat} ops pressure · ${osintHot} OSINT flags · ward heat live`, `${fieldHeat} অপস চাপ · ${osintHot} ওএসআইএনটি · ওয়ার্ড হিট লাইভ`),

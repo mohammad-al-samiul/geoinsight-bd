@@ -90,9 +90,12 @@ const NATIONAL_NAV: NavItem[] = [
 
 const LOCAL_NAV: NavItem[] = [
   { href: "/local", key: "localEntity", icon: Building2, minTier: 5 },
+  { href: "/local/unrest", key: "localUnrest", icon: Flame, minTier: 5 },
+  { href: "/local/politics", key: "localPolitics", icon: Users, minTier: 5 },
+  { href: "/local/issues", key: "localIssues", icon: AlertTriangle, minTier: 5 },
   { href: "/local/field", key: "localField", icon: Smartphone, minTier: 5 },
   { href: "/local/complaints", key: "localComplaints", icon: Siren, minTier: 5 },
-  { href: "/local/heatmap", key: "localHeatmap", icon: Flame, minTier: 5 },
+  { href: "/local/heatmap", key: "localHeatmap", icon: BarChart3, minTier: 5 },
   { href: "/local/visits", key: "localVisits", icon: CalendarDays, minTier: 5 },
   { href: "/local/wpi", key: "localWpi", icon: Gauge, minTier: 5 },
   { href: "/local/scorecard", key: "localScorecard", icon: Scale, minTier: 5 },

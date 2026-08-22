@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import {
@@ -22,12 +22,15 @@ import {
   LocalVizCard,
 } from "@/components/local-entity/local-viz";
 import { isPublicHttpUrl } from "@/components/local-entity/evidence-abstract-dialog";
-import { useLocalLiveIntel, uniqueLiveIntel, type DeskTopic, type LiveIntelItem } from "@/hooks/use-local-live-intel";
+import { useLocalLiveIntel, uniqueLiveIntel, itemHasCrossTopic, CROSS_TOPIC_FILTERS, type CrossTopicFilter, type DeskTopic, type LiveIntelItem } from "@/hooks/use-local-live-intel";
 import { cn } from "@/lib/utils";
 import { enterDelay } from "@/lib/motion";
 import { motion } from "framer-motion";
 
 const PATH_TOPICS: Array<{ prefix: string; topic: DeskTopic }> = [
+  { prefix: "/local/unrest", topic: "UNREST" },
+  { prefix: "/local/politics", topic: "PARTY" },
+  { prefix: "/local/issues", topic: "ISSUE" },
   { prefix: "/local/education", topic: "EDUCATION" },
   { prefix: "/local/health", topic: "HEALTH" },
   { prefix: "/local/jobs", topic: "EMPLOYMENT" },
@@ -66,6 +69,8 @@ const TOPIC_KEYS: Record<DeskTopic, string> = {
   SPECIALTY: "specialty",
   BUDGET: "budget",
   UNREST: "unrest",
+  PARTY: "party",
+  ISSUE: "issue",
 };
 
 function topicForPath(pathname: string): DeskTopic | null {
@@ -99,6 +104,37 @@ const ORIGIN_META = {
     pill: "border-amber-400/25 bg-amber-400/10 text-amber-100",
   },
 } as const;
+
+const CHIP_TONE: Partial<Record<Exclude<DeskTopic, "ALL">, string>> = {
+  UNREST: "border-rose-400/30 bg-rose-400/10 text-rose-200",
+  PARTY: "border-amber-400/30 bg-amber-400/10 text-amber-200",
+  ISSUE: "border-sky-400/30 bg-sky-400/10 text-sky-200",
+};
+
+const CHIP_ORDER: Array<Exclude<DeskTopic, "ALL">> = [
+  "UNREST",
+  "PARTY",
+  "ISSUE",
+  "EDUCATION",
+  "HEALTH",
+  "EMPLOYMENT",
+  "CRIME",
+  "CORRUPTION",
+  "OUTAGE",
+  "CIVIC",
+  "BUDGET",
+  "PULSE",
+  "SPECIALTY",
+];
+
+function orderedTags(topics: Array<Exclude<DeskTopic, "ALL">>): Array<Exclude<DeskTopic, "ALL">> {
+  const set = new Set(topics);
+  const out: Array<Exclude<DeskTopic, "ALL">> = [];
+  for (const key of CHIP_ORDER) {
+    if (set.has(key)) out.push(key);
+  }
+  return out.slice(0, 5);
+}
 
 function HeadlineCard({
   row,
@@ -150,6 +186,25 @@ function HeadlineCard({
             {row.keyword}
           </span>
         ) : null}
+        {orderedTags(row.topics).map((tag) => (
+          <span
+            key={tag}
+            className={cn(
+              "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+              CHIP_TONE[tag] ?? "border-white/10 bg-white/[0.04] text-muted-foreground",
+            )}
+          >
+            {t(TOPIC_KEYS[tag])}
+          </span>
+        ))}
+        {(row.places ?? []).slice(0, 2).map((place) => (
+          <span
+            key={place}
+            className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-200/90"
+          >
+            {place}
+          </span>
+        ))}
       </span>
       <span className="mt-3 block font-display text-[15px] font-semibold leading-snug tracking-tight text-foreground">
         {row.title}
@@ -223,6 +278,7 @@ export function LocalDeskIntel() {
   const locale = useLocale();
   const isBn = locale.startsWith("bn");
   const { data, loading } = useLocalLiveIntel(topic ?? "ALL", enabled);
+  const [crossFilter, setCrossFilter] = useState<"ALL" | CrossTopicFilter>("ALL");
 
   const sentimentPie = useMemo(() => {
     if (!data) return [];
@@ -255,12 +311,18 @@ export function LocalDeskIntel() {
   );
 
   const primaryItems = useMemo(
-    () => uniqueLiveIntel((data?.items ?? []).filter((r) => !r.related)).slice(0, 18),
-    [data?.items],
+    () =>
+      uniqueLiveIntel((data?.items ?? []).filter((r) => !r.related))
+        .filter((r) => itemHasCrossTopic(r, crossFilter))
+        .slice(0, 18),
+    [data?.items, crossFilter],
   );
   const relatedItems = useMemo(
-    () => uniqueLiveIntel((data?.items ?? []).filter((r) => r.related)).slice(0, 8),
-    [data?.items],
+    () =>
+      uniqueLiveIntel((data?.items ?? []).filter((r) => r.related))
+        .filter((r) => itemHasCrossTopic(r, crossFilter))
+        .slice(0, 8),
+    [data?.items, crossFilter],
   );
 
   if (!enabled) return null;
@@ -291,6 +353,28 @@ export function LocalDeskIntel() {
         <p className="text-[10px] text-muted-foreground">
           {data.entityCode} · {new Date(data.generatedAt).toLocaleTimeString()}
         </p>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {(["ALL", ...CROSS_TOPIC_FILTERS] as const).map((key) => {
+          const active = crossFilter === key;
+          const label = key === "ALL" ? t("filterAll") : t(TOPIC_KEYS[key]);
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setCrossFilter(key)}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
+                active
+                  ? "border-primary/40 bg-primary/15 text-primary"
+                  : "border-white/10 bg-white/[0.03] text-muted-foreground hover:border-white/20 hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {data.summary.total === 0 ? (
@@ -355,6 +439,7 @@ export function LocalDeskIntel() {
             </LocalVizCard>
           ) : null}
 
+          {primaryItems.length > 0 ? (
           <LocalVizCard title={t("headlines")} delay={0.16}>
             <div className="grid gap-3 sm:grid-cols-2">
               {primaryItems.map((row, i) => (
@@ -362,6 +447,7 @@ export function LocalDeskIntel() {
               ))}
             </div>
           </LocalVizCard>
+          ) : null}
 
           {relatedItems.length > 0 ? (
             <LocalVizCard title={t("related")} delay={0.2}>
@@ -371,6 +457,10 @@ export function LocalDeskIntel() {
               ))}
               </div>
             </LocalVizCard>
+          ) : primaryItems.length === 0 ? (
+            <p className="rounded-xl border border-border/50 bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
+              {t("emptyFilter")}
+            </p>
           ) : null}
 
           {topicBars.length > 1 ? (

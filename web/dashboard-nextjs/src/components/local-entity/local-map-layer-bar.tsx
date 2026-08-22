@@ -101,7 +101,65 @@ export function LocalMapLayerBar({
   ];
 
   return (
-    <div className="mb-3 space-y-2 rounded-xl border border-border/50 bg-background/30 p-3">
+    <div className="space-y-2 rounded-xl border border-border/50 bg-background/30 p-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border/30 pb-2">
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
+          <Layers3 className="h-3.5 w-3.5" />
+          {isBn ? "কুইক লেয়ার প্রিসেট:" : "Quick Presets:"}
+        </span>
+        <button
+          type="button"
+          onClick={() => onReset()}
+          className="rounded border border-border/60 bg-secondary/30 px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-secondary"
+        >
+          {isBn ? "সব লেয়ার (All)" : "All Layers"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onReset();
+            onToggleLayer("UNREST");
+          }}
+          className="rounded border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300 hover:bg-amber-500/25"
+        >
+          🔥 {isBn ? "আন্দোলন (Unrest)" : "Unrest"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onReset();
+            onToggleLayer("POWER");
+            onToggleLayer("DRAINAGE");
+            onToggleLayer("ROAD");
+            onToggleLayer("WATER");
+          }}
+          className="rounded border border-sky-500/40 bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-300 hover:bg-sky-500/25"
+        >
+          ⚡ {isBn ? "সিভিক (Civic)" : "Civic Infrastructure"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onReset();
+            onToggleLayer("CRIME");
+            onToggleLayer("CORRUPTION");
+          }}
+          className="rounded border border-red-500/40 bg-red-500/15 px-2 py-0.5 text-[11px] font-medium text-red-300 hover:bg-red-500/25"
+        >
+          🛡️ {isBn ? "অপরাধ (Crime)" : "Crime"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onReset();
+            onToggleLayer("PARTY");
+          }}
+          className="rounded border border-purple-500/40 bg-purple-500/15 px-2 py-0.5 text-[11px] font-medium text-purple-300 hover:bg-purple-500/25"
+        >
+          🚩 {isBn ? "দল (Party)" : "Party Politics"}
+        </button>
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           <Layers3 className="h-3.5 w-3.5 text-primary" />

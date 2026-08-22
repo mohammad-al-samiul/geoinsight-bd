@@ -554,6 +554,8 @@ export class LocalEntityModule extends BaseModule {
               "SPECIALTY",
               "BUDGET",
               "UNREST",
+              "PARTY",
+              "ISSUE",
             ])
             .optional(),
           limit: z.coerce.number().int().min(1).max(80).optional(),
@@ -576,7 +578,9 @@ export class LocalEntityModule extends BaseModule {
             | "PULSE"
             | "SPECIALTY"
             | "BUDGET"
-            | "UNREST";
+            | "UNREST"
+            | "PARTY"
+            | "ISSUE";
           limit?: number;
         };
         const data = await localDeskIntelService.getFeed(

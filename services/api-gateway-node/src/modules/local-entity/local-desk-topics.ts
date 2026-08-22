@@ -13,7 +13,9 @@ export type DeskTopic =
   | "PULSE"
   | "SPECIALTY"
   | "BUDGET"
-  | "UNREST";
+  | "UNREST"
+  | "PARTY"
+  | "ISSUE";
 
 export const DESK_TOPICS: DeskTopic[] = [
   "EDUCATION",
@@ -28,7 +30,12 @@ export const DESK_TOPICS: DeskTopic[] = [
   "SPECIALTY",
   "BUDGET",
   "UNREST",
+  "PARTY",
+  "ISSUE",
 ];
+
+export const CROSS_TOPICS = ["UNREST", "PARTY", "ISSUE"] as const;
+export type CrossTopic = (typeof CROSS_TOPICS)[number];
 
 const TOPIC_KEYWORDS: Record<Exclude<DeskTopic, "ALL" | "OSINT">, string[]> = {
   EDUCATION: [
@@ -215,11 +222,62 @@ const TOPIC_KEYWORDS: Record<Exclude<DeskTopic, "ALL" | "OSINT">, string[]> = {
     "unrest",
     "blockade",
     "strike",
+    "hartal",
+    "procession",
+    "rally",
+    "sit-in",
     "বিক্ষোভ",
     "সংঘর্ষ",
     "অবরোধ",
     "ধর্মঘট",
     "অসন্তোষ",
+    "হরতাল",
+    "মিছিল",
+    "সমাবেশ",
+    "আন্দোলন",
+  ],
+  PARTY: [
+    "bnp",
+    "awami league",
+    "awami",
+    "jamaat",
+    "jamaat-e-islami",
+    "jatiya party",
+    "ncp",
+    "chatra dal",
+    "chhatra dal",
+    "chhatra league",
+    "student league",
+    "jubo league",
+    "shibir",
+    "বিএনপি",
+    "আওয়ামী লীগ",
+    "আওয়ামী লীগ",
+    "জামায়াত",
+    "জামায়াত",
+    "ছাত্রদল",
+    "ছাত্রলীগ",
+    "যুবলীগ",
+    "শিবির",
+    "স্বেচ্ছাসেবক লীগ",
+    "জাতীয় পার্টি",
+  ],
+  ISSUE: [
+    "waterlog",
+    "waterlogging",
+    "chronic",
+    "recurring",
+    "hill cutting",
+    "drain collapse",
+    "pothole",
+    "traffic jam",
+    "জলাবদ্ধ",
+    "জলাবদ্ধতা",
+    "পাহাড় কাটা",
+    "দীর্ঘদিন",
+    "পুরনো সমস্যা",
+    "যানজট",
+    "নালা ধস",
   ],
 };
 
@@ -418,26 +476,104 @@ export function matchEntity(
 
 export type TopicHit = { topic: Exclude<DeskTopic, "ALL">; score: number; keyword: string };
 
+export function extractActors(text: string): string[] {
+  const blob = norm(text);
+  const actors: string[] = [];
+  if (/(police|rab|bgb|law enforcement|পুলিশ|র‌্যাব|বিজিবি|আইনশৃঙ্খলা|থানা)/.test(blob)) actors.push("POLICE");
+  if (/(student|university|college|school|chhatra|shibir|ছাত্র|শিক্ষার্থী|বিশ্ববিদ্যালয়|ছাত্রদল|ছাত্রলীগ)/.test(blob)) actors.push("STUDENT");
+  if (/(worker|labour|labor|garment|epz|driver|transport|শ্রমিক|গার্মেন্টস|কারখানা|পরিবহন|চালক)/.test(blob)) actors.push("WORKER");
+  if (/(trader|merchant|shopkeeper|market|hawker|ব্যবসায়ী|দোকানদার|হকার|বাজার)/.test(blob)) actors.push("BUSINESS");
+  if (/(resident|villager|citizen|naagrik|নাগরিক|বাসিন্দা|এলাকাবাসী)/.test(blob)) actors.push("CITIZEN");
+  return actors;
+}
+
+export function extractIntensity(text: string): "HIGH" | "MEDIUM" | "LOW" {
+  const blob = norm(text);
+  if (/(clash|fire|arson|blockade|violence|death|injured|murder|সংঘর্ষ|আগুন|অগ্নিকাণ্ড|অবরোধ|ভাঙচুর|হত্যাকাণ্ড|আহত|ধাওয়া-পাল্টা ধাওয়া)/.test(blob)) {
+    return "HIGH";
+  }
+  if (/(protest|procession|rally|sit-in|demonstration|strike|hartal|বিক্ষোভ|মিছিল|সমাবেশ|হরতাল|মানববন্ধন|স্লোগান)/.test(blob)) {
+    return "MEDIUM";
+  }
+  return "LOW";
+}
+
+const PROTEST_CONTEXT_RE =
+  /(protest|unrest|blockade|strike|hartal|procession|rally|sit-in|demonstration|demand|memorandum|বিক্ষোভ|অবরোধ|ধর্মঘট|অসন্তোষ|হরতাল|মিছিল|সমাবেশ|আন্দোলন|স্মারকলিপি|দাবি|মানববন্ধন|ব্যানার)/;
+
+const PARTY_ACTIVITY_RE =
+  /(rally|meeting|procession|campaign|statement|leader|candidate|outreach|faction|clash|সমাবেশ|মিছিল|সভা|প্রচার|গণসংযোগ|বক্তব্য|সংবাদ সম্মেলন|নেতা|প্রার্থী|কোন্দল|সংঘর্ষ|মহড়া|পদযাত্রা)/;
+
+const INAUGURATION_ROUTINE_RE =
+  /(inaugurat|opening|launch|foundation|inspect|mayor|commissioner|project|উদ্বোধন|প্রকল্প|পরিদর্শন|মেয়র|ভিত্তিপত্র|ইনফ্রাস্ট্রাকচার|উন্নয়ন কাজ)/;
+
 export function classifyTopics(text: string): TopicHit[] {
   const blob = norm(text);
-  const hits: TopicHit[] = [];
+  const rawHits: Record<string, { score: number; keyword: string }> = {};
+
   for (const topic of Object.keys(TOPIC_KEYWORDS) as Array<keyof typeof TOPIC_KEYWORDS>) {
     let score = 0;
     let keyword = "";
     for (const kw of TOPIC_KEYWORDS[topic]) {
-      if (blob.includes(kw.toLowerCase())) {
-        score += Math.min(10, Math.max(3, kw.length));
-        if (!keyword) keyword = kw;
+      if (!textHasKeyword(blob, kw)) continue;
+      score += Math.min(10, Math.max(3, kw.length));
+      if (!keyword) keyword = kw;
+    }
+    if (score > 0) rawHits[topic] = { score, keyword };
+  }
+
+  // Precision Rule 1: "Clash/সংঘর্ষ" distinction
+  const hasClash = textHasKeyword(blob, "clash") || textHasKeyword(blob, "সংঘর্ষ");
+  const hasProtestContext = PROTEST_CONTEXT_RE.test(blob);
+  if (hasClash) {
+    if (hasProtestContext) {
+      // Unrest clash: Boost UNREST, don't count purely as CRIME
+      if (rawHits.UNREST) rawHits.UNREST.score += 8;
+      else rawHits.UNREST = { score: 10, keyword: "clash" };
+      if (rawHits.CRIME) {
+        rawHits.CRIME.score = Math.max(0, rawHits.CRIME.score - 6);
+        if (rawHits.CRIME.score === 0) delete rawHits.CRIME;
+      }
+    } else {
+      // Non-protest clash: Keep under CRIME, prevent UNREST from triggering solely on "clash"
+      if (!hasProtestContext && rawHits.UNREST) {
+        const otherUnrestKw = TOPIC_KEYWORDS.UNREST.some(
+          (k) => k !== "clash" && k !== "সংঘর্ষ" && textHasKeyword(blob, k),
+        );
+        if (!otherUnrestKw) delete rawHits.UNREST;
       }
     }
-    if (score > 0) hits.push({ topic, score, keyword });
   }
+
+  // Precision Rule 2: "Party/দল" distinction
+  if (rawHits.PARTY) {
+    const hasPartyActivity = PARTY_ACTIVITY_RE.test(blob);
+    const isMayorInauguration = INAUGURATION_ROUTINE_RE.test(blob);
+    if (isMayorInauguration && !hasPartyActivity) {
+      delete rawHits.PARTY;
+    }
+  }
+
+  const hits: TopicHit[] = Object.entries(rawHits).map(([topic, data]) => ({
+    topic: topic as Exclude<DeskTopic, "ALL">,
+    score: data.score,
+    keyword: data.keyword,
+  }));
+
+  const hasCivic = hits.some((h) => h.topic === "CIVIC" || h.topic === "OUTAGE");
+  if (hasCivic && !hits.some((h) => h.topic === "ISSUE")) {
+    hits.push({ topic: "ISSUE", score: 8, keyword: "issue" });
+  }
+
   hits.sort((a, b) => b.score - a.score);
   return hits;
 }
 
+const CROSS_SET = new Set<string>(CROSS_TOPICS);
+
 export function primaryTopic(hits: TopicHit[]): Exclude<DeskTopic, "ALL"> {
-  return hits[0]?.topic ?? "OSINT";
+  const desk = hits.find((h) => !CROSS_SET.has(h.topic));
+  return desk?.topic ?? hits[0]?.topic ?? "OSINT";
 }
 
 export function topicMatches(filter: DeskTopic, hits: TopicHit[]): boolean {
@@ -446,12 +582,78 @@ export function topicMatches(filter: DeskTopic, hits: TopicHit[]): boolean {
     return hits.some((h) => h.topic === "PULSE" || h.topic === "UNREST");
   }
   if (filter === "CIVIC") {
-    return hits.some((h) => h.topic === "CIVIC" || h.topic === "OUTAGE");
+    return hits.some((h) => h.topic === "CIVIC" || h.topic === "OUTAGE" || h.topic === "ISSUE");
+  }
+  if (filter === "ISSUE") {
+    return hits.some((h) => h.topic === "ISSUE" || h.topic === "CIVIC" || h.topic === "OUTAGE");
+  }
+  if (filter === "UNREST") {
+    return hits.some((h) => h.topic === "UNREST" || h.topic === "PULSE");
+  }
+  if (filter === "PARTY") {
+    return hits.some((h) => h.topic === "PARTY" || h.topic === "PULSE");
   }
   if (filter === "SPECIALTY") {
     return hits.some((h) => h.topic === "SPECIALTY" || h.topic === "CIVIC" || h.topic === "OUTAGE");
   }
   return hits.some((h) => h.topic === filter);
+}
+
+export function unionTopics(
+  ...lists: Array<Array<Exclude<DeskTopic, "ALL">>>
+): Array<Exclude<DeskTopic, "ALL">> {
+  const seen = new Set<Exclude<DeskTopic, "ALL">>();
+  const out: Array<Exclude<DeskTopic, "ALL">> = [];
+  for (const list of lists) {
+    for (const topic of list) {
+      if (seen.has(topic)) continue;
+      seen.add(topic);
+      out.push(topic);
+    }
+  }
+  return out;
+}
+
+export function placeHits(code: string, text: string): string[] {
+  const blob = norm(text);
+  const out: string[] = [];
+  for (const k of entityKeywords(code)) {
+    if (k.length < 4) continue;
+    if (/^(ctg-|chattogram-|chittagong-|ccc mayor|cocc)/.test(k)) continue;
+    if (k.includes("city corporation") || k.includes("সিটি কর্পোরেশন")) continue;
+    if (k.includes(" wards") || k.includes("ওয়ার্ড")) continue;
+    if (!textHasKeyword(blob, k)) continue;
+    if (!out.includes(k)) out.push(k);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+export function decorateTopics(
+  entityCode: string,
+  text: string,
+  base: Array<Exclude<DeskTopic, "ALL">> = [],
+): {
+  topics: Array<Exclude<DeskTopic, "ALL">>;
+  places: string[];
+  keyword: string | null;
+  primary: Exclude<DeskTopic, "ALL">;
+  actors: string[];
+  intensity: "HIGH" | "MEDIUM" | "LOW";
+} {
+  const hits = classifyTopics(text);
+  const topics = unionTopics(base, hits.map((h) => h.topic));
+  const places = placeHits(entityCode, text);
+  const actors = extractActors(text);
+  const intensity = extractIntensity(text);
+  return {
+    topics,
+    places,
+    keyword: hits[0]?.keyword ?? places[0] ?? null,
+    primary: primaryTopic(hits) !== "OSINT" ? primaryTopic(hits) : (base[0] ?? "OSINT"),
+    actors,
+    intensity,
+  };
 }
 
 export function specialtyModuleId(catalog: LocalEntityDefinition | null, text: string): string | null {

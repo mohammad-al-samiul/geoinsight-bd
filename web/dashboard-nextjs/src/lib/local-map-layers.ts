@@ -21,16 +21,28 @@ export const MAP_LAYERS = [
   "HEALTH",
   "UNEMPLOYMENT",
   "UNREST",
+  "PARTY",
   "OTHER",
 ] as const;
 export type MapLayerId = (typeof MAP_LAYERS)[number];
 
 export const UNREST_LAYERS: MapLayerId[] = ["UNREST"];
+export const CIVIC_LAYERS: MapLayerId[] = [
+  "POWER",
+  "GAS",
+  "FUEL",
+  "WATER",
+  "DRAINAGE",
+  "ROAD",
+  "INTERNET",
+  "COMPLAINT",
+];
+export const CRIME_LAYERS: MapLayerId[] = ["CRIME", "CORRUPTION"];
+export const PARTY_LAYERS: MapLayerId[] = ["PARTY"];
 
 export const EDUCATION_LAYERS: MapLayerId[] = ["EDUCATION"];
 export const HEALTH_LAYERS: MapLayerId[] = ["HEALTH"];
 export const JOBS_LAYERS: MapLayerId[] = ["UNEMPLOYMENT"];
-export const CRIME_LAYERS: MapLayerId[] = ["CRIME"];
 export const CORRUPTION_LAYERS: MapLayerId[] = ["CORRUPTION"];
 
 export const COMMAND_LAYERS: MapLayerId[] = [...MAP_LAYERS];
@@ -79,6 +91,7 @@ export const LAYER_COLORS: Record<MapLayerId, string> = {
   HEALTH: "#2dd4bf",
   UNEMPLOYMENT: "#f59e0b",
   UNREST: "#fb923c",
+  PARTY: "#a855f7",
   OTHER: "#94a3b8",
 };
 

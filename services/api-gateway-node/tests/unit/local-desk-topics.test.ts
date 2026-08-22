@@ -1,4 +1,10 @@
-import { matchEntity } from "../../src/modules/local-entity/local-desk-topics";
+import {
+  classifyTopics,
+  extractActors,
+  extractIntensity,
+  matchEntity,
+  topicMatches,
+} from "../../src/modules/local-entity/local-desk-topics";
 
 function hit(code: string, text: string, district?: string) {
   return matchEntity(code, district ?? null, null, text).hit;
@@ -48,5 +54,51 @@ describe("matchEntity seat isolation", () => {
     expect(hit("COCC", "Cumilla city corporation tax drive")).toBe(true);
     expect(hit("COCC", "Chittagong port congestion", "Chattogram")).toBe(false);
     expect(hit("COCC", "Dhaka metro delay", "Dhaka")).toBe(false);
+  });
+});
+
+describe("classifyTopics multi-label and Phase 4 precision rules", () => {
+  const topicsOf = (text: string) => classifyTopics(text).map((h) => h.topic);
+
+  it("tags movement, party, and civic issue together", () => {
+    const tags = topicsOf("BNP rally and hartal in Panchlaish after drain waterlogging");
+    expect(tags).toEqual(expect.arrayContaining(["UNREST", "PARTY", "CIVIC", "ISSUE"]));
+  });
+
+  it("does not tag a school closure as party politics", () => {
+    const tags = topicsOf("Panchlaish primary school closed after rain");
+    expect(tags).toContain("EDUCATION");
+    expect(tags).not.toContain("PARTY");
+  });
+
+  it("distinguishes protest clash from criminal clash", () => {
+    const unrestClash = topicsOf("পঞ্চলাইশে বিক্ষোভ মিছিল ও পুলিশের সঙ্গে সংঘর্ষ");
+    expect(unrestClash).toContain("UNREST");
+
+    const criminalClash = topicsOf("পঞ্চলাইশে ছিনতাই নিয়ে ২ দলের মধ্যে মারামারি ও সংঘর্ষ");
+    expect(criminalClash).toContain("CRIME");
+  });
+
+  it("filters out party tag on mayor routine project inaugurations", () => {
+    const tags = topicsOf("মেয়র উদ্বোধন করলেন পঞ্চলাইশের নতুন সড়ক উন্নয়ন প্রকল্প");
+    expect(tags).not.toContain("PARTY");
+  });
+
+  it("extracts actor tags and intensity levels correctly", () => {
+    const actors = extractActors("পঞ্চলাইশে ছাত্রলীগের মিছিলের সময় পুলিশের লাঠিচার্জ");
+    expect(actors).toEqual(expect.arrayContaining(["POLICE", "STUDENT"]));
+
+    const highIntensity = extractIntensity("অবরোধের সময় গাড়িতে আগুন ও সংঘর্ষ");
+    expect(highIntensity).toBe("HIGH");
+
+    const mediumIntensity = extractIntensity("পঞ্চলাইশ গোলচত্বরে শিক্ষার্থীদের বিক্ষোভ মিছিল");
+    expect(mediumIntensity).toBe("MEDIUM");
+  });
+
+  it("matches unrest and issue filters", () => {
+    const hits = classifyTopics("হরতাল ও মিছিল পঞ্চলাইশে");
+    expect(topicMatches("UNREST", hits)).toBe(true);
+    const civic = classifyTopics("পঞ্চলাইশে জলাবদ্ধতা");
+    expect(topicMatches("ISSUE", civic)).toBe(true);
   });
 });

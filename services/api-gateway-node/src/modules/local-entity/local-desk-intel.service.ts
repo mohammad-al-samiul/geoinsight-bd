@@ -14,9 +14,11 @@ import { resolveLocalEntityId } from "./local-entity.scope";
 import { integrityOpsHint, outageOpsHint, sectorOpsHint } from "./ops-solutions";
 import {
   classifyTopics,
+  decorateTopics,
   matchEntity,
   primaryTopic,
   topicMatches,
+  unionTopics,
   type DeskTopic,
   type TopicHit,
 } from "./local-desk-topics";
@@ -32,6 +34,7 @@ export type LiveIntelItem = {
   publishedAt: string;
   topic: Exclude<DeskTopic, "ALL">;
   topics: Array<Exclude<DeskTopic, "ALL">>;
+  places?: string[];
   local: boolean;
   related: boolean;
   origin: LiveIntelOrigin;
@@ -140,6 +143,8 @@ function mergeStory(keep: LiveIntelItem, extra: LiveIntelItem): LiveIntelItem {
     primary.related = other.related;
   }
   if (!primary.summary && other.summary) primary.summary = other.summary;
+  primary.topics = unionTopics(primary.topics, other.topics);
+  primary.places = [...new Set([...(primary.places ?? []), ...(other.places ?? [])])].slice(0, 4);
   return primary;
 }
 
@@ -261,8 +266,7 @@ export class LocalDeskIntelService {
       const hits: TopicHit[] = classifyTopics(blob);
       const onTopic = topicMatches(topic, hits) || topic === "ALL" || topic === "OSINT";
       for (const print of prints) seen.add(print);
-      const topics = hits.map((h) => h.topic);
-      if (!topics.includes("OSINT")) topics.push("OSINT");
+      const decorated = decorateTopics(entity.code, blob, ["OSINT"]);
       const row: LiveIntelItem = {
         id,
         title,
@@ -271,7 +275,8 @@ export class LocalDeskIntelService {
         url,
         publishedAt: publishedAt.toISOString(),
         topic: primaryTopic(hits),
-        topics,
+        topics: decorated.topics,
+        places: decorated.places,
         local: match.local,
         related: !onTopic,
         origin: onTopic ? "news" : "related",
@@ -349,7 +354,9 @@ export class LocalDeskIntelService {
     const actionSeen = new Set<string>();
 
     for (const row of items) {
-      byTopic[row.topic] = (byTopic[row.topic] ?? 0) + 1;
+      for (const tag of row.topics.length ? row.topics : [row.topic]) {
+        byTopic[tag] = (byTopic[tag] ?? 0) + 1;
+      }
       bySource[row.sourceName] = (bySource[row.sourceName] ?? 0) + 1;
       const day = dayKey(row.publishedAt);
       dailyMap.set(day, (dailyMap.get(day) ?? 0) + 1);
@@ -409,14 +416,26 @@ export class LocalDeskIntelService {
   }
 
   private async opsItems(entityId: string, entityCode: string, topic: DeskTopic): Promise<LiveIntelItem[]> {
-    const want = (t: DeskTopic) => topic === "ALL" || topic === t || (topic === "CIVIC" && t === "OUTAGE");
-    const cap = (n: number) => (topic === "ALL" ? Math.min(6, n) : n);
+    const cross = topic === "UNREST" || topic === "PARTY" || topic === "ISSUE";
+    const want = (t: DeskTopic) =>
+      topic === "ALL" || topic === t || cross || (topic === "CIVIC" && t === "OUTAGE");
+    const cap = (n: number) => (topic === "ALL" || cross ? Math.min(6, n) : n);
     const out: LiveIntelItem[] = [];
     const seatNews = (title: string, detail: string | null | undefined) =>
       matchEntity(entityCode, null, null, `${title} ${detail ?? ""}`).hit;
 
     const push = (row: LiveIntelItem) => {
-      out.push(row);
+      const decorated = decorateTopics(entityCode, `${row.title} ${row.summary ?? ""}`, row.topics);
+      const next: LiveIntelItem = {
+        ...row,
+        topics: decorated.topics,
+        places: decorated.places,
+        keyword: row.keyword ?? decorated.keyword,
+      };
+      if (cross && !topicMatches(topic, decorated.topics.map((t) => ({ topic: t, score: 1, keyword: "" })))) {
+        return;
+      }
+      out.push(next);
     };
 
     if (want("EDUCATION") || want("HEALTH") || want("EMPLOYMENT") || topic === "ALL") {

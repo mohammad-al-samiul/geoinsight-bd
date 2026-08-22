@@ -40,6 +40,7 @@ import {
 } from "@/components/local-entity/local-viz";
 import { LocalWardMap } from "@/components/local-entity/local-ward-map";
 import { LocalMorningBriefPanel } from "@/components/local-entity/local-morning-brief";
+import { LocalHomeSummaryBlock } from "@/components/local-entity/local-home-summary-block";
 import { LocalFreshnessBadge } from "@/components/local-entity/local-freshness-badge";
 import { PmoLocalSectorLeagueSnippets } from "@/components/dashboard/pmo-local-sector-league";
 import { PmoLocalCommandSnippets } from "@/components/dashboard/pmo-local-command-strip";
@@ -433,6 +434,8 @@ export function LocalEntityPanel() {
         </div>
         <LocalQuickNav items={quickNav} />
       </MotionSection>
+
+      <LocalHomeSummaryBlock />
 
       {/* PMO multi-entity brief when no single entity selected */}
       {user.role === "PMO" && !entityKey ? (

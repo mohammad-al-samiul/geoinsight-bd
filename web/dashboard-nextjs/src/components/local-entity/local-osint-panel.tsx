@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useLocalOsint } from "@/hooks/use-local-osint-pulse";
 import { useLocalEntityId } from "@/hooks/use-local-entity-id";
+import { CROSS_TOPIC_FILTERS, itemHasCrossTopic, type CrossTopicFilter } from "@/hooks/use-local-live-intel";
 import { cn } from "@/lib/utils";
 
 function sentimentClass(s: string) {
@@ -42,6 +43,7 @@ export function LocalOsintPanel() {
   const isBn = locale.startsWith("bn");
   const entityId = useLocalEntityId();
   const [propagandaOnly, setPropagandaOnly] = useState(false);
+  const [crossFilter, setCrossFilter] = useState<"ALL" | CrossTopicFilter>("ALL");
 
   const { data, error, loading, reload } = useLocalOsint(entityId, propagandaOnly);
 
@@ -75,6 +77,11 @@ export function LocalOsintPanel() {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
   }, [data?.items]);
+
+  const filteredItems = useMemo(
+    () => (data?.items ?? []).filter((row) => itemHasCrossTopic(row, crossFilter)),
+    [data?.items, crossFilter],
+  );
 
   const riskPie = useMemo(() => {
     if (!data) return [];
@@ -147,6 +154,26 @@ export function LocalOsintPanel() {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
+          {(["ALL", ...CROSS_TOPIC_FILTERS] as const).map((key) => {
+            const active = crossFilter === key;
+            const label =
+              key === "ALL" ? t("filterAll") : key === "UNREST" ? t("unrest") : key === "PARTY" ? t("party") : t("issue");
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setCrossFilter(key)}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
+                  active
+                    ? "border-primary/40 bg-primary/15 text-primary"
+                    : "border-white/10 bg-white/[0.03] text-muted-foreground hover:border-white/20 hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
           {(data?.keywords ?? []).slice(0, 8).map((kw) => (
             <Link
               key={kw}
@@ -208,6 +235,28 @@ export function LocalOsintPanel() {
                 <p className="line-clamp-1 text-[11px] text-muted-foreground">
                   {row.summary}
                 </p>
+                {(row.topics?.length || row.places?.length) ? (
+                  <p className="mt-1 flex flex-wrap gap-1">
+                    {(row.topics ?? [])
+                      .filter((tag) => tag === "UNREST" || tag === "PARTY" || tag === "ISSUE")
+                      .map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                        >
+                          {tag === "UNREST" ? t("unrest") : tag === "PARTY" ? t("party") : t("issue")}
+                        </span>
+                      ))}
+                    {(row.places ?? []).slice(0, 2).map((place) => (
+                      <span
+                        key={place}
+                        className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5 text-[10px] text-emerald-200/90"
+                      >
+                        {place}
+                      </span>
+                    ))}
+                  </p>
+                ) : null}
               </div>
             ),
           },
@@ -265,7 +314,7 @@ export function LocalOsintPanel() {
             ),
           },
         ]}
-        rows={data?.items ?? []}
+        rows={filteredItems}
       />
     </ModuleShell>
   );
