@@ -95,6 +95,19 @@ describe("classifyTopics multi-label and Phase 4 precision rules", () => {
     expect(mediumIntensity).toBe("MEDIUM");
   });
 
+  it("tags gas/power crisis and exam postponement correctly as ISSUE and UNREST", () => {
+    const powerIssue = topicsOf("পঞ্চলাইশে বিদ্যুৎ ও গ্যাস সংকট নিয়ে সড়ক অবরোধ ও আন্দোলন");
+    expect(powerIssue).toEqual(expect.arrayContaining(["ISSUE", "UNREST"]));
+
+    const examIssue = topicsOf("এইচএসসি পরীক্ষা স্থগিতের দাবিতে শিক্ষার্থীদের বিক্ষোভ মিছিল");
+    expect(examIssue).toEqual(expect.arrayContaining(["ISSUE", "UNREST"]));
+  });
+
+  it("tags opposition party anti-gov programs as PARTY and UNREST", () => {
+    const partyProgram = topicsOf("জামায়াত ও এনসিপির সরকার বিরোধী সমাবেশ ও বিক্ষোভ কর্মসূচি");
+    expect(partyProgram).toEqual(expect.arrayContaining(["PARTY", "UNREST"]));
+  });
+
   it("matches unrest and issue filters", () => {
     const hits = classifyTopics("হরতাল ও মিছিল পঞ্চলাইশে");
     expect(topicMatches("UNREST", hits)).toBe(true);
